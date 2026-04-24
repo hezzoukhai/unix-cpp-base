@@ -1,0 +1,342 @@
+
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      pcrd_billing.pc                                                        */
+/*                                                                             */
+/* Description                                                                 */
+/*      Billing Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#include <langue.h>
+#include <dbl_billing.h>
+#include <paramdef.h>
+#include <iso_hps.h>
+#include <param_ctx.h>
+#include <thr_ndc_extern.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+  /***********************************************************************
+  **  nom	: GetBillingCreditList()											**
+  **  desc	: chargement des comptes d'un porteur					**
+  **  entree	: P7IsoInfo	-> tampon PowerSEVEN					**
+  **		  	firstBillingSeq-> sequence du premier compte			**
+  **  sortie	: billingList	-> liste de six comptes				**
+  **		  billingListSize-> nombre de comptes charge			**
+  **  retour	: OK	-> chargement reussi						**
+  **		  NOK	-> chargement de 1 compte						**
+  **		  ERROR	-> erreur fatal									**
+  ***********************************************************************/
+GetBillingCreditList(	nIndexCtx,
+				P7IsoInfo, 
+				firstBillingSeq, 
+				pTransCode, 
+				billingList, 
+				billingListSize)
+
+int			nIndexCtx;
+TSIsoInfo   *P7IsoInfo;
+int			firstBillingSeq;
+char		pTransCode;
+billing_s	billingList	[  6];
+int			*billingListSize;
+{
+   struct sqlca sqlca;
+int		cpt;
+char 	sLine[MAX_LINE_TRC];
+char 	tmpField[LG_MAX];
+int 	lgField;
+
+EXEC SQL BEGIN DECLARE SECTION;
+    char		pCardNumber     	[40 + 1];
+    char		plTransCode		[ 5];
+
+    varchar		plBillingNumber1	[24];
+    varchar		plBillingWording1	[30];
+    char		plBillingCurrency1	[ 3+1];
+    char		plBillingDate1		[ 10+1];
+    double		plBillingAmount1		;
+
+    varchar		plBillingNumber2	[24];
+    varchar		plBillingWording2	[30];
+    char		plBillingCurrency2	[ 3+1];
+    char		plBillingDate2		[ 10+1];
+    double		plBillingAmount2		;
+
+    varchar		plBillingNumber3	[24];
+    varchar		plBillingWording3	[30];
+    char		plBillingCurrency3	[ 3+1];
+    char		plBillingDate3		[ 10+1];
+    double		plBillingAmount3		;
+
+    varchar		plBillingNumber4	[24];
+    varchar		plBillingWording4	[30];
+    char		plBillingCurrency4	[ 3+1];
+    char		plBillingDate4		[ 10+1];
+    double		plBillingAmount4		;
+
+    varchar		plBillingNumber5	[24];
+    varchar		plBillingWording5	[30];
+    char		plBillingCurrency5	[ 3+1];
+    char		plBillingDate5		[ 10+1];
+    double		plBillingAmount5		;
+
+    varchar		plBillingNumber6	[24];
+    varchar		plBillingWording6	[30];
+    char		plBillingCurrency6	[ 3+1];
+    char		plBillingDate6		[ 10+1];
+    double		plBillingAmount6		;
+
+    int			plStartPosition;
+    int			plBillingsNumber;
+    int			plRetour;
+EXEC SQL END DECLARE SECTION;
+
+trace_event("Start GetBillingCreditList ", PROCESSING);
+
+/* Initialisation des variables C */
+for(cpt = 0; cpt < MAX_BILLING; cpt++)
+{
+    memset(billingList[cpt].billingNumber,	0,	25);
+    memset(billingList[cpt].billingWording,	0,	31);
+    memset(billingList[cpt].billingDate,	0,	 11);
+    memset(billingList[cpt].billingCurrency,	0,	 4);
+    billingList[cpt].billingAmount = 0.000;
+    billingList[cpt].billingAvailable	= NO;
+}
+*billingListSize = 0;
+
+memset(plBillingNumber1.arr,		0, sizeof(plBillingNumber1.arr));
+memset(plBillingWording1.arr,		0, sizeof(plBillingWording1.arr));
+memset(plBillingDate1,				0, sizeof(plBillingDate1));
+memset(plBillingCurrency1,			0, sizeof(plBillingCurrency1));
+plBillingNumber1.len	= 2;
+plBillingWording1.len	= 2;
+
+memset(plBillingNumber2.arr,		0, sizeof(plBillingNumber2.arr));
+memset(plBillingWording2.arr,		0, sizeof(plBillingWording2.arr));
+memset(plBillingDate2,				0, sizeof(plBillingDate2));
+memset(plBillingCurrency2,			0, sizeof(plBillingCurrency2));
+plBillingNumber2.len	= 2;
+plBillingWording2.len	= 2;
+
+memset(plBillingNumber3.arr,		0, sizeof(plBillingNumber3.arr));
+memset(plBillingWording3.arr,		0, sizeof(plBillingWording3.arr));
+memset(plBillingDate3,				0, sizeof(plBillingDate3));
+memset(plBillingCurrency3,			0, sizeof(plBillingCurrency3));
+plBillingNumber3.len	= 2;
+plBillingWording3.len	= 2;
+
+memset(plBillingNumber4.arr,		0, sizeof(plBillingNumber4.arr));
+memset(plBillingWording4.arr,		0, sizeof(plBillingWording4.arr));
+memset(plBillingDate4,				0, sizeof(plBillingDate4));
+memset(plBillingCurrency4,			0, sizeof(plBillingCurrency4));
+plBillingNumber4.len	= 2;
+plBillingWording4.len	= 2;
+
+memset(plBillingNumber5.arr,		0,sizeof(plBillingNumber5.arr));
+memset(plBillingWording5.arr,		0,sizeof(plBillingWording5.arr));
+memset(plBillingDate5,				0, sizeof(plBillingDate5));
+memset(plBillingCurrency5,			0,sizeof(plBillingCurrency5));
+plBillingNumber5.len	= 2;
+plBillingWording5.len	= 2;
+
+memset(plBillingNumber6.arr,		0, sizeof(plBillingNumber6.arr));
+memset(plBillingWording6.arr,		0, sizeof(plBillingWording6.arr));
+memset(plBillingDate6,				0, sizeof(plBillingDate6));
+memset(plBillingCurrency6,		0, sizeof(plBillingCurrency6));
+plBillingNumber6.len	= 2;
+plBillingWording6.len	= 2;
+
+/* initialisation des variables PL/SQL */
+memset(pCardNumber,		0, sizeof(pCardNumber));
+
+if (GetIsoField(ISO_CARD_NBR , P7IsoInfo, tmpField, &lgField) == SUCCES)
+	memcpy(pCardNumber,tmpField,lgField);
+
+GetTransCode(pTransCode,plTransCode);
+plStartPosition = firstBillingSeq;
+
+
+EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+EXEC SQL EXECUTE
+
+DECLARE
+      v_enr_billing1		BBK_SPECIFIC_GET_BILLS.BILLING_ROW;
+      v_enr_billing2		BBK_SPECIFIC_GET_BILLS.BILLING_ROW;
+      v_enr_billing3		BBK_SPECIFIC_GET_BILLS.BILLING_ROW;
+      v_enr_billing4		BBK_SPECIFIC_GET_BILLS.BILLING_ROW;
+      v_enr_billing5		BBK_SPECIFIC_GET_BILLS.BILLING_ROW;
+      v_enr_billing6		BBK_SPECIFIC_GET_BILLS.BILLING_ROW;
+      v_enr_billing7		BBK_SPECIFIC_GET_BILLS.BILLING_ROW;
+      v_enr_billing8		BBK_SPECIFIC_GET_BILLS.BILLING_ROW;
+	  v_env_info_trace      global_vars.env_info_trace_type := NULL;
+
+    BEGIN
+
+
+      :plRetour := BBK_SPECIFIC_GET_BILLS.GET_CREDIT_CARDS_BILLS(
+                                       :pCardNumber,
+                                       :plStartPosition,
+                                       TRUE,
+                                       :plTransCode,
+                                       v_enr_billing1,
+                                       v_enr_billing2,
+                                       v_enr_billing3,
+                                       v_enr_billing4,
+                                       v_enr_billing5,
+                                       v_enr_billing6,
+                                       v_enr_billing7,
+                                       v_enr_billing8,
+                                       :plBillingsNumber);
+
+      IF :plRetour = DECLARATION_CST.OK THEN
+        :plBillingNumber1	:= v_enr_billing1.billing_number;
+        :plBillingWording1	:= v_enr_billing1.billing_wording;
+        :plBillingDate1		:= TO_CHAR(v_enr_billing1.billing_date,'DD/MM/YYYY');
+        :plBillingCurrency1	:= v_enr_billing1.billing_currency;
+        :plBillingAmount1	:= v_enr_billing1.billing_amount;
+        IF :plBillingsNumber > 1 THEN
+          :plBillingNumber2		:= v_enr_billing2.billing_number;
+          :plBillingWording2	:= v_enr_billing2.billing_wording;
+          :plBillingDate2		:= TO_CHAR(v_enr_billing2.billing_date,'DD/MM/YYYY');
+          :plBillingCurrency2	:= v_enr_billing2.billing_currency;
+       	  :plBillingAmount2		:= v_enr_billing2.billing_amount;
+        END IF;
+        IF :plBillingsNumber > 2 THEN
+          :plBillingNumber3		:= v_enr_billing3.billing_number;
+          :plBillingWording3	:= v_enr_billing3.billing_wording;
+          :plBillingDate3		:= TO_CHAR(v_enr_billing3.billing_date,'DD/MM/YYYY');
+          :plBillingCurrency3	:= v_enr_billing3.billing_currency;
+          :plBillingAmount3		:= v_enr_billing3.billing_amount;
+        END IF;
+        IF :plBillingsNumber > 3 THEN
+          :plBillingNumber4		:= v_enr_billing4.billing_number;
+          :plBillingWording4	:= v_enr_billing4.billing_wording;
+          :plBillingDate4		:= TO_CHAR(v_enr_billing4.billing_date,'DD/MM/YYYY');
+          :plBillingCurrency4	:= v_enr_billing4.billing_currency;
+          :plBillingAmount4		:= v_enr_billing4.billing_amount;
+        END IF;
+        IF :plBillingsNumber > 4 THEN
+          :plBillingNumber5		:= v_enr_billing5.billing_number;
+          :plBillingWording5	:= v_enr_billing5.billing_wording;
+          :plBillingDate5		:= TO_CHAR(v_enr_billing5.billing_date,'DD/MM/YYYY');
+          :plBillingCurrency5	:= v_enr_billing5.billing_currency;
+          :plBillingAmount5		:= v_enr_billing5.billing_amount;
+        END IF;
+        IF :plBillingsNumber > 5 THEN
+          :plBillingNumber6		:= v_enr_billing6.billing_number;
+          :plBillingWording6	:= v_enr_billing6.billing_wording;
+          :plBillingDate6		:= TO_CHAR(v_enr_billing6.billing_date,'DD/MM/YYYY');
+          :plBillingCurrency6	:= v_enr_billing6.billing_currency;
+          :plBillingAmount6		:= v_enr_billing6.billing_amount;
+        END IF;
+      END IF;
+    END;
+  END-EXEC;
+
+  if(plRetour != OK)
+  {
+    sprintf(sLine, "End   GetBillingCreditList(%d)", plRetour);
+    trace_event(sLine, ERROR);
+    return (plRetour);
+  }
+  /* recuperation du contenu des variable PL/SQL */
+  *billingListSize = plBillingsNumber;
+
+  memcpy(billingList[0].billingNumber, plBillingNumber1.arr, plBillingNumber1.len);
+  memcpy(billingList[0].billingWording,plBillingWording1.arr, plBillingWording1.len);
+  memcpy(billingList[0].billingDate,plBillingDate1, 10);
+  memcpy(billingList[0].billingCurrency,plBillingCurrency1, 3);
+  billingList[0].billingAmount 		= plBillingAmount1;
+  billingList[0].billingAvailable	= YES;
+
+  if(*billingListSize > 1)
+  {
+    memcpy(billingList[1].billingNumber, plBillingNumber2.arr, plBillingNumber2.len);
+    memcpy(billingList[1].billingWording,plBillingWording2.arr, plBillingWording2.len);
+    memcpy(billingList[1].billingDate,plBillingDate2, 10);
+    memcpy(billingList[1].billingCurrency,plBillingCurrency2, 3);
+    billingList[1].billingAmount 		= plBillingAmount2;
+    billingList[1].billingAvailable	= YES;
+  }
+
+  if(*billingListSize > 2)
+  {
+    memcpy(billingList[2].billingNumber, plBillingNumber3.arr, plBillingNumber3.len);
+    memcpy(billingList[2].billingWording,plBillingWording3.arr, plBillingWording3.len);
+    memcpy(billingList[2].billingDate,plBillingDate3,10);
+    memcpy(billingList[2].billingCurrency,plBillingCurrency3, 3);
+    billingList[2].billingAmount 		= plBillingAmount3;
+    billingList[2].billingAvailable	= YES;
+  }
+
+  if(*billingListSize > 3)
+  {
+    memcpy(billingList[3].billingNumber,plBillingNumber4.arr, plBillingNumber4.len);
+    memcpy(billingList[3].billingWording,plBillingWording4.arr, plBillingWording4.len);
+    memcpy(billingList[3].billingDate,plBillingDate4, 10);
+    memcpy(billingList[3].billingCurrency,plBillingCurrency4, 3);
+    billingList[3].billingAmount 		= plBillingAmount4;
+    billingList[3].billingAvailable	= YES;
+  }
+
+  if(*billingListSize > 4)
+  {
+    memcpy(billingList[4].billingNumber,plBillingNumber5.arr, plBillingNumber5.len);
+    memcpy(billingList[4].billingWording,plBillingWording5.arr, plBillingWording5.len);
+    memcpy(billingList[4].billingDate,plBillingDate5, 10);
+    memcpy(billingList[4].billingCurrency,plBillingCurrency5, 3);
+    billingList[4].billingAmount 		= plBillingAmount5;
+    billingList[4].billingAvailable	= YES;
+  }
+
+  if(*billingListSize > 5)
+  {
+    memcpy(billingList[5].billingNumber,plBillingNumber6.arr, plBillingNumber6.len);
+    memcpy(billingList[5].billingWording,plBillingWording6.arr, plBillingWording6.len);
+    memcpy(billingList[5].billingDate,plBillingDate6, 10);
+    memcpy(billingList[5].billingCurrency,plBillingCurrency6, 3);
+    billingList[5].billingAmount 		= plBillingAmount6;
+    billingList[5].billingAvailable	= YES;
+  }
+
+   /*PutIsoField(ISO_RESPONSE_CODE, P7IsoInfo, "085", 3);*/
+
+  sprintf(sLine, "billing 1 number : %.24s", billingList[0].billingNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "billing 1 wording e : %.20s",billingList[0].billingWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "billing 2 number : %.24s", billingList[1].billingNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "billing 2 wording e : %.20s",billingList[1].billingWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "billing 3 number : %.24s", billingList[2].billingNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "billing 3 wording e : %.20s",billingList[2].billingWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "billing 4 number : %.24s", billingList[3].billingNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "billing 4 wording e : %.20s",billingList[3].billingWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "billing 5 number : %.24s", billingList[4].billingNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "billing 5 wording e : %.20s",billingList[4].billingWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "billing 6 number : %.24s", billingList[5].billingNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "billing 6 wording e : %.20s",billingList[5].billingWording);
+  trace_event(sLine, PROCESSING);
+
+sprintf(sLine, "End   GetBillingCreditList(OK %d)", *billingListSize);
+trace_event(sLine, PROCESSING);
+return (OK);
+}
+

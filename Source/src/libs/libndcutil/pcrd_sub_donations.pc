@@ -1,0 +1,396 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      pcrd_sub_donations.pc                                              */
+/*                                                                             */
+/* Description                                                                 */
+/*      Account Tools Management                                               */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		22-11-2011  		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#include <langue.h>
+#include <donation.h>
+#include <paramdef.h>
+#include <iso_hps.h>
+#include <param_ctx.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+  /***********************************************************************
+  **  nom	: GetSubDonationList()											**
+  **  desc	: chargement des comptes d'un porteur					**
+  **  entree	: P7IsoInfo	-> tampon PowerSEVEN					**
+  **		  	firstAccountSeq-> sequence du premier compte			**
+  **  sortie	: subDonationList	-> liste de six comptes				**
+  **		  subDonationListSize-> nombre de comptes charge			**
+  **  retour	: OK	-> chargement reussi						**
+  **		  NOK	-> chargement de 1 compte						**
+  **		  ERROR	-> erreur fatal									**
+  **  auteur	: Younes OUADI (25 Oct 1998)						**
+  ***********************************************************************/
+int GetSubDonationList(	
+					int			nIndexCtx,
+					TSIsoInfo   *P7IsoInfo,
+					int			firstAccountSeq,
+					char		pTransCode,
+					char        *pDonationNumber,
+					sub_donation_s	subDonationList	[  7],
+					int			*subDonationListSize)
+{
+	struct sqlca sqlca;
+	int		cpt;
+	char 	sLine[MAX_LINE_TRC];
+
+	int 	lgField;
+
+EXEC SQL BEGIN DECLARE SECTION;
+    char		plTransCode						[ 5];
+	
+	varchar		plDonationNumber				[25];
+	
+    varchar		plSubDonationNumber1			[25];
+    varchar		plSubsubDonationAraWording1	[31];
+    varchar		plSubsubDonationEngWording1	[31];
+	varchar		plSubDonationAccNumber1			[25];
+	
+    varchar		plSubDonationNumber2			[25];
+    varchar		plSubsubDonationAraWording2	[31];
+    varchar		plSubsubDonationEngWording2	[31];
+	varchar		plSubDonationAccNumber2			[25];
+                                    
+    varchar		plSubDonationNumber3			[25];
+    varchar		plSubsubDonationAraWording3	[31];
+    varchar		plSubsubDonationEngWording3	[31];
+	varchar		plSubDonationAccNumber3			[25];
+                                 
+    varchar		plSubDonationNumber4			[25];
+    varchar		plSubsubDonationAraWording4	[31];
+    varchar		plSubsubDonationEngWording4	[31];
+	varchar		plSubDonationAccNumber4			[25];
+                                    
+    varchar		plSubDonationNumber5			[25];
+    varchar		plSubsubDonationAraWording5	[31];
+    varchar		plSubsubDonationEngWording5	[31];
+	varchar		plSubDonationAccNumber5			[25];
+                                    
+    varchar		plSubDonationNumber6			[25];
+    varchar		plSubsubDonationAraWording6	[31];
+    varchar		plSubsubDonationEngWording6	[31];
+	varchar		plSubDonationAccNumber6			[25];
+
+	varchar		plSubDonationNumber7			[25];
+    varchar		plSubsubDonationAraWording7	[31];
+    varchar		plSubsubDonationEngWording7	[31];
+	varchar		plSubDonationAccNumber7			[25];
+	
+    int			plStartPosition;
+    int			plDonationsNumber;
+    int			plRetour;
+EXEC SQL END DECLARE SECTION;
+
+	trace_event("Start GetSubDonationList() ", PROCESSING);
+
+
+	/* Initialisation des variables C */
+	for(cpt = 0; cpt < MAX_DONATION; cpt++)
+	{
+		memset(subDonationList[cpt].donationNumber,			0,	25);
+		memset(subDonationList[cpt].subDonationNumber,		0,	25);
+		memset(subDonationList[cpt].subDonationAraWording,		0,	31);
+		memset(subDonationList[cpt].subDonationEngWording,		0,	31);
+		memset(subDonationList[cpt].subDonationAccount,		0,	25);
+		subDonationList[cpt].subDonationAvailable	= NO;
+	}
+	*subDonationListSize = 0;
+
+	memset(plDonationNumber.arr,				0, sizeof(plDonationNumber.arr));
+	plDonationNumber.len			= 0;
+
+	memset(plSubDonationNumber1.arr,			0, sizeof(plSubDonationNumber1.arr));
+	memset(plSubsubDonationAraWording1.arr,		0, sizeof(plSubsubDonationAraWording1.arr));
+	memset(plSubsubDonationEngWording1.arr,		0, sizeof(plSubsubDonationEngWording1.arr));
+	memset(plSubDonationAccNumber1.arr,					0, sizeof(plSubDonationAccNumber1.arr));
+	plSubDonationNumber1.len		= 0;
+	plSubsubDonationAraWording1.len	= 0;
+	plSubsubDonationEngWording1.len	= 0;
+	plSubDonationAccNumber1.len	= 0;
+
+	memset(plSubDonationNumber2.arr,			0, sizeof(plSubDonationNumber2.arr));
+	memset(plSubsubDonationAraWording2.arr,		0, sizeof(plSubsubDonationAraWording2.arr));
+	memset(plSubsubDonationEngWording2.arr,		0, sizeof(plSubsubDonationEngWording2.arr));
+	memset(plSubDonationAccNumber2.arr,				0, sizeof(plSubDonationAccNumber2.arr));
+	plSubDonationNumber2.len		= 0;
+	plSubsubDonationAraWording2.len	= 0;
+	plSubsubDonationEngWording2.len	= 0;
+	plSubDonationAccNumber2.len	= 0;
+
+	memset(plSubDonationNumber3.arr,			0, sizeof(plSubDonationNumber3.arr));
+	memset(plSubsubDonationAraWording3.arr,		0, sizeof(plSubsubDonationAraWording3.arr));
+	memset(plSubsubDonationEngWording3.arr,		0, sizeof(plSubsubDonationEngWording3.arr));
+	memset(plSubDonationAccNumber3.arr,					0, sizeof(plSubDonationAccNumber3.arr));
+	plSubDonationNumber3.len		= 0;
+	plSubsubDonationAraWording3.len	= 0;
+	plSubsubDonationEngWording3.len	= 0;
+	plSubDonationAccNumber3.len	= 0;
+
+	memset(plSubDonationNumber4.arr,			0, sizeof(plSubDonationNumber4.arr));
+	memset(plSubsubDonationAraWording4.arr,		0, sizeof(plSubsubDonationAraWording4.arr));
+	memset(plSubsubDonationEngWording4.arr,		0, sizeof(plSubsubDonationEngWording4.arr));
+	memset(plSubDonationAccNumber4.arr,					0, sizeof(plSubDonationAccNumber4.arr));
+	plSubDonationNumber4.len		= 0;
+	plSubsubDonationAraWording4.len	= 0;
+	plSubsubDonationEngWording4.len	= 0;
+	plSubDonationAccNumber4.len	= 0;
+
+	memset(plSubDonationNumber5.arr,			0,sizeof(plSubDonationNumber5.arr));
+	memset(plSubsubDonationAraWording5.arr,		0,sizeof(plSubsubDonationAraWording5.arr));
+	memset(plSubsubDonationEngWording5.arr,		0,sizeof(plSubsubDonationEngWording5.arr));
+	memset(plSubDonationAccNumber5.arr,				0,sizeof(plSubDonationAccNumber5.arr));
+	plSubDonationNumber5.len		= 0;
+	plSubsubDonationAraWording5.len	= 0;
+	plSubsubDonationEngWording5.len	= 0;
+	plSubDonationAccNumber5.len	= 0;
+
+	memset(plSubDonationNumber6.arr,			0, sizeof(plSubDonationNumber6.arr));
+	memset(plSubsubDonationAraWording6.arr,		0, sizeof(plSubsubDonationAraWording6.arr));
+	memset(plSubsubDonationEngWording6.arr,		0, sizeof(plSubsubDonationEngWording6.arr));
+	memset(plSubDonationAccNumber6.arr,				0, sizeof(plSubDonationAccNumber6.arr));
+	plSubDonationNumber6.len		= 0;
+	plSubsubDonationAraWording6.len	= 0;
+	plSubsubDonationEngWording6.len	= 0;
+	plSubDonationAccNumber6.len	= 0;
+
+	memset(plSubDonationNumber7.arr,			0, sizeof(plSubDonationNumber7.arr));
+	memset(plSubsubDonationAraWording7.arr,		0, sizeof(plSubsubDonationAraWording7.arr));
+	memset(plSubsubDonationEngWording7.arr,		0, sizeof(plSubsubDonationEngWording7.arr));
+	memset(plSubDonationAccNumber7.arr,				0, sizeof(plSubDonationAccNumber7.arr));
+	plSubDonationNumber7.len		= 0;
+	plSubsubDonationAraWording7.len	= 0;
+	plSubsubDonationEngWording7.len	= 0;
+	plSubDonationAccNumber7.len	= 0;
+
+	dump_p7_struct(P7IsoInfo);
+
+
+
+	memset(plTransCode, 0, sizeof(plTransCode));
+
+	GetTransCode(pTransCode,plTransCode);
+	plStartPosition = firstAccountSeq;
+
+	memcpy(plDonationNumber.arr,pDonationNumber, strlen(pDonationNumber));
+	plDonationNumber.len			= strlen(pDonationNumber);
+
+	sprintf (sLine," Start Position               : %d", plStartPosition);
+	trace_event(sLine,TRACE);
+	sprintf (sLine," Trans Code                   : %s", plTransCode);
+	trace_event(sLine,TRACE);
+	sprintf (sLine," Donation Code                : %s", pDonationNumber);
+	trace_event(sLine,TRACE);
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO get_sub_donation_list_err;
+	EXEC SQL EXECUTE
+	DECLARE
+      v_enr_sub_charity1		PCRD_ATM_CHARITY.SUB_CHARITY_ROW;
+      v_enr_sub_charity2		PCRD_ATM_CHARITY.SUB_CHARITY_ROW;
+      v_enr_sub_charity3		PCRD_ATM_CHARITY.SUB_CHARITY_ROW;
+      v_enr_sub_charity4		PCRD_ATM_CHARITY.SUB_CHARITY_ROW;
+      v_enr_sub_charity5		PCRD_ATM_CHARITY.SUB_CHARITY_ROW;
+      v_enr_sub_charity6		PCRD_ATM_CHARITY.SUB_CHARITY_ROW;
+      v_enr_sub_charity7		PCRD_ATM_CHARITY.SUB_CHARITY_ROW;
+	  v_env_info_trace      global_vars.env_info_trace_type := NULL;
+	  
+    BEGIN
+
+	:plRetour := PCRD_ATM_CHARITY.GET_SUB_CHARITY_LIST_FOR_ATM(
+															   :plStartPosition,
+															   :plTransCode,
+															   :plDonationNumber,
+															   v_enr_sub_charity1,
+															   v_enr_sub_charity2,
+															   v_enr_sub_charity3,
+															   v_enr_sub_charity4,
+															   v_enr_sub_charity5,
+															   v_enr_sub_charity6,
+															   v_enr_sub_charity7,
+															   :plDonationsNumber);
+
+      IF :plRetour = DECLARATION_CST.OK THEN
+        :plSubDonationNumber1			:= v_enr_sub_charity1.bas_sub_charity_code;
+        :plSubsubDonationAraWording1	:= v_enr_sub_charity1.bas_sub_charity_abrv_ara; 
+        :plSubsubDonationEngWording1	:= v_enr_sub_charity1.bas_sub_charity_abrv_eng;
+		:plSubDonationAccNumber1		:= v_enr_sub_charity1.bas_sub_charity_acc;
+		
+        IF :plDonationsNumber > 1 THEN
+          :plSubDonationNumber2			:= v_enr_sub_charity2.bas_sub_charity_code;
+          :plSubsubDonationAraWording2	:= v_enr_sub_charity2.bas_sub_charity_abrv_ara; 
+          :plSubsubDonationEngWording2	:= v_enr_sub_charity2.bas_sub_charity_abrv_eng;
+		  :plSubDonationAccNumber2		:= v_enr_sub_charity2.bas_sub_charity_acc; 
+        END IF;
+		
+        IF :plDonationsNumber > 2 THEN
+          :plSubDonationNumber3			:= v_enr_sub_charity3.bas_sub_charity_code;
+          :plSubsubDonationAraWording3	:= v_enr_sub_charity3.bas_sub_charity_abrv_ara; 
+          :plSubsubDonationEngWording3	:= v_enr_sub_charity3.bas_sub_charity_abrv_eng;
+		  :plSubDonationAccNumber3		:= v_enr_sub_charity3.bas_sub_charity_acc; 
+        END IF;
+		
+        IF :plDonationsNumber > 3 THEN
+          :plSubDonationNumber4			:= v_enr_sub_charity4.bas_sub_charity_code;
+          :plSubsubDonationAraWording4	:= v_enr_sub_charity4.bas_sub_charity_abrv_ara; 
+          :plSubsubDonationEngWording4	:= v_enr_sub_charity4.bas_sub_charity_abrv_eng;
+		  :plSubDonationAccNumber4		:= v_enr_sub_charity4.bas_sub_charity_acc; 
+        END IF;
+		
+        IF :plDonationsNumber > 4 THEN
+          :plSubDonationNumber5			:= v_enr_sub_charity5.bas_sub_charity_code;
+          :plSubsubDonationAraWording5	:= v_enr_sub_charity5.bas_sub_charity_abrv_ara; 
+          :plSubsubDonationEngWording5	:= v_enr_sub_charity5.bas_sub_charity_abrv_eng;
+		  :plSubDonationAccNumber5		:= v_enr_sub_charity5.bas_sub_charity_acc; 
+        END IF;
+		
+        IF :plDonationsNumber > 5 THEN
+          :plSubDonationNumber6			:= v_enr_sub_charity6.bas_sub_charity_code;
+          :plSubsubDonationAraWording6	:= v_enr_sub_charity6.bas_sub_charity_abrv_ara; 
+          :plSubsubDonationEngWording6	:= v_enr_sub_charity6.bas_sub_charity_abrv_eng;
+		  :plSubDonationAccNumber6		:= v_enr_sub_charity6.bas_sub_charity_acc; 
+        END IF;
+		
+        IF :plDonationsNumber > 6 THEN
+          :plSubDonationNumber7			:= v_enr_sub_charity7.bas_sub_charity_code;
+          :plSubsubDonationAraWording7	:= v_enr_sub_charity7.bas_sub_charity_abrv_ara; 
+          :plSubsubDonationEngWording7	:= v_enr_sub_charity7.bas_sub_charity_abrv_eng;
+		  :plSubDonationAccNumber7		:= v_enr_sub_charity7.bas_sub_charity_acc; 
+        END IF;		
+      END IF;
+    END;
+  END-EXEC;
+
+  if(plRetour != OK)
+  {
+    sprintf(sLine, "End   GetSubDonationList(%d)", plRetour);
+    trace_event(sLine, ERROR);
+    return (plRetour);
+  }
+  /* recuperation du contenu des variable PL/SQL */
+  *subDonationListSize = plDonationsNumber;
+
+  
+  memcpy(subDonationList[0].donationNumber,plDonationNumber.arr, plDonationNumber.len);
+  memcpy(subDonationList[0].subDonationNumber,plSubDonationNumber1.arr, plSubDonationNumber1.len);
+  memcpy(subDonationList[0].subDonationAraWording,plSubsubDonationAraWording1.arr, plSubsubDonationAraWording1.len);
+  memcpy(subDonationList[0].subDonationEngWording,plSubsubDonationEngWording1.arr, plSubsubDonationEngWording1.len);
+  memcpy(subDonationList[0].subDonationAccount,plSubDonationAccNumber1.arr,  plSubDonationAccNumber1.len );
+  subDonationList[0].subDonationAvailable	= YES;
+
+  if(*subDonationListSize > 1)
+  {
+	memcpy(subDonationList[1].donationNumber,plDonationNumber.arr, plDonationNumber.len);
+    memcpy(subDonationList[1].subDonationNumber,plSubDonationNumber2.arr, plSubDonationNumber2.len);
+    memcpy(subDonationList[1].subDonationAraWording,plSubsubDonationAraWording2.arr, plSubsubDonationAraWording2.len);
+    memcpy(subDonationList[1].subDonationEngWording,plSubsubDonationEngWording2.arr, plSubsubDonationEngWording2.len);
+	memcpy(subDonationList[1].subDonationAccount,plSubDonationAccNumber2.arr,  plSubDonationAccNumber2.len );
+    subDonationList[1].subDonationAvailable	= YES;
+  }
+
+  if(*subDonationListSize > 2)
+  {
+	memcpy(subDonationList[2].donationNumber,plDonationNumber.arr, plDonationNumber.len);
+    memcpy(subDonationList[2].subDonationNumber,plSubDonationNumber3.arr, plSubDonationNumber3.len);
+    memcpy(subDonationList[2].subDonationAraWording,plSubsubDonationAraWording3.arr, plSubsubDonationAraWording3.len);
+    memcpy(subDonationList[2].subDonationEngWording,plSubsubDonationEngWording3.arr, plSubsubDonationEngWording3.len);
+	memcpy(subDonationList[2].subDonationAccount,plSubDonationAccNumber3.arr,  plSubDonationAccNumber3.len );
+    subDonationList[2].subDonationAvailable	= YES;
+  }
+
+  if(*subDonationListSize > 3)
+  {
+	memcpy(subDonationList[3].donationNumber,plDonationNumber.arr, plDonationNumber.len);
+    memcpy(subDonationList[3].subDonationNumber,plSubDonationNumber4.arr, plSubDonationNumber4.len);
+    memcpy(subDonationList[3].subDonationAraWording,plSubsubDonationAraWording4.arr, plSubsubDonationAraWording4.len);
+    memcpy(subDonationList[3].subDonationEngWording,plSubsubDonationEngWording4.arr, plSubsubDonationEngWording4.len);
+	memcpy(subDonationList[3].subDonationAccount,plSubDonationAccNumber4.arr,  plSubDonationAccNumber4.len );
+    subDonationList[3].subDonationAvailable	= YES;
+  }
+
+  if(*subDonationListSize > 4)
+  {
+	memcpy(subDonationList[4].donationNumber,plDonationNumber.arr, plDonationNumber.len);
+    memcpy(subDonationList[4].subDonationNumber,plSubDonationNumber5.arr, plSubDonationNumber5.len);
+    memcpy(subDonationList[4].subDonationAraWording,plSubsubDonationAraWording5.arr, plSubsubDonationAraWording5.len);
+    memcpy(subDonationList[4].subDonationEngWording,plSubsubDonationEngWording5.arr, plSubsubDonationEngWording5.len);
+	memcpy(subDonationList[4].subDonationAccount,plSubDonationAccNumber5.arr,  plSubDonationAccNumber5.len );
+    subDonationList[4].subDonationAvailable	= YES;
+  }
+
+  if(*subDonationListSize > 5)
+  {
+	memcpy(subDonationList[5].donationNumber,plDonationNumber.arr, plDonationNumber.len);
+    memcpy(subDonationList[5].subDonationNumber,plSubDonationNumber6.arr, plSubDonationNumber6.len);
+    memcpy(subDonationList[5].subDonationAraWording,plSubsubDonationAraWording6.arr, plSubsubDonationAraWording6.len);
+    memcpy(subDonationList[5].subDonationEngWording,plSubsubDonationEngWording6.arr, plSubsubDonationEngWording6.len);
+	memcpy(subDonationList[5].subDonationAccount,plSubDonationAccNumber6.arr,  plSubDonationAccNumber6.len );
+    subDonationList[5].subDonationAvailable	= YES;
+  }
+  
+  if(*subDonationListSize > 6)
+  {
+	memcpy(subDonationList[6].donationNumber,plDonationNumber.arr, plDonationNumber.len);
+    memcpy(subDonationList[6].subDonationNumber,plSubDonationNumber7.arr, plSubDonationNumber7.len);
+    memcpy(subDonationList[6].subDonationAraWording,plSubsubDonationAraWording7.arr, plSubsubDonationAraWording7.len);
+    memcpy(subDonationList[6].subDonationEngWording,plSubsubDonationEngWording7.arr, plSubsubDonationEngWording7.len);
+	memcpy(subDonationList[6].subDonationAccount,plSubDonationAccNumber7.arr,  plSubDonationAccNumber7.len );
+    subDonationList[6].subDonationAvailable	= YES;
+  }
+   PutIsoField(ISO_RESPONSE_CODE, P7IsoInfo, "085", 3);
+
+  sprintf(sLine, "donation 1 number : %.25s", subDonationList[0].subDonationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 1 description e : %.20s",subDonationList[0].subDonationEngWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 2 number : %.25s", subDonationList[1].subDonationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 2 description e : %.20s",subDonationList[1].subDonationEngWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 3 number : %.25s", subDonationList[2].subDonationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 3 description e : %.20s",subDonationList[2].subDonationEngWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 4 number : %.25s", subDonationList[3].subDonationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 4 description e : %.20s",subDonationList[3].subDonationEngWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 5 number : %.25s", subDonationList[4].subDonationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 5 description e : %.20s",subDonationList[4].subDonationEngWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 6 number : %.25s", subDonationList[5].subDonationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 6 description e : %.20s",subDonationList[5].subDonationEngWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 7 number : %.25s", subDonationList[6].subDonationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 7 description e : %.20s",subDonationList[6].subDonationEngWording);
+  trace_event(sLine, PROCESSING);
+  
+	sprintf(sLine, "End   GetSubDonationList(OK %d)", *subDonationListSize);
+	trace_event(sLine, PROCESSING);
+	return (OK);
+
+get_sub_donation_list_err :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   GetSubDonationList(ERROR)", ERROR);
+    return (ERROR);
+}
+
+
+
+

@@ -1,0 +1,464 @@
+#include <stdio.h>
+#include <pthread.h>
+
+#include <define.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <stdlib.h>
+#include <thread_var.h>
+
+
+pthread_mutex_t ConnectMutex   = PTHREAD_MUTEX_INITIALIZER;
+
+/*EBE140421: Define tab_ParamCtx[]*/
+P7_DEF_SYM TSParamCtx  tab_ParamCtx[ PTHREAD_THREADS_MAX ];
+P7_DEF_SYM TSThrInfo   tab_ThrInfo[ PTHREAD_THREADS_MAX ];
+P7_DEF_SYM char g_LocDBServ[4 + 1];
+/**************************************************************************/
+/* Connection a la base avec user & password                              */
+/*-----------------------------------------------------------             */
+/*  Parametres :                                                          */
+/*     Indice du Contexte Oracle                                          */
+/*     user      (chaine de caractere)                                    */
+/*     password  (chaine de carateres)                                    */
+/*  Valeur de retour :                                                    */
+/*     OK   si connection etablie                                         */
+/*     NOK  si connection non etablie                                     */
+/*  Date  :                                                               */
+/**************************************************************************/
+int ConnectOracleCmd(int indice, char *sUser, char *sPass )
+{
+   struct sqlca sqlca;
+   char sLine[MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+   VARCHAR         pUserName[20];
+   VARCHAR         pPassWord[32];
+   EXEC SQL END DECLARE SECTION;
+
+   strcpy((char *)pUserName.arr,sUser); 
+   pUserName.len=strlen(sUser);
+
+   strcpy((char *)pPassWord.arr, sPass);
+   pPassWord.len=strlen(sPass);
+   sprintf    ( sLine , "Start ConnectOracleCmd(%s,%s) ",sUser,sPass);
+   trace_event( sLine , PROCESSING );
+    
+   EXEC SQL WHENEVER SQLERROR  goto err_conn;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[indice].ctx;
+
+   EXEC SQL CONNECT :pUserName IDENTIFIED BY :pPassWord;
+
+   EXEC SQL ALTER SESSION SET NLS_DATE_FORMAT='DD/MM/YY HH24:MI:SS';
+
+   trace_event( "End ConnectOracleCmd()" , PROCESSING );
+   return(OK);
+
+err_conn:
+   fprintf(stderr, "End   ConnectOracleCmd(NOK) \n");
+   fprintf(stderr, "%s \n",sqlca.sqlerrm.sqlerrmc);
+   sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+   trace_event( sLine , PROCESSING );
+   sprintf    ( sLine , "End ConnectOracleCmd(NOK) ");
+   trace_event( sLine , PROCESSING );
+   return(NOK);
+}
+
+/****************************************************************************/
+/*Connection a la base							    */
+/*--------------------                                                      */
+/*  Parametres :                                                          */
+/*     Indice du Contexte Oracle                                          */
+/*  Valeur de retour :							    */
+/*     OK   si connection etablie					    */
+/*     NOK  si connection non etablie					    */
+/*  User et Date de derniere modification				    */
+/*     Il faut avoir 5 parametres dans le .profile	    		    */
+/*     DB_MODE = 0 pour production					    */
+/*     DB_MODE = 1 pour test						    */
+/*     DB_USER_PROD User de production					    */
+/*     DB_USER_TEST User de test					    */
+/*     DB_PASSWORD_PROD password de production				    */
+/*     DB_PASSWORD_TEST password de test				    */
+/*    									    */
+/*  									    */
+/****************************************************************************/
+int ConnectOracle(int indice)
+{
+   char sLine[MAX_LINE_TRC];
+   struct sqlca   sqlca;
+
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         username[20];
+        VARCHAR         password[20];
+   EXEC SQL END DECLARE SECTION;
+
+   char    	    mode        [ 2];
+   char    	    user        [24];
+   char	            cryptogram  [512];/*AER28022013 Password encryption with 3DES method*/
+   unsigned char    pass        [32 + 1];
+   unsigned char    pass_encrypt[64 + 4 + 1];
+   unsigned char    pass_plain  [64 + 4 + 1];
+
+   sprintf(sLine, "Start ConnectOracle(%d)",indice);
+   trace_event(sLine,PROCESSING);
+   
+   memset(mode,         0, sizeof(mode));
+   memset(user,         0, sizeof(user));
+   memset(pass,         0, sizeof(pass));
+   memset(pass_encrypt, 0, sizeof(pass_encrypt));
+   memset(pass_plain,   0, sizeof(pass_plain));
+   memset(cryptogram,   0, sizeof(cryptogram));/*AER28022013 Password encryption with 3DES method*/
+
+   sprintf(mode, "%s", getenv("DB_MODE"));
+
+   if (memcmp(mode, PROD, 1) == 0)
+   {
+      sprintf(user, "%s", getenv("DB_USER_PROD"));
+      sprintf((char *)pass_encrypt, "%s", getenv("DB_PASSWORD_PROD"));
+   }
+   else
+   {
+      sprintf(user, "%s", getenv("DB_USER_TEST"));
+      sprintf((char *)pass_encrypt, "%s", getenv("DB_PASSWORD_TEST"));
+   }
+
+/***** la fonction DES n'est pas thread-safe *****/
+   pthread_mutex_lock (&ConnectMutex);
+
+   /*DES(-1, (unsigned char)'H', pass_encrypt,(unsigned char *)KEY_PASS, pass_plain);*/
+   /* ATH26032018 START (commenter code) */
+   /* GetCryptogram(cryptogram); */ /*AER28022013 Password encryption with 3DES method*/
+   /* fct_3DES(-1,cryptogram,pass_encrypt,pass_plain); */ /*AER28022013 Password encryption with 3DES method*/
+   /*compress(pass, pass_plain);*/
+   /* PcrdCompress(pass, pass_plain); *//*ICH20160811 Change func name*/
+   /* ATH26032018 END*/
+   decipherPassword(pass_encrypt,pass);
+
+   pthread_mutex_unlock (&ConnectMutex);
+/***** la fonction DES n'est pas thread-safe *****/
+
+   strcpy((char *)username.arr,user);
+   username.len=strlen((char *)username.arr);
+/*
+   memcpy((char *)username.arr + username.len ,"@pcardt",7);
+   username.len += 7;
+*/
+
+   strcpy((char *)password.arr, (char *)pass);
+   password.len=strlen((char *)password.arr);
+
+   EXEC SQL WHENEVER SQLERROR GOTO err_conn;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[indice].ctx;
+   EXEC SQL CONNECT :username IDENTIFIED BY :password;
+
+   EXEC SQL ALTER SESSION SET NLS_DATE_FORMAT='DD/MM/YY HH24:MI:SS';
+
+   /*AER29122014 memset memory for PCI compliance*/
+   memset(pass,         	0, sizeof(pass));
+   memset(pass_encrypt, 	0, sizeof(pass_encrypt));
+   memset(pass_plain,   	0, sizeof(pass_plain));
+   memset(cryptogram,   	0, sizeof(cryptogram));
+   memset(password.arr,     0, sizeof(password.arr));
+   password.len=0;
+   /*AER29122014 memset memory for PCI compliance*/
+   
+   trace_event("End   ConnectOracle(OK)", PROCESSING);
+   return(OK);
+
+   err_conn:
+      sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+      fprintf(stderr, "%s\n", sLine);
+      trace_event(sLine, FATAL);
+	  /*AER29122014 memset memory for PCI compliance*/
+      memset(pass,         	   0, sizeof(pass));
+      memset(pass_encrypt, 	   0, sizeof(pass_encrypt));
+	  memset(pass_plain,   	   0, sizeof(pass_plain));
+      memset(cryptogram,   	   0, sizeof(cryptogram));
+      memset(password.arr,     0, sizeof(password.arr));
+      password.len=0;
+      /*AER29122014 memset memory for PCI compliance*/
+      trace_event("End   ConnectOracle(NOK)", PROCESSING);
+      return(NOK);
+}
+
+/**************************************************************************/
+/* Deconnection de la base 			                          */
+/*--------------------                                                    */
+/*  Parametres :                                                          */
+/*     Indice du Contexte Oracle                                          */
+/*  Valeur de retour :                                                    */
+/*     Aucune                                                             */
+/*  User et Date de derniere modification                                 */
+/*                                                                        */
+/*                                                                        */
+/**************************************************************************/
+void DeconnectOracle(int indice)
+{
+   struct sqlca sqlca;
+   trace_event("Start DeconnectOracle()", PROCESSING);
+
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[indice].ctx;
+   EXEC SQL COMMIT WORK RELEASE;
+   trace_event("End   DeconnectOracle(VOID)", PROCESSING);
+}
+
+/**************************************************************************/
+/* Commit de la transaction dans la base de donnees                       */
+/*------------------------------------------------                        */
+/*  Parametres :                                                          */
+/*     Indice du Contexte Oracle                                          */
+/*  Valeur de retour :                                                    */
+/*     Aucune                                                             */
+/*  User et Date de derniere modification                                 */
+/*                                                                        */
+/**************************************************************************/
+void CommitOracle(int indice)
+{
+   trace_event("Start CommitOracle()", PROCESSING);
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[indice].ctx;
+   EXEC SQL COMMIT;
+
+   trace_event("End   CommitOracle(VOID)", PROCESSING);
+}
+
+/**************************************************************************/
+/* Rollback de la transaction dans la base de donnees                     */
+/*--------------------------------------------------                      */
+/*  Parametres :                                                          */
+/*     Indice du Contexte Oracle                                          */
+/*  Valeur de retour :                                                    */
+/*     Aucune                                                             */
+/*  User et Date de derniere modification                                 */
+/**************************************************************************/
+void RollBackOracle(int indice)
+{
+   trace_event("Start RollBackOracle()", PROCESSING);
+
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[indice].ctx;
+
+   EXEC SQL ROLLBACK WORK;
+
+   trace_event("End   RollBackOracle(OK)", PROCESSING);
+}
+
+/**************************************************************************/
+/* Enable Threads                                       		  */
+/*------------------------------                                          */
+/*  Parametres :                                                          */
+/*     Indice du Contexte Oracle                                          */
+/*  Valeur de retour :                                                    */
+/*     Aucune                                                             */
+/*                                                                        */
+/*                                                                        */
+/**************************************************************************/
+void EnableThreads(int indice)
+{
+	struct sqlca sqlca;
+   EXEC SQL ENABLE THREADS;
+}
+
+/**************************************************************************/
+/* Allocation du contexte Oracle                        		  */
+/*------------------------------                                          */
+/*  Parametres :                                                          */
+/*     Indice du Contexte Oracle                                          */
+/*  Valeur de retour :                                                    */
+/*     Aucune                                                             */
+/*                                                                        */
+/*                                                                        */
+/**************************************************************************/
+void AllocateOracleCtx(int indice)
+{
+   
+   struct sqlca sqlca;      /*  SQL-02134: Invalid runtime context*/
+
+   trace_event("Start AllocateOracleCtx()", PROCESSING);
+
+   EXEC SQL CONTEXT ALLOCATE :tab_ParamCtx[indice].ctx;
+
+    trace_event("End   AllocateOracleCtx()", PROCESSING);
+
+}
+
+/**************************************************************************/
+/* Liberation du contexte Oracle                        		  */
+/*------------------------------                                          */
+/*  Parametres :                                                          */
+/*     Indice du Contexte Oracle                                          */
+/*  Valeur de retour :                                                    */
+/*     Aucune                                                             */
+/*                                                                        */
+/*                                                                        */
+/**************************************************************************/
+void FreeOracleCtx(int indice)
+{
+   trace_event("Start FreeOracleCtx()", PROCESSING);
+   
+   EXEC SQL CONTEXT FREE :tab_ParamCtx[indice].ctx;
+
+   trace_event("End   FreeOracleCtx()", PROCESSING);
+}
+
+/* EBE140422: Adding another free ctx function*/
+void DeconnectOracleParamCtx(TSParamCtx* ParamCtx)
+{
+   struct sqlca sqlca;
+   trace_event("Start DeconnectOracleParamCtx()", PROCESSING);
+
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   EXEC SQL CONTEXT USE :ParamCtx->ctx;
+   EXEC SQL COMMIT WORK RELEASE;
+   trace_event("End   DeconnectOracleParamCtx(VOID)", PROCESSING);
+}
+
+void FreeOracleParamCtx(TSParamCtx* ParamCtx)
+{
+   trace_event("Start FreeOracleParamCtx()", PROCESSING);
+   
+   EXEC SQL CONTEXT FREE :ParamCtx->ctx;
+
+   trace_event("End   FreeOracleParamCtx()", PROCESSING);
+}
+
+
+
+int ConnectOracleCmd2(int indice, char *sUser, char *sPass , FILE *fp )
+{
+   struct sqlca sqlca;
+   char sLine[MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+   VARCHAR         pUserName[20];
+   VARCHAR         pPassWord[32];
+   char            db_name[20]   = "powercard";
+   /*SKO290509*/ /* char            db_string[20] = "pcard";*/
+   EXEC SQL END DECLARE SECTION;
+
+   strcpy((char *)pUserName.arr,sUser); 
+   pUserName.len=strlen(sUser);
+
+   strcpy((char *)pPassWord.arr, sPass);
+   pPassWord.len=strlen(sPass);
+   sprintf ( sLine , "Start ConnectOracleCmd2(%s,%s) ",sUser,sPass);
+   fprintf ( fp , sLine );
+    
+   EXEC SQL WHENEVER SQLERROR  goto err_conn;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[indice].ctx;
+   EXEC SQL DECLARE DB_NAME DATABASE;
+
+   EXEC SQL CONNECT :pUserName IDENTIFIED BY :pPassWord;
+
+   EXEC SQL ALTER SESSION SET NLS_DATE_FORMAT = 'DD/MM/YY HH24:MI:SS';
+
+
+   fprintf(fp, "End   ConnectOracleCmd2(OK) \n");
+   return(OK);
+
+err_conn:
+   fprintf(fp, "End   ConnectOracleCmd2(NOK) \n");
+   fprintf(fp, "%s \n",sqlca.sqlerrm.sqlerrmc);
+   return(NOK);
+}
+
+/* EBE: refresh connection if killed by the firewal */
+int RefreshDBConnection(int nIndiceCtx)
+{
+
+	struct sqlca sqlca;
+	char	szDetail[512];
+
+	/*trace_event ( "Start RefreshDBConnection() ", PROCESSING );*/
+	EXEC SQL BEGIN DECLARE SECTION;
+		char            T_dummy [12];
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+  
+	memset(T_dummy,'\0',sizeof(T_dummy));
+
+	EXEC SQL WHENEVER SQLERROR GOTO err_RefreshDBConnection;
+	EXEC SQL EXECUTE
+	BEGIN
+		SELECT '1' INTO :T_dummy FROM DUAL;
+	END;
+	END-EXEC;
+
+
+	/*trace_event ( "End RefreshDBConnection(OK) ", PROCESSING );*/
+	return OK;
+
+err_RefreshDBConnection :
+	trace_event ( "End RefreshDBConnection(MALFUNCTION) ", ERROR );
+	sprintf(szDetail, ">>> Error on[%d]: %s",nIndiceCtx, sqlca.sqlerrm.sqlerrmc);
+	trace_event ( szDetail, ERROR );
+	return MALFUNCTION;
+}
+
+
+/* ELKAM14092022 PLUTONL-5169 START */
+int FillOraErrorList ( int nIndiceCtx , int* tErrorTab)
+{
+
+char        sLine[MAX_LINE_TRC];
+int         i = 0 ;
+
+EXEC SQL BEGIN DECLARE SECTION;
+    int     v_error_code;
+    int     v_count = MAX_LENGTH_ORA_ERROR_LIST;
+EXEC SQL END DECLARE SECTION;
+
+EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event("Start FillOraErrorList()",PROCESSING); 
+	
+	EXEC SQL WHENEVER SQLERROR GOTO ErrorException;
+	EXEC SQL DECLARE ERROR_ORA_COUNT_CUR CURSOR FOR
+        SELECT  count(1)
+        FROM    ERROR_ORA_LIST ;
+	EXEC SQL OPEN ERROR_ORA_COUNT_CUR ;
+    v_count = 0;
+    EXEC SQL FETCH ERROR_ORA_COUNT_CUR INTO	:v_count ;
+    if (v_count > MAX_LENGTH_ORA_ERROR_LIST)
+    {
+        trace_event(">>> FillOraErrorList() : the number of records returned is more than MAX_LENGTH_ORA_ERROR_LIST",PROCESSING); 
+        v_count = MAX_LENGTH_ORA_ERROR_LIST;
+    }
+
+    EXEC SQL WHENEVER NOT FOUND CONTINUE;
+    EXEC SQL CLOSE ERROR_ORA_COUNT_CUR ;
+
+	EXEC SQL WHENEVER SQLERROR GOTO ErrorException;
+	EXEC SQL DECLARE ERROR_ORA_CUR CURSOR FOR
+        SELECT  error_code
+        FROM    ERROR_ORA_LIST ;
+	EXEC SQL OPEN ERROR_ORA_CUR ;
+	EXEC SQL WHENEVER NOT FOUND DO break;
+	
+	while( i < v_count )
+	{
+        v_error_code = 0;
+        EXEC SQL FETCH ERROR_ORA_CUR INTO	:v_error_code;
+        tErrorTab[i++] = v_error_code;
+	}
+
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+    EXEC SQL CLOSE ERROR_ORA_CUR ;
+	
+	trace_event("END FillOraErrorList(OK)",PROCESSING); 
+	return(OK);
+
+ErrorException:
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event ( sLine , ERROR );
+	trace_event("END FillOraErrorList(NOK)",PROCESSING); 
+	return(99);
+}
+/* ELKAM14092022 PLUTONL-5169 END */

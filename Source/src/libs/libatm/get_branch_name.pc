@@ -1,0 +1,95 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_branch_name.pc                                                     */
+/*                                                                             */
+/* Description                                                                 */
+/*       recuperation du nom de l'agence								                       */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+0001MK     		12-03-2024   		MHO    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <param_ctx.h>
+#include <define.h>
+
+
+
+/***********************************************************************
+**  nom	: GetBranchName()                                             **
+**  desc	:                                                           **
+**  entree	: pTermNbr	-> numero du terminal                         **
+**  sortie	: pPtServName	-> nom de l'agence                          **
+**  retour	:                                                         **
+***********************************************************************/
+int	GetBranchName(
+	int		nIndexCtx,
+	char	*pTermNbr,
+	char    *pAcqBank,
+	char	*pBranchName)
+{
+	struct sqlca sqlca; /**Linux ***/
+	char		sLine  [MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	varchar		hTermNbr	[15];
+	varchar		hAcqBank	[6+1];	
+	varchar		hBranchName	[40+1];
+	int			hRet;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start GetBranchName(%.15s,%.6s)", pTermNbr,pAcqBank);
+	trace_event(sLine, PROCESSING);
+
+	/* - initialisation des variables - */
+	memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr)		);
+	memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));
+	memset(hBranchName.arr,	0, sizeof(hBranchName.arr)	);
+
+	memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr)	);
+	hTermNbr.len	= strlen(pTermNbr);
+	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));
+	hAcqBank.len	= strlen(pAcqBank);
+	hBranchName.len	= 40;
+
+
+	/* - capture des exceptions - */
+	EXEC SQL WHENEVER SQLERROR GOTO GetBranchNameErr;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+
+	/* - traitement PL/SQL - */
+	EXEC SQL EXECUTE
+		BEGIN
+		:hRet := PCRD_ATM_WATCH_SPEC.GET_BRANCH_NAME(
+		:hTermNbr,
+		:hAcqBank,
+		:hBranchName);
+	END;
+	END-EXEC;
+
+	if(hRet != OK) {
+		sprintf(sLine, "End   GetBranchName(%d)", hRet);
+		trace_event(sLine, PROCESSING);
+		return (NOK);
+	}
+
+	/* - recuperation du resultat du traitement PL/SQL - */
+	memcpy(pBranchName,		hBranchName.arr, hBranchName.len);
+
+
+	sprintf(sLine, "End   GetBranchName(%.40s)", pBranchName);
+	trace_event(sLine, PROCESSING);
+	return (strlen(pBranchName));
+
+GetBranchNameErr :
+	sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   GetBranchName(ERROR)", ERROR);
+	return (ERROR);
+}
+
+

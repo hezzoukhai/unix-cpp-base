@@ -1,0 +1,190 @@
+#include <stdio.h>
+#include <define.h>
+
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+int  GetAquirerBin (int  nIndexCtx, char  *sAcquirerBank, char  *sNetwork , char * sAquirerBin)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_bank_code			[6 + 1];
+        char       T_network_code		[2 + 1];
+        VARCHAR    T_acquirer_bin		[12 + 1];
+       
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GetAquirerBin()", PROCESSING);
+
+   memset (T_bank_code,       0, sizeof(T_bank_code));
+   memset (T_network_code,        0, sizeof(T_network_code));
+   memset (T_acquirer_bin.arr,   0, sizeof(T_acquirer_bin.arr));T_acquirer_bin.len = 0;
+
+   
+
+   memcpy (T_bank_code, sAcquirerBank, 6);
+   memcpy (T_network_code, sNetwork, 2);
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_acquirer_bin_err;
+   EXEC SQL EXECUTE  
+   BEGIN
+      :result := PCRD_P7_FUNCTION_TOOLS.GET_ACQUIRER_BIN (
+															:T_bank_code,
+															:T_network_code,
+															:T_acquirer_bin);
+
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+      memcpy (sAquirerBin,    T_acquirer_bin.arr,   T_acquirer_bin.len);
+	  sAquirerBin[T_acquirer_bin.len]='\0';
+	  sprintf(sLine,"End GetAquirerBin(OK): [%s]",sAquirerBin);
+      trace_event (sLine, PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      trace_event ("End GetAquirerBin(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_acquirer_bin_err:   
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event ("End GetAquirerBin (NOK)", PROCESSING);
+	return (NOK);
+}
+
+int  GetAquirerId ( int   nIndexCtx, 
+					char  *pBankCode,
+					char  *pNetworkCode,
+					char  *pAcquirerId)
+{
+
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_bank_code          [7];
+        char       T_network_code       [3];
+        VARCHAR    T_acquirer_id       [12];
+
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GetAquirerId()", PROCESSING);
+
+   memset (T_bank_code,        0, sizeof(T_bank_code));
+   memset (T_network_code,     0, sizeof(T_network_code));
+   memset (T_acquirer_id.arr,  0, sizeof(T_acquirer_id.arr));
+   T_acquirer_id.len = 0;
+
+   memcpy (T_bank_code,    pBankCode, 6);
+   memcpy (T_network_code, pNetworkCode, 2);
+
+   result = 909;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_acq_id_err;
+   EXEC SQL EXECUTE
+   BEGIN
+      :result := PCRD_P7_FUNCTION_TOOLS.GET_ACQUIRER_ID (
+                                        :T_bank_code,
+                                        :T_network_code,
+                                        :T_acquirer_id);
+
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+      memcpy (pAcquirerId, T_acquirer_id.arr, T_acquirer_id.len);
+ 
+      trace_event ("End  GetAquirerId(OK)", PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      trace_event ("End  GetAquirerId(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+   get_acq_id_err:
+	  EXEC SQL WHENEVER SQLERROR CONTINUE;
+	  sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	  trace_event(sLine, ERROR);
+      trace_event ("End  GetAquirerId(MALFUNCTION)", PROCESSING);
+      return (NOK);
+}
+
+
+int  GetAquirerICA ( int   nIndexCtx, 
+					char  *pBankCode,
+					char  *pNetworkCode,
+					char  *pAcquirerICA)
+{
+
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_bank_code          [7];
+        char       T_network_code       [3];
+        char		T_acquirer_ica      [6 + 1];
+
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GetAquirerICA()", PROCESSING);
+
+   memset (T_bank_code,        0, sizeof(T_bank_code));
+   memset (T_network_code,     0, sizeof(T_network_code));
+   memset (T_acquirer_ica,  0, sizeof(T_acquirer_ica));
+
+
+   memcpy (T_bank_code,    pBankCode, 6);
+   memcpy (T_network_code, pNetworkCode, 2);
+
+   result = 909;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_acq_ica_err;
+   EXEC SQL EXECUTE
+   BEGIN
+      :result := PCRD_P7_FUNCTION_TOOLS.GET_ACQUIRER_ICA (
+                                        :T_bank_code,
+                                        :T_network_code,
+                                        :T_acquirer_ica);
+
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+      memcpy (pAcquirerICA, T_acquirer_ica, 6);
+ 
+      trace_event ("End  GetAquirerICA(OK)", PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      trace_event ("End  GetAquirerICA(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_acq_ica_err:
+	  EXEC SQL WHENEVER SQLERROR CONTINUE;
+	  sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	  trace_event(sLine, ERROR);
+      trace_event ("End  GetAquirerICA(MALFUNCTION)", PROCESSING);
+      return (NOK);
+}
+
+

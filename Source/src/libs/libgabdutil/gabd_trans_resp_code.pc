@@ -1,0 +1,83 @@
+/****************************************************************************/
+/*  Routines to translate the response code (field 39) from ISO to GABD     */
+/*  and vice versa.                                                         */
+/****************************************************************************/
+#include <stdio.h>
+#include <string.h>
+
+#include <define.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+/****************************************************************************/
+/*   GabdTransRespCode()                                                    */
+/*                                                                          */
+/*   Converts an ISO response code to GABD code 			               */
+/*   Input:  FromCode  (response code to convert)                           */
+/*   Output: ToCode    (converted response code)                            */
+/****************************************************************************/
+int  GabdTransRespCode (int   nIndexCtx,
+                        char *Processing_Code,
+                        char *FromCode,
+                        char *ToCode,
+						char *Affichage,
+						char *printercode)
+{
+   EXEC SQL BEGIN DECLARE SECTION;
+		char 	   sLine[MAX_LINE_TRC];
+        char       T_processing_code 		[3];
+        VARCHAR    T_action_code_from 		[4];
+        VARCHAR    T_action_code_translat 	[4];
+        char       T_affichage_code 		[2];
+		char	   T_printer_code		    [3+1];
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+   sprintf(sLine," Start GabdTransRespCode ( %s, %s )",Processing_Code,FromCode);
+   trace_event(sLine,PROCESSING);
+
+   memset (T_processing_code,       	 0, sizeof(T_processing_code));
+   memset (T_action_code_from.arr,       0, sizeof(T_action_code_from.arr));
+   memset (T_action_code_translat.arr,   0, sizeof(T_action_code_translat.arr));
+   memset (T_affichage_code,         	 0, sizeof(T_affichage_code));
+   memset (T_printer_code,         		 0, sizeof(T_printer_code));
+
+   memcpy (T_processing_code, Processing_Code, 2);
+   memcpy (T_action_code_from.arr, FromCode, strlen (FromCode));
+   T_action_code_from.len = strlen (FromCode) ;  
+   T_action_code_translat.len = 0; 
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+   EXEC SQL WHENEVER SQLERROR GOTO action_code_error;
+   EXEC SQL EXECUTE
+   BEGIN
+      :result := PCRD_GET_GABDPARAM.GET_GABD_ACTION_CODE (
+                                          			:T_processing_code,
+                                          			:T_action_code_from,
+                                          			:T_action_code_translat,
+										  			:T_affichage_code,
+										  			:T_printer_code);
+   END;
+   END-EXEC;
+   if (result == OK)
+   {
+       memcpy (ToCode, T_action_code_translat.arr, T_action_code_translat.len);
+       memcpy (Affichage, T_affichage_code, 1);
+       memcpy (printercode, T_printer_code, 3);
+       trace_event("End   GabdTransRespCode(OK)",PROCESSING);
+       return (OK);
+   }
+       trace_event("End   GabdTransRespCode(NOK)",PROCESSING);
+       return (NOK);
+
+   action_code_error:
+	  sprintf(sLine, "ERROR :%s",sqlca.sqlerrm.sqlerrmc);
+      trace_event(sLine, ERROR);
+      trace_event("End   GabdTransRespCode(MALFUNCTION)",PROCESSING);
+      return (NOK);
+}
+
+

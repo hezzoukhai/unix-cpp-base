@@ -1,0 +1,106 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <tlv_fields.h>
+#include <resources.h>
+#include <tlv_private.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int LoadIssuerInfo (    int   nIndiceCtx          ,
+                        char *sTlvBuffer          ,
+			   	        char *sInternationalCheck 
+                   )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+ 	char       	T_international_check;
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start LoadIssuerInfo() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+ 	T_international_check = sInternationalCheck [ 0 ];
+
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+
+
+	
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_LoadIssuerData;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_LOAD_AUTH_DATA.LOAD_AUTH_DATA_ELEMENTS( 	
+								:T_tlv_auth,
+								:T_international_check
+							 );
+
+	END;
+	END-EXEC;
+
+	tlvcpy(sTlvBuffer, T_tlv_auth.arr, T_tlv_auth.len);
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	if (response_code == OK)
+	{
+		trace_event ( "End   LoadIssuerInfo() ", PROCESSING );
+		return(OK);
+	}	
+
+    dump_buffer(sTlvBuffer,T_tlv_auth.len,'A','X','X');
+
+	
+	sprintf(sLine,"End LoadIssuerInfo(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_LoadIssuerData :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End LoadIssuerInfo(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

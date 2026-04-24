@@ -1,0 +1,96 @@
+
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_action_info.pc                                                                 */
+/*                                                                             */
+/* Description                                                                 */
+/*      ATM Reply Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		17-11-2003   		Mahjoub KARROUM    		Initial Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <define.h>
+#include <langue.h>
+#include <param_ctx.h>
+
+/*****************************************************************************/
+/* Fonction GetActionInfo                                                     */
+/* ----------------------------------------                                  */
+/*  Retour   : OK                                                            */
+/*  Revision :                                                               */
+/*****************************************************************************/
+int     GetActionInfo(nIndexCtx,
+                     pRepCode,
+		     pActionFlag,
+		     pActionLabel)
+int    nIndexCtx;
+char   *pRepCode;
+char   *pActionFlag;
+char   *pActionLabel;
+
+{
+struct sqlca sqlca;
+   char sLine[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+        char	T_pRepCode	[3+1];
+        char    T_ActionFlag	[1+1];
+	VARCHAR T_ActionLabel	[16+1];
+	int		plRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start GetActionInfo(%s)", pRepCode);
+trace_event(sLine, PROCESSING);
+
+memset(T_ActionFlag, 0,sizeof(T_ActionFlag));
+memset(T_ActionLabel.arr,    0,sizeof(T_ActionLabel.arr));
+T_ActionLabel.len = 0;
+
+memset(T_pRepCode , 0,sizeof(T_pRepCode));
+memcpy(T_pRepCode , pRepCode,3);
+
+EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+EXEC SQL WHENEVER SQLERROR GOTO GetActionInfoErr;
+EXEC SQL EXECUTE
+
+BEGIN
+	:plRetour := PCRD_ATM_TOOLS_3.GET_ACTION_INFO(
+					    	:T_pRepCode,
+						:T_ActionLabel,
+						:T_ActionFlag
+						 );
+END;
+END-EXEC;
+
+if(plRetour == OK)
+{
+ memcpy(pActionLabel, T_ActionLabel.arr, T_ActionLabel.len);
+ memcpy(pActionFlag, T_ActionFlag, sizeof(T_ActionFlag));
+ sprintf(sLine, "END   GetActionInfo(%s,%s)", pActionLabel, pActionFlag);
+ trace_event(sLine, PROCESSING);
+ return(OK);
+}
+else
+{
+ memcpy(pActionLabel, T_ActionLabel.arr, T_ActionLabel.len);
+ memcpy(pActionFlag, T_ActionFlag, sizeof(T_ActionFlag));
+ sprintf(sLine, "END   GetActionInfo(%s,%s)", "UNKNOWN ACTION", pActionFlag);
+ trace_event("END   GetActionInfo(NOK)", PROCESSING);
+ return(NOK);
+}
+GetActionInfoErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   GetActionInfo(ERROR)", ERROR);
+    return (ERROR);
+}
+

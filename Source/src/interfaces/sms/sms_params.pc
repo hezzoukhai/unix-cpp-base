@@ -1,0 +1,153 @@
+#include <stdio.h>
+#include <define.h>
+#include <sms_param.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/****************************************************************************/
+/*  GetSmsParams()                                                          */
+/*  Reads Sms parameters from table.                                        */
+/****************************************************************************/
+int  GetSmsParams (int  nIndexCtx, char  *pResourceId)
+{
+   struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_resource_id     [7];
+        char       T_station_id      [7];
+        VARCHAR    T_acquirer_id     [12];
+        char       T_plus_pmc        [7];
+        char       T_country_code    [4];
+        char       T_alpha_country2  [3];
+        char       T_alpha_country3  [4];
+        VARCHAR    T_bank_location   [12];
+        
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf(sLine,"Start  GetSmsParams() ResourceID ....  : %s", pResourceId);
+   trace_event (sLine, PROCESSING);
+
+   memset (sLine,               0, sizeof(sLine));
+   memset (T_resource_id,       0, sizeof(T_resource_id));
+   memset (T_station_id,        0, sizeof(T_station_id));
+   memset (T_plus_pmc,          0, sizeof(T_plus_pmc)); 
+   memset (T_country_code,      0, sizeof(T_country_code));
+   memset (T_alpha_country2,    0, sizeof(T_alpha_country2));
+   memset (T_alpha_country3,    0, sizeof(T_alpha_country3));
+   memset (T_acquirer_id.arr,   0, sizeof(T_acquirer_id.arr));
+   memset (T_bank_location.arr, 0, sizeof(T_bank_location.arr));
+ 
+   T_acquirer_id.len = 0;
+   T_bank_location.len = 0;
+
+   memcpy (T_resource_id, pResourceId, 6);
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO resource_params_error;
+   EXEC SQL EXECUTE
+       DECLARE
+              T_sms_params  P7_SMS_RESOURCE_PARAM%ROWTYPE;
+   BEGIN
+      :result := PCRD_SWI_RESOURCES_PARAM.GET_SMS_PARAMS (  :T_resource_id,
+                                                              T_sms_params);
+
+      IF (:result = 0) THEN
+         :T_station_id     := T_sms_params.station_id;
+         :T_plus_pmc       := T_sms_params.plus_pmc;
+         :T_country_code   := T_sms_params.country_code;
+         :T_alpha_country2 := T_sms_params.alpha_country_code2;
+         :T_alpha_country3 := T_sms_params.alpha_country_code3;
+         :T_acquirer_id    := T_sms_params.acquirer_id;
+         :T_bank_location  := T_sms_params.bank_location;
+
+      END IF;
+ 
+   END;
+   END-EXEC;
+
+   sprintf(sLine," result is ....  : %d", result);
+   trace_event (sLine, PROCESSING);
+
+   if (result == OK)
+   {
+      memcpy (StationId,     T_station_id,        6);
+      memcpy (PlusPmc,       T_plus_pmc,          6);
+      memcpy (CountryCode,   T_country_code,      3);
+      memcpy (AlphaCode2,    T_alpha_country2,    2);
+      memcpy (AlphaCode3,    T_alpha_country3,    3);
+      memcpy (AcquirerId,    T_acquirer_id.arr,   T_acquirer_id.len);
+      memcpy (BankLocation,  T_bank_location.arr, T_bank_location.len);
+      
+      fprintf (stderr, "End GetSmsParams(OK)");
+      return (OK);
+   }
+   else
+   {
+      fprintf (stderr, "End GetSmsParams(NOK)");
+      return (NOK);
+   }
+
+   resource_params_error:
+   /*EXEC SQL WHENEVER SQLERROR CONTINUE;*/
+      sprintf(sLine, "End GetSmsParams(MALFUNCTION)|%s",sqlca.sqlerrm.sqlerrmc);
+      fprintf(stderr,sLine);
+      return (NOK);
+}
+
+void DumpSmsGlobals ( )
+{
+   fprintf (stderr,"\n Comms Id ................. = %.2s ", CommsId );
+   fprintf ( stderr,"\n trace_file................= %s ", trace_file  );
+   fprintf (stderr,"\n trace_level .............. = %d ", trace_level );
+   fprintf (stderr,"\n Acquirer Timer ........... = %d ", nTimerAcq );
+   fprintf (stderr,"\n Delta Time Acquirer/Issuer = %d ", nIssAcqDelta);
+   fprintf (stderr,"\n Min Troubles Ind ......... = %d ", MinTroublesInd );
+   fprintf (stderr,"\n Max Troubles Ind ......... = %d ", MaxTroublesInd );
+   fprintf (stderr,"\n Nbr Max Threads  ......... = %d ", max_thread  );
+   fprintf (stderr,"\n Nbr User Threads ......... = %d ", nUserThread );
+   fprintf (stderr,"\n Max Request .............. = %d ", max_request );
+   fprintf (stderr,"\n Protocol ID .............. = %.2s ",  ProtocolId );
+   fprintf (stderr,"\n Device Name .............. = %.15s ",  DeviceName );
+   fprintf (stderr,"\n Remote Application Name... = %.15s ",  RemoteAppName );
+   fprintf (stderr,"\n Remote Application Id..... = %.15s ",  RemoteAppId   );
+   fprintf (stderr,"\n Local  Application Name... = %.15s ",  LocalAppName );
+   fprintf (stderr,"\n Local  Application Id..... = %.15s ",  LocalAppId );
+   fprintf (stderr,"\n Station Id ............... = %.6s ", StationId );
+   fprintf (stderr,"\n Plus Pmc ................. = %.6s ", PlusPmc );
+   fprintf (stderr,"\n Country Code.............. = %.3s ",  CountryCode );
+   fprintf (stderr,"\n Alpha Code2............... = %.2s ", AlphaCode2 );
+   fprintf (stderr,"\n Alpha Code3............... = %.3s ",  AlphaCode3 );
+   fprintf (stderr,"\n Acq Inst Id............... = %.11s ",  AcquirerId );
+   fprintf (stderr,"\n Bank Location............. = %.11s ", BankLocation );
+   fprintf (stderr,"\n Acquirer Bank ............ = %.6s ", AcquirerBank );
+
+   fprintf ( stderr,"\n");
+}
+
+/*int GetMaxSafCounter()
+{
+   return ( 10 );
+}
+
+GetAdviceInterval ( char *ResourceId )
+{
+   return ( 2 );
+}
+
+char GetDeclineAdvicesFlag ( char * Resource )
+{
+  return ( 'N' );
+}*/
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,186 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_terminal_profile.pc                                                */
+/*                                                                             */
+/* Description                                                                 */
+/*      chargement du code profil d'un terminal				       */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+SWI03022012   		03-02-2012   		Said El Waggagui   		MTP-V226_DEV-02022012-MKB-NDC_CURRENCY	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <sqlca.h>
+
+
+/***********************************************************************
+**  nom	: GetTerminalProfile					**
+**  desc	: chargement du code profile d'un terminal		**
+**  entree	: terminalNumber	-> numero terminal		**
+**  sortie	: profileCode		-> code profil du terminal	**
+**  retour	: OK	-> fonction OK					**
+**		  NOK	-> terminal non trouve				**
+**		  ERROR	-> erreur fatal					**
+**  auteur	: Younes OUADI (29 Oct 1998)				**
+***********************************************************************/
+int GetTerminalProfile(
+	int			nIndexCtx,
+	char		*terminalNumber,
+	char		*bankCode,
+	char		*profileCode)
+{
+	struct sqlca sqlca; /**Linux ***/
+	char		sLine[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR		plTerminalNumber[15+1];
+	VARCHAR		plBankCode		[ 6+1];
+	char		plProfileCode	[ 3+1];
+	int			hRet;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start GetTerminalProfile(%.8s,%s)", terminalNumber,bankCode);
+	trace_event(sLine, PROCESSING);
+
+	memset(plTerminalNumber.arr,0, sizeof(plTerminalNumber.arr)	);
+	memset(plBankCode.arr,	0, sizeof(plBankCode.arr)	);
+	memset(plProfileCode,	0, sizeof(plProfileCode)	);
+
+	memcpy(plTerminalNumber.arr,	terminalNumber, strlen(terminalNumber));
+	plTerminalNumber.len = strlen(terminalNumber);
+
+	memcpy(plBankCode.arr,	bankCode, strlen(bankCode));
+	plBankCode.len = strlen(bankCode);
+
+
+	EXEC SQL WHENEVER SQLERROR GOTO getTerminalProfileErr;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL EXECUTE
+		BEGIN
+		:hRet := PCRD_ATM_WATCH.TERMINAL_PROFILE(:plTerminalNumber,
+		:plBankCode,
+		:plProfileCode);
+	END;
+	END-EXEC;
+
+	if(hRet != OK) {
+		sprintf(sLine, "End   GetTerminalProfile(%d)", hRet);
+		trace_event(sLine, PROCESSING);
+		return (NOK);
+	}
+
+
+	memcpy(profileCode,		plProfileCode,	3);
+
+	sprintf(sLine, "End   GetTerminalProfile(%.6s,%.3s)", bankCode, profileCode);
+	trace_event(sLine, PROCESSING);
+	return (OK);
+
+getTerminalProfileErr :
+	sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   GetTerminalProfile(ERROR)", PROCESSING);
+	return (ERROR);
+}
+
+/*Start SWI03022012*/
+/***********************************************************************
+**  nom       : GetProfileCurencies                                    *
+**  desc      : chargement des monnaies du profile GAB                **
+**  entree    : ProfileCode        -> profile terminal                **
+: BankCode           -> Bank code                       **
+**  sortie    : default_currency   -> monnaie supportee par le profil **
+first_currency
+second_currency
+third_currency
+
+**  retour    : OK    -> fonction OK                                  **
+**              NOK   -> terminal non trouve                          **
+**              ERROR -> erreur fatal                                 **
+**  auteur    : Kamal Sbai (15 Sep 2007)                            **
+***********************************************************************/
+int GetProfileCurencies(
+	int             nIndexCtx,
+	char            *ProfileCode,
+	char            *BankCode,
+	char            *default_currency,
+	char            *first_currency,
+	char            *second_currency,
+	char            *third_currency)
+{
+	char                sLine[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	char                T_BankCode        [ 6+1];
+	char                T_ProfileCode     [ 3+1];
+	char                T_DefCurrency     [ 3+1];
+	char                T_FirstCurrency   [ 3+1];
+	char                T_SecCurrency     [ 3+1];
+	char                T_ThdCurrency     [ 3+1];
+	int                 hRet;
+	short            	null_DfltCurrency_ind; 	/* To Overcome the "Fetch Column is Null" Error */
+	short            	null_FstCurrency_ind; 	
+	short            	null_SecCurrency_ind; 
+	short            	null_ThdCurrency_ind; 																						 										 										 
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start GetProfileCurencies(%.3s,%.6s)", ProfileCode,BankCode);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_BankCode,          0, sizeof(T_BankCode)   );
+	memset(T_ProfileCode,       0, sizeof(T_ProfileCode));
+	memset(T_DefCurrency,       0, sizeof(T_DefCurrency) );
+	memset(T_FirstCurrency,     0, sizeof(T_FirstCurrency) );
+	memset(T_SecCurrency,       0, sizeof(T_SecCurrency)   );
+	memset(T_ThdCurrency,       0, sizeof(T_ThdCurrency)   );
+
+	memcpy(T_BankCode,           BankCode, 6);
+	memcpy(T_ProfileCode,        ProfileCode, 3);
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO getTerminalProfileErr;
+	EXEC SQL EXECUTE
+		BEGIN
+		:hRet := PCRD_ATM_WATCH.GET_PROFILE_CURRENCIES(:T_ProfileCode,
+		:T_BankCode,
+		:T_DefCurrency:null_DfltCurrency_ind,
+		:T_FirstCurrency:null_FstCurrency_ind,
+		:T_SecCurrency:null_SecCurrency_ind,
+		:T_ThdCurrency:null_ThdCurrency_ind);
+	END;
+	END-EXEC;
+
+	if(hRet != OK)
+	{
+		sprintf(sLine, "End   GetProfileCurencies(%d)", hRet);
+		trace_event(sLine, PROCESSING);
+		return (NOK);
+	}
+	else if (null_DfltCurrency_ind == -1 || null_FstCurrency_ind == -1 || 	/*AMER20200827 PLUTONL-2186*/
+			 null_SecCurrency_ind == -1 || null_ThdCurrency_ind == -1) 
+	{
+	   trace_event("End GetProfileCurencies, one of the 4 currencies is null", PROCESSING);
+	}																   
+
+	memcpy(default_currency,          T_DefCurrency,     3);
+	memcpy(first_currency,            T_FirstCurrency,   3);
+	memcpy(second_currency,           T_SecCurrency,     3);
+	memcpy(third_currency,            T_ThdCurrency,     3);
+
+	sprintf(sLine, "End   GetProfileCurencies(%.3s,%.3s,%.3s,%.3s)", default_currency, first_currency,second_currency,third_currency);
+	trace_event(sLine, PROCESSING);
+	return (OK);
+
+getTerminalProfileErr :
+	sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   GetProfileCurencies(ERROR)", PROCESSING);
+	return (ERROR);
+}
+/*End SWI03022012*/
+
+
+

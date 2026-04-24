@@ -1,0 +1,131 @@
+
+  /***********************************************************************
+  **  nom	: gabd_get_flag.pc					**
+  **  desc	: gestion de configuration gabd				**
+  ***********************************************************************/
+#include <stdio.h>
+#include <string.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <define.h>
+#include <gabd_config.h>
+#include <param_ctx.h>
+
+  /***********************************************************************
+  **  nom		: Get_Gabd_Flag()					**
+  **  desc		: chargement des flags de la configuration		**
+  **  entree	: pTerminalConfig	-> identification de la config	**
+  **  sortie	: pTerminalConfig	-> flags de la config		**
+  **  retour	: 	OK	-> si c'est OK					**
+  **		  		NOK	-> si pas de configuration pour ce terminal	**
+  **		  		ERROR	-> erreur fatal					**
+  **				(c) 1999 Hightech Payment Systems		**
+  ***********************************************************************/
+int	Get_Gabd_Flag(nIndexCtx, pTerminalConfig)
+int				nIndexCtx;
+gabd_config	*pTerminalConfig;
+{
+EXEC SQL BEGIN DECLARE SECTION;
+    char  sLine[MAX_LINE_TRC];
+    VARCHAR	hTerminalNumber	[15];
+    varchar	hAcqBank		[6+1];/*ICH270715*/ 
+    char	hLoadScreenFlag;
+    char	hLoadConfigParamFlag;
+    char	hLoadFitFlag;
+    char	hLoadDateTimeFlag;
+    char	hLoadCommsKeyFlag;
+    char    hSendArretComptableFlag;
+    char    hSendEvenementFlag;
+    char    hSendJournalDataFlag;
+    char    hCmdGoInServiceFlag;
+    char    hCmdGoOutServiceFlag;
+    int		hResponseCode;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start Get_Gabd_Flag(%s) ", pTerminalConfig->fTerminalNumber);
+trace_event(sLine, PROCESSING);
+sprintf(sLine, "terminal_number_len = %d ", (int)strlen(pTerminalConfig->fTerminalNumber) );
+trace_event(sLine, PROCESSING);
+/* le jour du site pilote*/
+pTerminalConfig->fTerminalNumber[6] = '\0';
+										  
+sprintf(sLine,"nIndexCtx: %d  ID: %d  Ctx: %ld", nIndexCtx, tab_ParamCtx[nIndexCtx].ID, tab_ParamCtx[nIndexCtx].ctx);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des chaines ------------------------------------------------- */
+    memset(&hTerminalNumber.arr,	0, sizeof(hTerminalNumber.arr)	);
+    memset(&hAcqBank.arr,			0, sizeof(hAcqBank.arr));/*ICH270715*/     
+
+
+    /* - initialisation ----------------------------------------------------- */
+    memcpy(hTerminalNumber.arr,
+           pTerminalConfig->fTerminalNumber,
+           strlen(pTerminalConfig->fTerminalNumber));
+    hTerminalNumber.len = strlen(pTerminalConfig->fTerminalNumber);
+
+    memcpy(hAcqBank.arr,	pTerminalConfig->fAcqBank, strlen(pTerminalConfig->fAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pTerminalConfig->fAcqBank);
+
+    /* - capture des exception ---------------------------------------------- */
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO getConfigFlagsErr;
+    /* - execution de la fonction PL/SQL ------------------------------------ */
+    EXEC SQL EXECUTE
+    DECLARE
+        enr_gabd_terminal_config	GABD_TERMINAL_CONFIG%ROWTYPE;
+    BEGIN
+      -- initialisation de enr_gabd_terminal_config
+      enr_gabd_terminal_config.terminal_atm_number := :hTerminalNumber;
+      enr_gabd_terminal_config.bank_code 			:= :hAcqBank;/*ICH270715*/  
+
+      -- appel de la fonction PL/SQL
+      :hResponseCode:=PCRD_GABD_TERMINAL_CONFIG.GET_CONFIG(enr_gabd_terminal_config);
+
+      -- recuperation des champs de gabd_terminal_config
+      IF :hResponseCode = DECLARATION_CST.OK
+      THEN
+        :hLoadScreenFlag	    :=enr_gabd_terminal_config.load_screen_flag;
+        :hLoadConfigParamFlag	:=enr_gabd_terminal_config.load_config_param_flag;
+        :hLoadFitFlag			:=enr_gabd_terminal_config.load_fit_flag;
+        :hLoadDateTimeFlag		:=enr_gabd_terminal_config.load_date_time_flag;
+        :hLoadCommsKeyFlag		:=enr_gabd_terminal_config.load_comms_key_flag;
+        :hSendArretComptableFlag:=enr_gabd_terminal_config.send_arret_comptable_flag;
+        :hSendEvenementFlag		:=enr_gabd_terminal_config.send_evenement_flag;
+        :hSendJournalDataFlag	:=enr_gabd_terminal_config.send_journal_data_flag;
+        :hCmdGoOutServiceFlag	:=enr_gabd_terminal_config.cmd_go_out_service_flag;
+      END IF;
+    END;
+    END-EXEC;
+
+    /* - examen du retour de la fonction PL/SQL ----------------------------- */
+    if(hResponseCode != OK)
+    {
+        trace_event("End   Get_Gabd_Flag(NOK)", PROCESSING);
+        return (hResponseCode);
+    }
+
+
+    /* - recuperation du resultat ------------------------------------------- */
+    pTerminalConfig->fLoadScreenFlag			= hLoadScreenFlag;
+    pTerminalConfig->fLoadConfigParamFlag		= hLoadConfigParamFlag;
+    pTerminalConfig->fLoadFitFlag				= hLoadFitFlag;
+    pTerminalConfig->fLoadDateTimeFlag			= hLoadDateTimeFlag;
+    pTerminalConfig->fLoadCommsKeyFlag			= hLoadCommsKeyFlag;
+    pTerminalConfig->fSendArretComptableFlag	= hSendArretComptableFlag;
+    pTerminalConfig->fSendEvenementFlag			= hSendEvenementFlag;
+    pTerminalConfig->fSendJournalDataFlag		= hSendJournalDataFlag;
+    pTerminalConfig->fCmdGoOutServiceFlag		= hCmdGoOutServiceFlag;
+
+
+sprintf(sLine, "End   Get_Gabd_Flag(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+getConfigFlagsErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   Get_Gabd_Flag(ERROR)", ERROR);
+    return (ERROR);
+}

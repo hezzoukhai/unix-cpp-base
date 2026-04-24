@@ -1,0 +1,33 @@
+#ifndef HPS_POS_ICTAG_H
+#define HPS_POS_ICTAG_H
+
+#define    POS_TAG_ISS_SCRIPT1         "0071"
+#define    POS_TAG_ISS_SCRIPT2         "0072"
+#define    POS_TAG_ISS_SCRIPT_CMD      "0086"
+#define    POS_TAG_APP_INTER_PROFILE   "0082"
+#define    POS_TAG_DED_FILE_NAME       "0084"
+#define    POS_TAG_ICC_APP_ID          "004F"
+#define    POS_TAG_TERM_CAP_PROFILE    "9F33"
+#define    POS_TAG_AUTHOR_RESP_CODE    "008A"
+#define    POS_TAG_ISS_AUTHEN_DATA     "0091"
+#define    POS_TAG_TVR                 "0095"
+#define    POS_TAG_TRANS_DATE          "009A"
+#define    POS_TAG_TRANS_TYPE          "009C"
+#define    POS_TAG_TRANS_CUR_CODE      "5F2A"
+#define    POS_TAG_TRANS_AMOUNT        "9F02"
+#define    POS_TAG_OTHER_AMOUNT        "9F03"
+#define    POS_TAG_TERM_APP_VER_NUM    "9F09"
+#define    POS_TAG_ISS_APP_DATA        "9F10"
+#define    POS_TAG_TERM_COUNTRY_CODE   "9F1A"
+#define    POS_TAG_IFD_SERIAL_NUM      "9F1E"
+#define    POS_TAG_APP_CRYPTOGRAM      "9F26"
+#define    POS_TAG_CRYPTO_INFO_DATA    "9F27"
+#define    POS_TAG_TERM_CAP            "9F33"
+#define    POS_TAG_CVM                 "9F34"
+#define    POS_TAG_TERM_TYPE           "9F35"
+#define    POS_TAG_ATC                 "9F36"
+#define    POS_TAG_UNPRED_NUMBER       "9F37"
+#define    POS_TAG_TRANS_SEQ_NUM       "9F41"
+#define    POS_TAG_TRANS_CATEG_CODE    "9F53"
+
+#endif /** HPS_POS_ICTAG_H **/

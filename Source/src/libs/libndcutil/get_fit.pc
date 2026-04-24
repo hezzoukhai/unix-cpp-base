@@ -1,0 +1,105 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_fit.pc                                                                 */
+/*                                                                             */
+/* Description                                                                 */
+/*      Get FIT Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+
+#include <define.h>
+
+#include <paramdef.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+     /********************************************************************
+     **  GetAllFits(pTerminalNumber, pFit).                          	**
+     **  Descri : charge la table des fits.			     	**
+     **  Entree : pTerminalNumber -> numero terminal			**
+     **  Sortie : pFit -> structure ndc_param qui recevra la        	**
+     **      chaine fit(.data) et sa langueur(.len).                 	**
+     **  Return : OK -> foctinnement normal.			     	**
+     **		  ERROR -> erreur ORACLE.			     	** 
+     **  Auteur : Younes OUADI (le 27/11/1997).			     	**
+     *********************************************************************/
+int GetAllFits(
+int 		nIndexCtx,
+char		*pTerminalNumber,
+char		*pAcqBank/*ICH270715*/,
+char	*pFit,
+char	*pNextFitCode)
+{
+   struct sqlca sqlca;
+    char  detail[MAX_LINE_TRC];
+
+EXEC SQL BEGIN DECLARE SECTION;
+    char		plBankCode		[    6+1];
+    char		plProfileCode	[    3+1];
+    /* BEGIN LHI CORRIGER BUG SUITE 0 UN COUNT FIT EGALE A 240 
+    varchar		plFit    		[10000+1];
+    */
+    char		plNextFitCode [3 + 1]; 
+    
+    varchar		plFit    		[32767 +1];
+    int			plRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(detail, "Start GetAllFits(%.8s,%s)", pTerminalNumber,pAcqBank);
+trace_event(detail, PROCESSING);
+
+   /* initialisation des variables PL/SQL */
+   memset(plFit.arr,	0,	sizeof(plFit.arr));
+   memset(plBankCode,	0,	sizeof(plBankCode));
+   memset(plProfileCode,	0,	sizeof(plProfileCode));
+   plFit.len = 0;
+
+    memset(plNextFitCode, 0, sizeof(plNextFitCode));
+    memcpy(plNextFitCode, pNextFitCode, 3);
+
+   
+	memcpy(plBankCode,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+
+   plRetour = GetTerminalProfile(nIndexCtx,pTerminalNumber, plBankCode, plProfileCode);
+   if(plRetour != OK)
+   {
+      trace_event("End   GetAllFits(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+   EXEC SQL WHENEVER SQLERROR GOTO GetAllFits_err;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+   EXEC SQL EXECUTE
+      BEGIN
+         :plRetour := PCRD_GET_NDCPARAM_1.FIT(:plBankCode, :plProfileCode, :plFit, :plNextFitCode);
+      END;
+   END-EXEC;
+
+   if (plRetour != OK)
+   {
+      trace_event("END   GetAllFits(NOK)",PROCESSING);
+      return (NOK);
+   }
+
+
+   memcpy(pFit, plFit.arr, plFit.len);
+   memcpy(pNextFitCode, plNextFitCode, 3);
+
+   trace_event("End   GetAllFits(OK)",PROCESSING);
+   return (OK);
+
+GetAllFits_err :
+   sprintf(detail,"End   GetAllFits(%s,X) -> %s",
+                   pTerminalNumber,sqlca.sqlerrm.sqlerrmc);
+   trace_event(detail, ERROR);
+   return(ERROR);
+}

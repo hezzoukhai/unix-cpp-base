@@ -1,0 +1,489 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      ndc_util.pc                                                            */
+/*                                                                             */
+/* Description                                                                 */
+/*       Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <define.h>
+#include <atmcmd.h>
+#include <param_ctx.h>
+#include <langue.h>
+#include <command.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+void GetTransCode(char TransCodes, char *TransCoded)
+
+{
+	char 	sLine[MAX_LINE_TRC];
+
+	sprintf(sLine, "Start GetTransCode(%c)", TransCodes);
+	trace_event(sLine, PROCESSING);
+
+	switch(TransCodes){
+	case ARABIC : memcpy(TransCoded,"ARA",3);
+		break;
+	case FRENSH : memcpy(TransCoded,"FRE",3);
+		break;
+	default :
+		memcpy(TransCoded,"ENG",3);
+	}
+	TransCoded[3] = '\0';
+	sprintf(sLine, "End   GetTransCode(%s)", TransCoded);
+	trace_event(sLine, PROCESSING);
+	return;
+}
+
+/******************************************************************************/
+/* Fonction watch_status.                                                     */
+/* ---------------------                                                      */
+/* Description : Cette fonction a pour but de mettre a jour la table des      */
+/*               ressource pour la ressource ATM2                             */
+/* Entree      : Nouveau status.                                              */
+/* Sortie      : NOK si erreur                                                */
+/*               OK Sinon                                                     */
+/* Date/Auteur : 16/09/96 A. ALAOUI                                           */
+/* Revision    :                                                              */
+/******************************************************************************/
+/*
+watch_status(status)
+int status;
+{
+   trace_event("Start watch_status()", PROCESSING);
+   trace_event("End   watch_status()", PROCESSING);
+   return(OK);
+}
+*/
+/* =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- */
+/* =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- */
+int     GetMonth(int		nIndexCtx,int     offset,char    month[],char	flag)
+{
+   struct sqlca sqlca;
+   char   sLine[MAX_LINE_TRC];
+
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR             vDate[8];
+	VARCHAR				vflag[2];
+    int                 vOffset;
+    int                 plRetour;
+EXEC SQL END DECLARE SECTION;
+	memset(vDate.arr,0,sizeof(vDate.arr));
+	vDate.len = 4;
+	memset(vflag.arr,0,sizeof(vflag.arr));
+	vflag.len = 1;
+        vOffset = offset;
+
+	/* EBE140523 memcpy(vflag.arr,flag,1); *Linux*/
+	vflag.arr[0] = flag;
+
+   EXEC SQL WHENEVER SQLERROR GOTO getMonthErr;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL EXECUTE
+      BEGIN
+         :plRetour := PCRD_ATM_TOOLS_3.GET_MONTH(:vflag,
+                                             	 :vOffset,
+												 :vDate);
+      END;
+   END-EXEC;
+
+
+if (plRetour == NOK)
+{
+   trace_event("End   GetMonth(NOK)", PROCESSING);
+   return(NOK);
+}
+
+memcpy(month, vDate.arr, vDate.len);
+trace_event("End   GetMonth(OK)", PROCESSING);
+return (OK);
+
+getMonthErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   GetMonth(ERROR)", ERROR);
+    return (ERROR);
+}
+
+/* =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- */
+/* =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- */
+int	TransMonth(char	*pMonth)
+{
+   char   sLine[MAX_LINE_TRC];
+   char	lNewMonth	[15];
+
+   sprintf(sLine, "Start TransMonth(%s)", pMonth);
+   trace_event(sLine, PROCESSING);
+
+   memset(lNewMonth,	0, sizeof(lNewMonth));
+
+   memcpy(lNewMonth,	pMonth+strlen (pMonth) - 4, 4);
+
+   if(memcmp(pMonth, "JAN", 3) == 0)	  memcpy(lNewMonth+4, "  @_#Z_", 7);
+   else if(memcmp(pMonth, "FEB", 3) == 0) memcpy(lNewMonth+4, " @_\"@_M", 7);
+   else if(memcmp(pMonth, "MAR", 3) == 0) memcpy(lNewMonth+4, "   C@#X", 7);
+   else if(memcmp(pMonth, "APR", 3) == 0) memcpy(lNewMonth+4, "  T_@&\"", 7);
+   else if(memcmp(pMonth, "MAY", 3) == 0) memcpy(lNewMonth+4, "    ^#X", 7);
+   else if(memcmp(pMonth, "JUN", 3) == 0) memcpy(lNewMonth+4, "  [_Z[_", 7);
+   else if(memcmp(pMonth, "JUL", 3) == 0) memcpy(lNewMonth+4, " A[_U[_", 7);
+   else if(memcmp(pMonth, "AUG", 3) == 0) memcpy(lNewMonth+4, "    (DL", 7);
+   else if(memcmp(pMonth, "SEP", 3) == 0) memcpy(lNewMonth+4, "  @_Z(D", 7);
+   else if(memcmp(pMonth, "OCT", 3) == 0) memcpy(lNewMonth+4, " @_[(Q\"", 7);
+   else if(memcmp(pMonth, "NOV", 3) == 0) memcpy(lNewMonth+4, "  @&Z[Z", 7);
+   else if(memcmp(pMonth, "DEC", 3) == 0) memcpy(lNewMonth+4, "  @&Z,>", 7);
+
+
+   memcpy(pMonth,	lNewMonth, 11);
+
+
+sprintf(sLine, "End   TransMonth(%.8s)", pMonth);
+trace_event(sLine, PROCESSING);
+return (OK);
+}
+
+/* =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- */
+/* =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- */
+
+int     isPassiveAtm(int  nIndexCtx,char  *V_terminal_number,char  *V_AcqBank)
+{
+   char   sLine[MAX_LINE_TRC];
+
+EXEC SQL BEGIN DECLARE SECTION;
+     VARCHAR         T_terminal_number       [15];
+     VARCHAR      	     T_AcqBank  	 		 [6+1];/*ICH270715*/ 
+     int                 plRetour;
+EXEC SQL END DECLARE SECTION;
+   
+/*
+   sprintf(sLine,"Start isPassive(%s,%.6s)",V_terminal_number,V_AcqBank);
+   trace_event(sLine,PROCESSING);
+*/
+
+   memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+   memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+   T_terminal_number.len = strlen(V_terminal_number);
+
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+   EXEC SQL WHENEVER SQLERROR GOTO getPassiveErr;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL EXECUTE
+      BEGIN
+         :plRetour := PCRD_ATM_TERMINAL.IS_PASSIVE_TERMINAL(:T_terminal_number,:T_AcqBank/*ICH270715*/ );
+      END;
+   END-EXEC;
+
+
+if (plRetour == NOK)
+{
+/*
+   trace_event("End  isPassiveAtm(NOK)", PROCESSING);
+**/
+   return(NOK);
+}
+
+trace_event("End   isPassiveAtm(OK)", PROCESSING);
+return (OK);
+
+getPassiveErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   isPassiveAtm(ERROR)", ERROR);
+    return (ERROR);
+}
+
+/* =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- */
+/* =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- */
+
+int     processCommand(int  nIndexCtx,char  *V_terminal_number,char* V_AcqBank, char *Resource_Id,char *V_command)
+
+{
+   struct sqlca sqlca;
+   char   sLine[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+
+    VARCHAR                  T_terminal_number[15];
+    VARCHAR      				 T_AcqBank  	  [6+1];/*ICH270715*/ 
+    VARCHAR                  T_business_date [12];
+    VARCHAR                  T_resource_id [6];
+    VARCHAR                  T_command [30];
+    VARCHAR                  T_tlv_string[10000];
+    VARCHAR                  T_ACTION_CODE[3];
+    VARCHAR                  T_TRACE_AUDIT_NUMBER [6];
+    VARCHAR                  T_TRANSMISSION_DATE_TIME [10];
+    int                      T_result;
+    int                      plRetour;
+    int                      T_timeout;
+EXEC SQL END DECLARE SECTION;
+
+
+   sprintf(sLine,"Start. processCommand(%s,%s)",V_terminal_number,V_AcqBank);
+   trace_event(sLine,PROCESSING);
+
+   memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+   memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+   memset(T_business_date.arr, 0, sizeof(T_business_date.arr));
+   memset(T_resource_id.arr, 0, sizeof(T_resource_id.arr));
+   memset(T_command.arr, 0, sizeof(T_command.arr));
+   memset(T_tlv_string.arr, 0, sizeof(T_tlv_string.arr));
+   memset(T_ACTION_CODE.arr, 0, sizeof(T_ACTION_CODE.arr));
+   memset(T_TRACE_AUDIT_NUMBER.arr, 0, sizeof(T_TRACE_AUDIT_NUMBER.arr));
+   memset(T_TRANSMISSION_DATE_TIME.arr, 0, sizeof(T_TRANSMISSION_DATE_TIME.arr));
+
+
+   T_terminal_number.len = 0;
+   T_AcqBank.len =0;
+   T_business_date.len =0;
+   T_resource_id.len = 0;
+   T_ACTION_CODE.len =0;
+   T_TRACE_AUDIT_NUMBER.len =0;
+   T_TRANSMISSION_DATE_TIME.len =0;
+
+
+   memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+   T_terminal_number.len = strlen(V_terminal_number);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+   T_tlv_string.len =0;
+
+
+  
+   T_timeout =-1;
+
+   memcpy(T_command.arr, V_command, strlen(V_command));
+   T_command.len = strlen(V_command);
+
+
+   memcpy(T_resource_id.arr,Resource_Id, 6);
+   T_resource_id.len =6;
+
+
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO processAtmErr;
+   EXEC SQL EXECUTE
+
+      BEGIN
+
+      :plRetour := PCRD_ATM_MNG.PROCESS_ATM_CMD( :T_terminal_number,
+       												 :T_AcqBank,/*ICH270715*/
+                                                     :T_timeout,
+                                                     :T_command,
+                                                     :T_resource_id , 
+                                                     SYSDATE -1, 
+                                                     SYSDATE + 1, 
+                                                     :T_tlv_string,
+                                                     :T_ACTION_CODE,
+                                                     :T_TRACE_AUDIT_NUMBER,
+                                                     :T_TRANSMISSION_DATE_TIME,
+                                                     :T_result);
+    END;
+    END-EXEC;
+
+
+if (plRetour != OK)
+{
+   trace_event("End  processCommand(NOK)", PROCESSING);
+   return(NOK);
+}
+
+trace_event("End   processCommand(OK)", PROCESSING);
+return (OK);
+
+processAtmErr :                                                                                                                   
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("getProcessErr",ERROR);                                                                                           
+    trace_event("End   processCommand(ERROR)", ERROR);                                                                             
+    return (ERROR);
+}
+
+/*PROD00026076*/
+int     InsertATMCommand(int  nIndexCtx,char  *V_terminal_number,char* V_AcqBank, char *V_command)
+
+{
+   struct sqlca sqlca;
+   char   sLine[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+
+    VARCHAR                  T_terminal_number[15];
+    VARCHAR      			 T_AcqBank  	  [6+1];
+    VARCHAR                  T_command [30];
+    VARCHAR                  T_tlv_string[10000];
+    int                      plRetour;
+ 
+EXEC SQL END DECLARE SECTION;
+
+
+   sprintf(sLine,"Start. InsertATMCommand(%s,%s)",V_terminal_number,V_AcqBank);
+   trace_event(sLine,PROCESSING);
+
+   memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+   memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr)); 
+   memset(T_command.arr, 0, sizeof(T_command.arr));
+
+
+   T_terminal_number.len = 0;
+   T_AcqBank.len =0;
+
+
+   memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+   T_terminal_number.len = strlen(V_terminal_number);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+   memcpy(T_command.arr, V_command, strlen(V_command));
+   T_command.len = strlen(V_command);
+
+
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO insert_atm_cmd;
+   EXEC SQL EXECUTE
+
+      BEGIN
+
+      :plRetour := PCRD_ATM_MNG.INSERT_ATM_CMD( :T_terminal_number,
+       												 :T_AcqBank,
+                                                     :T_command, 
+                                                     SYSDATE + 1);
+    END;
+    END-EXEC;
+
+
+if (plRetour != OK)
+{
+   trace_event("End  InsertATMCommand(NOK)", PROCESSING);
+   return(NOK);
+}
+
+trace_event("End   InsertATMCommand(OK)", PROCESSING);
+return (OK);
+
+insert_atm_cmd :                                                                                                                   
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);                                                                                     
+    trace_event("End   InsertATMCommand(ERROR)", ERROR);                                                                             
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom       : DeleteATMCmd()                                     **
+  **  desc      :                           **
+  **  entree    : fTerminalNumber       -> numero du terminal           **
+  **  sortie    : fCommand              -> commande pour le terminal    **
+  **  retour    : OK    -> si c'est OK                                  **
+  **              ERROR -> erreur fatal                                 **
+  **  auteur    : Kamal Sbai                            **
+  **                    (c) 1999 Hightech Payment Systems               **
+  ***********************************************************************/
+int    DeleteATMCmd(int             nIndexCtx,atm_command*     pATMCommand)
+{
+   struct sqlca sqlca;
+
+   char  sLine[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar             hTermNbr        [15+1];
+    VARCHAR				hAcqBank		[6+1];/*ICH270715*/ 
+    int                 hCmdSeq;
+    varchar             hCmd            [30+1];
+    char                hPurgeDate      [12+1];
+    char                hStatus         [ 1+1];
+    int                 hRet;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start DeleteATMCmd(%.15s,%.6s,%d,%.30s,%.12s,%.1s)",
+                pATMCommand->fTerminalNumber,
+                pATMCommand->fAcqBank,/*ICH270715*/
+                pATMCommand->fCmdSeq,
+                pATMCommand->fCommand,
+                pATMCommand->fPurgeDate,
+                pATMCommand->fStatus);
+trace_event(sLine, PROCESSING);
+
+    /* - initilialisation des variables ------------------------------------- */
+    memset(hTermNbr.arr,                0, sizeof(hTermNbr.arr)         );
+    memset(hAcqBank.arr,				0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hCmd.arr,                    0, sizeof(hCmd.arr)             );
+    memset(hPurgeDate,                  0, sizeof(hPurgeDate)           );
+    memset(hStatus,                     0, sizeof(hStatus)              );
+
+    /* - renseignement des variables PL/SQL --------------------------------- */
+    memcpy(hTermNbr.arr,pATMCommand->fTerminalNumber,
+                        strlen(pATMCommand->fTerminalNumber));
+    hTermNbr.len        = strlen(pATMCommand->fTerminalNumber);
+    
+    memcpy(hAcqBank.arr,	pATMCommand->fAcqBank, strlen(pATMCommand->fAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pATMCommand->fAcqBank);
+	
+    memcpy(hCmd.arr,    pATMCommand->fCommand,
+                        strlen(pATMCommand->fCommand));
+    hCmd.len            = strlen(pATMCommand->fCommand);
+    memcpy(hPurgeDate,  pATMCommand->fPurgeDate,
+                        strlen(pATMCommand->fPurgeDate));
+    memcpy(hStatus,     pATMCommand->fStatus, 1);
+    hCmdSeq             = pATMCommand->fCmdSeq;
+
+
+    /* - capture des exceptions PL/SQL -------------------------------------- */
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO getUserCommandErr;
+
+    /* - execution du traitement PL/SQL ------------------------------------- */
+
+    EXEC SQL EXECUTE
+    DECLARE
+        enr_atm_commands        ATM_COMMANDS%ROWTYPE;
+    BEGIN
+        -- preparation de l'enregistrement
+        enr_atm_commands.terminal_number        := :hTermNbr;
+        enr_atm_commands.bank_code		 		:= :hAcqBank;/*ICH270715*/
+        enr_atm_commands.command                := :hCmd;
+        enr_atm_commands.purge_date             := TO_DATE(:hPurgeDate,'YYMMDDHH24MISS');
+        enr_atm_commands.status                 := :hStatus;
+		enr_atm_commands.cmd_seq				:= :hCmdSeq;
+        -- execution du PL/SQL
+        :hRet := PCRD_ATM_MNG.DELETE_ATM_CMD(enr_atm_commands);
+    END;
+    END-EXEC;
+
+
+    /* - examen du retour du traitement PL/SQL ------------------------------ */
+    if (hRet != OK)
+    {
+        sprintf(sLine, "End   DeleteATMCmd(%d)", hRet);
+        trace_event(sLine, PROCESSING);
+        return (hRet);
+    }
+
+sprintf(sLine, "End   DeleteATMCmd(%s)", pATMCommand->fCommand);
+trace_event(sLine, PROCESSING);
+return (OK);
+
+getUserCommandErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   DeleteATMCmd(ERROR)", ERROR);
+    return (ERROR);
+}
+
+
+

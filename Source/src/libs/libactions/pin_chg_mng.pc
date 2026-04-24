@@ -1,0 +1,272 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      pin_chg_mng.pc                                                         */
+/*                                                                             */
+/* Description                                                                 */
+/*      Pin Change Tools Management                                            */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#include <paramdef.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <tlv_autho.h>
+#include <define.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+  /************************************************************
+  ** Fonction    : PutPinOffset()                            **
+  ** Desc        : Maj du Pin Offset du porteur dans la base **
+  ** Entrée      : pCardNumber   - Numéro de carte           **
+  **               pNewPin       - Nouveau PIN               **
+  ** Retour      : OK    si Succes                           **
+  **               NOK   si Erreur                           **
+  *************************************************************/
+int PutPinOffset(nIndexCtx,pCardNumber, pCardSeqNbr, pExpiryDate, pNewPinOffset)
+int			nIndexCtx;
+char        *pCardNumber    ;
+char 		*pCardSeqNbr;
+char 		*pExpiryDate;
+char        *pNewPinOffset  ;
+{
+char 	sLine[MAX_LINE_TRC];
+
+EXEC SQL BEGIN DECLARE SECTION;
+VARCHAR             hCardNumber     [32];
+VARCHAR             hNewPinOffset   [32];
+VARCHAR             hNewPvv   	    [16];
+VARCHAR             hExpiryDate     [4 + 1];
+int					hSeqNum;
+int                 hRet;
+EXEC SQL END DECLARE SECTION;
+     	if (debug_option == 1)
+		sprintf(sLine, "Start PutPinOffset(%.22s,%.08s)", pCardNumber,pNewPinOffset);
+	else
+		sprintf(sLine, "Start PutPinOffset()");
+	trace_event(sLine, PROCESSING);
+
+    /* - Memset des variables --------------------------------- */
+
+
+    memset(hCardNumber.arr,     0, sizeof(hCardNumber.arr)  );
+    hCardNumber.len = 0;
+
+    memset(hNewPinOffset.arr, 0, sizeof(hNewPinOffset.arr)  );
+    hNewPinOffset.len = 0;
+	
+	memset ( hExpiryDate.arr      ,  0  ,   sizeof(hExpiryDate.arr )  );
+    hExpiryDate.len = 0;
+
+   
+    /* - Initialisation des variables -------------------------- */
+    memcpy(hCardNumber.arr, pCardNumber, strlen(pCardNumber)    );
+    hCardNumber.len         = strlen(hCardNumber.arr);
+
+
+	memcpy(hNewPinOffset.arr,   pNewPinOffset, strlen(pNewPinOffset)    );
+    hNewPinOffset.len           = strlen(pNewPinOffset);
+
+	memcpy(hNewPvv.arr,   "0000", 4 );
+    hNewPvv.len       = 4;
+	
+	hSeqNum = atoi(pCardSeqNbr);
+    
+	memcpy(hExpiryDate.arr,   pExpiryDate, strlen(pExpiryDate) );
+    hExpiryDate.len       = strlen(pExpiryDate);
+
+    /* - Capture des exceptions -------------------------------- */
+    EXEC SQL WHENEVER SQLERROR GOTO PutPinOffsetErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL EXECUTE
+    BEGIN
+       :hRet := PCRD_P7_CTRL_SECURITY.PUT_PIN_OFFSET(:hCardNumber, :hSeqNum, :hExpiryDate, :hNewPinOffset,:hNewPvv);
+    END;
+    END-EXEC;
+
+
+	memset(hCardNumber.arr,     0, sizeof(hCardNumber.arr)  );
+	memset(hNewPinOffset.arr, 0, sizeof(hNewPinOffset.arr)  );
+	sprintf(sLine, "End   PutPinOffset(%d)", hRet);
+	trace_event(sLine, PROCESSING);
+	return (hRet);
+
+PutPinOffsetErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+	memset(hCardNumber.arr,     0, sizeof(hCardNumber.arr)  );
+	memset(hNewPinOffset.arr, 0, sizeof(hNewPinOffset.arr)  );
+    trace_event("End   PutPinOffset(ERROR)", ERROR);
+    return (ERROR);
+}
+
+/************************************************************
+** Fonction    : PutPvv()                                  **
+** Desc        : Maj du Pvv Offset du porteur dans la base **
+** Entrée      : pCardNumber   - Numéro de carte           **
+**               pNewPvv       - Nouveau PIN               **
+**               pPvki         - = 1                       **
+** Retour      : OK    si Succes                           **
+**               NOK   si Erreur                           **
+*************************************************************/
+int PutPvv(nIndexCtx,pCardNumber, pCardSeqNbr, pExpiryDate, pNewPvv,pPvki, pPinOffset)
+int			nIndexCtx;
+char        *pCardNumber    ;
+char 		*pCardSeqNbr;
+char 		*pExpiryDate;
+char        *pNewPvv  ;
+char        *pPvki  ;
+char		*pPinOffset;
+{
+	char 	sLine[MAX_LINE_TRC];
+	
+	
+	
+	EXEC SQL BEGIN DECLARE SECTION;
+		VARCHAR             hCardNumber     	[22 + 1];
+		VARCHAR             hNewPvv				[20 + 1];
+		VARCHAR             hNewPinOffset 		[16 + 1];
+		VARCHAR             hPvki   			[1 + 1];
+		VARCHAR             hExpiryDate         [4 + 1];
+		int					hSeqNum;
+		int                 hRet;
+	EXEC SQL END DECLARE SECTION;
+     
+	 if (debug_option == 1)
+		sprintf(sLine, "Start PutPvv(%.22s,%s,%s,%.08s,%s,%s)", pCardNumber,pCardSeqNbr,pExpiryDate,pNewPvv,pPvki,pPinOffset);
+	else
+		sprintf(sLine, "Start PutPvv()");
+       
+	trace_event(sLine, PROCESSING);
+
+    /* - Memset des variables --------------------------------- */
+
+    memset ( hNewPvv.arr            ,  0  ,   sizeof(hNewPvv.arr )  );
+    hNewPvv.len = 0;
+
+    memset(hCardNumber.arr, 0, sizeof(hCardNumber.arr)  );
+    hCardNumber.len = 0;
+
+    memset(hNewPinOffset.arr, 0, sizeof(hNewPinOffset.arr)  );
+    hNewPinOffset.len = 0;
+
+    memset ( hPvki.arr            ,  0  ,   sizeof(hPvki.arr )  );
+    hPvki.len = 0;
+	
+	memset ( hExpiryDate.arr      ,  0  ,   sizeof(hExpiryDate.arr )  );
+    hExpiryDate.len = 0;
+	    
+    /* - Initialisation des variables -------------------------- */
+
+    memcpy(hCardNumber.arr, pCardNumber, strlen(pCardNumber)    );
+    hCardNumber.len         = strlen(pCardNumber);
+
+	memcpy( hNewPvv.arr, pNewPvv , strlen(pNewPvv) );     
+    hNewPvv.len         = strlen(pNewPvv);
+	
+    memcpy(hNewPinOffset.arr,   pPinOffset, strlen(pPinOffset) );
+    hNewPinOffset.len       = strlen(pPinOffset);
+
+	if( pPvki && strlen(pPvki) > 0)
+	{
+		memcpy(hPvki.arr, pPvki, strlen(pPvki)    );
+		hPvki.len         = strlen(pPvki);
+	} 
+	else
+	{
+		memcpy(hPvki.arr, "0", 1  );
+		hPvki.len         = 1;
+	}
+	
+	hSeqNum = atoi(pCardSeqNbr);
+    
+	memcpy(hExpiryDate.arr,   pExpiryDate, strlen(pExpiryDate) );
+    hExpiryDate.len       = strlen(pExpiryDate);
+	
+    /* - Capture des exceptions -------------------------------- */
+    hRet = SYSTEM_MALFUNCTION;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO PutPvv;
+    EXEC SQL EXECUTE
+    BEGIN
+       :hRet := PCRD_P7_CTRL_SECURITY.UPDATE_PIN_INFO(:hCardNumber, :hSeqNum, :hExpiryDate, :hNewPvv, :hNewPinOffset,:hPvki);
+    END;
+    END-EXEC;
+
+	memset(hCardNumber.arr,     0, sizeof(hCardNumber.arr)  );
+	memset(hNewPinOffset.arr, 0, sizeof(hNewPinOffset.arr)  );
+	memset(hNewPvv.arr, 0, sizeof(hNewPvv.arr)  );
+
+
+	sprintf(sLine, "End   PutPvv(%d)", hRet);
+	trace_event(sLine, PROCESSING);
+	return (hRet);
+
+PutPvv:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+	memset(hCardNumber.arr,     0, sizeof(hCardNumber.arr)  );
+	memset(hNewPinOffset.arr, 0, sizeof(hNewPinOffset.arr)  );
+	memset(hNewPvv.arr, 0, sizeof(hNewPvv.arr)  );
+    trace_event("End   PutPvv(ERROR)", ERROR);
+    return (ERROR);
+}
+
+int PinInfoReversal(int			nIndexCtx,char        *pCardNumber, char *pCardSeqNbr)
+{
+	char 	sLine[MAX_LINE_TRC];
+	
+	
+
+	EXEC SQL BEGIN DECLARE SECTION;
+		VARCHAR             hCardNumber     	[22 + 1];
+		int					hSeqNum;
+		int                 hRet;
+	EXEC SQL END DECLARE SECTION;
+     	if (debug_option == 1)
+		sprintf(sLine, "Start PinInfoReversal(%.22s, %s)", pCardNumber, pCardSeqNbr);
+	else
+		sprintf(sLine, "Start PinInfoReversal()");
+
+	trace_event(sLine, PROCESSING);
+
+    memset(hCardNumber.arr, 0, sizeof(hCardNumber.arr)  );
+    hCardNumber.len = 0;
+
+	/*START NAB03022020*/  /*PLUTONL-1052*/
+	/*Initialisation des variables*/
+	memcpy(hCardNumber.arr, pCardNumber, strlen(pCardNumber)    );
+    hCardNumber.len         = strlen(pCardNumber);
+	/*END NAB03022020*/
+    hSeqNum = atoi(pCardSeqNbr);
+
+    /* - Capture des exceptions -------------------------------- */
+    hRet = SYSTEM_MALFUNCTION;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO pin_info_reversal;
+    EXEC SQL EXECUTE
+    BEGIN
+       :hRet := PCRD_P7_CTRL_SECURITY.REVERSE_PIN_INFO(:hCardNumber,:hSeqNum);
+    END;
+    END-EXEC;
+
+	memset(hCardNumber.arr,     0, sizeof(hCardNumber.arr)  );
+
+	sprintf(sLine, "End   PinInfoReversal(%d)", hRet);
+	trace_event(sLine, PROCESSING);
+	return (hRet);
+
+pin_info_reversal:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+	memset(hCardNumber.arr,     0, sizeof(hCardNumber.arr)  );
+    trace_event("End   PinInfoReversal(ERROR)", ERROR);
+    return (ERROR);
+}
+

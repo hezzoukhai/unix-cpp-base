@@ -1,0 +1,121 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <tlv_autho.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetAuthNumber ( int nIndiceCtx, char  *sTlvBuffer )
+{
+   struct sqlca sqlca;
+   char sLine [ MAX_LINE_TRC];
+   char sEventCode [ 3 + 1];
+   int  nLength;
+
+   EXEC SQL BEGIN DECLARE SECTION;
+    char          T_auth_number [ 6 + 1];
+    int            response_code;
+   EXEC SQL END DECLARE SECTION;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+   trace_event ( "Start GetAuthNumber() ", PROCESSING );
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    memset ( T_auth_number, 0, sizeof ( T_auth_number ));
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+    response_code = SYSTEM_MALFUNCTION;
+    EXEC SQL WHENEVER SQLERROR GOTO err_get_auth_number;
+    EXEC SQL EXECUTE
+    BEGIN
+
+        :response_code := PCRD_P7_GENERAL_TOOLS.GET_AUTH_NUMBER ( :T_auth_number  );
+		:T_auth_number := '0' || SUBSTR(:T_auth_number,2);
+
+
+    END;
+    END-EXEC;
+
+    if ( response_code == 0 )
+    {
+	   		PutTlvBuffer(AUTO_AUTH_NUMBER , sTlvBuffer, T_auth_number , 6 );
+            trace_event("End GetAuthNumber( OK )", PROCESSING);
+    }
+    else
+	   PutTlvBuffer(AUTO_AUTH_NUMBER , sTlvBuffer, "999999" , 6 );
+
+     sprintf(sLine,"End GetAuthNumber( %d )", response_code);
+     trace_event(sLine,PROCESSING);
+     return(response_code);
+
+ err_get_auth_number :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+    trace_event (  sLine , ERROR );
+    trace_event("End GetAuthNumber(SYSTEM_MALFUNCTION)", PROCESSING);
+     return( SYSTEM_MALFUNCTION );
+}
+
+
+int GenAuthNumber ( int nIndiceCtx, char  *sAuthNumber )
+{
+   struct sqlca sqlca;
+   char sLine [ MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+    char          T_auth_number [ 6 + 1];
+    int            response_code;
+   EXEC SQL END DECLARE SECTION;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+   trace_event ( "Start GenAuthNumber() ", PROCESSING );
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    memset ( T_auth_number, 0, sizeof ( T_auth_number ));
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+    response_code = SYSTEM_MALFUNCTION;
+    EXEC SQL WHENEVER SQLERROR GOTO err_gen_auth_number;
+    EXEC SQL EXECUTE
+    BEGIN
+
+        :response_code := PCRD_P7_GENERAL_TOOLS.GET_AUTH_NUMBER ( :T_auth_number  );
+		:T_auth_number := '0' || SUBSTR(:T_auth_number,2);
+
+
+    END;
+    END-EXEC;
+
+    if ( response_code == 0 )
+    {
+		memcpy(sAuthNumber, T_auth_number , 6 );
+    }
+    else
+		memcpy(sAuthNumber, "999999" , 6 );
+
+	sAuthNumber[6]='\0';
+	sprintf(sLine,"End GenAuthNumber( %d )", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+ err_gen_auth_number :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+    trace_event (  sLine , ERROR );
+    trace_event("End GenAuthNumber(SYSTEM_MALFUNCTION)", PROCESSING);
+     return( SYSTEM_MALFUNCTION );
+}

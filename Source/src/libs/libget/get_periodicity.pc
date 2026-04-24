@@ -1,0 +1,82 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetPeriodicity  (int nIndiceCtx, TSAuthoPeriod *autho_period)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	char   PERIOD_CODE  [ 3 ];
+ 	char   PERIOD_TYPE  [ 1 ];
+ 	int    PERIOD_VALUE;
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetAuthoPeriod() ", PROCESSING );
+ 	memset (   PERIOD_CODE  , 0 ,  3  );
+ 	memset (   PERIOD_TYPE  , 0 ,  1  );
+        PERIOD_VALUE = 0;
+
+	memcpy ( PERIOD_CODE,autho_period->period_code,3);
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_autho_period;
+	EXEC SQL EXECUTE
+	    DECLARE T_P7_AUTHO_PERIOD   P7_AUTHO_PERIOD%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_PARAM_AUTHO_ROWS.GET_P7_AUTHO_PERIOD
+						(   :PERIOD_CODE, 
+	                                            T_P7_AUTHO_PERIOD 
+	                                        );
+
+
+		IF :response_code = 0 THEN
+		:PERIOD_TYPE        := T_P7_AUTHO_PERIOD.PERIOD_TYPE;
+		:PERIOD_VALUE       := T_P7_AUTHO_PERIOD.PERIOD_VALUE;
+		END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+	        memcpy ( autho_period->period_type,
+							PERIOD_TYPE,1);
+	        autho_period->period_value = PERIOD_VALUE;
+	        trace_event ( "End GetAuthoPeriod( OK ) ", PROCESSING );
+		return(OK);
+	}
+	trace_event ( "End GetAuthoPeriod( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_autho_period:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+	        memcpy ( autho_period->period_type,
+							PERIOD_TYPE,1);
+	        autho_period->period_value = PERIOD_VALUE;
+	        trace_event ( "End GetAuthoPeriod( OK ) ", PROCESSING );
+		return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetAuthoPeriod( NOK ) ", PROCESSING );
+	return( NOK );
+}

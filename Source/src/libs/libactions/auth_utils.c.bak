@@ -1,0 +1,574 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/*  NAME                                                                       */
+/*      auth_utils.c                                                           */
+/*                                                                             */
+/* FUNCTION                                                                    */
+/*         Utilities for autorisation : Local autorisation/ Stand In Autoris...*/
+/*         Check data integrity of TLV data                                    */
+/* NOTES                                                                       */
+/*                                                                             */
+/* MODIFIED                                                                    */
+/*        H.YOUSFI   12/05/2002 -         V 2.0.1                              */
+/*        Add a call of PutEvent during the check of the integrity of the TLV  */
+/*        data see (HYJCC120502)                                               */
+/*******************************************************************************/
+
+#include <stdio.h>
+#include <define.h>
+#include <iso_hps.h>
+#include <sys/time.h>
+#include <dump.h>
+#include <list_thr.h>
+#include <hsm_inc.h>
+#include <iso_hps.h>
+#include <tlv_fields.h>
+#include <tlv_autho.h>
+#include <tlv_privfields.h>
+#include <tlv_private.h>
+#include <security_data.h>
+#include <security_flags.h>
+#include <security_results.h>
+#include <resources.h>
+#include <service.h>
+#include <event_auth.h>
+#include <maj_card_activity.h>
+
+/******************************************************************************/
+/******************************************************************************/
+/******************************************************************************/
+/******************************************************************************/
+/******************************************************************************/
+int AuthorRouting( int nIndiceCtx,char *sTlvBuffer,
+	char *sResource, pid_t nPrisPid , TSIsoInfo *sIsoInfo )
+{
+
+	TSTlvAutho      sTlvInfo;
+	char sActionCode[ 3 + 1 ];
+	char sLine      [ MAX_LINE_TRC + 1 ];
+	char sPid       [ 8 + 1 ];
+	char sSecurData [ LG_MAX ];
+	int  nRetCode;
+	int  nLength;
+	char szWork[256];
+	char tmpField[256];
+	struct timeval time_s_aut;
+
+	trace_event ( "Start Authr Routing"  , PROCESSING );
+
+	memset ( sActionCode , 0 , sizeof ( sActionCode ));
+	memset ( sLine , 0 , sizeof ( sLine ));
+	memset  ( sPid , 0 , sizeof ( sPid ));
+	memset ( szWork , 0 , sizeof ( szWork ));
+	memset ( tmpField , 0 , sizeof ( tmpField ));
+	memset ( sSecurData , 0 , sizeof ( sSecurData ));
+
+	PutTlvBuffer ( AUTO_ROUTING_CODE ,  sTlvBuffer,sResource,6);
+	PutTlvBuffer ( AUTO_AUTHO_FLAG   ,  sTlvBuffer, "R" ,  1);
+
+	sprintf ( sPid , "%08d",  nPrisPid );
+	/* Update field 72 with the time Before autho_activity_insert Start HY 141002 */
+	if(  GetTlvBuffer(AUTO_UF_FILE_RECORD,sTlvBuffer,tmpField,&nLength) == SUCCES)
+	{
+		gettimeofday (&time_s_aut,NULL);
+		sprintf(szWork, "%010ld%06d",time_s_aut.tv_sec, time_s_aut.tv_usec);
+		memcpy(tmpField + 16, szWork, 16);
+		PutTlvBuffer ( AUTO_UF_FILE_RECORD , sTlvBuffer, tmpField , nLength );
+	}
+	nRetCode = InsertionAuthoActivity ( nIndiceCtx , sTlvBuffer );
+	if ( nRetCode != OK )
+	{
+		trace_event ( "Can Not Write In Authorisation table !!!", FATAL );
+		PutTlvBuffer( AUTO_CUR_TABLE_INDICATOR , sTlvBuffer, "SAF" ,  3);
+		nRetCode = InsertionAuthoActivity ( nIndiceCtx , sTlvBuffer );
+		if ( nRetCode != OK )
+			trace_event("Can Not Write In Authorisation SAF table !!!", FATAL);
+
+		PutTlvBuffer ( AUTO_EVENT_CODE , sTlvBuffer , MALFUNCTION_EVENT , 3);
+		nRetCode = GetActionCode( nIndiceCtx , sTlvBuffer , sActionCode );                                                            
+		if ( nRetCode != OK )                                                                                                         
+			PutTlvBuffer(AUTO_RESPONSE_CODE,sTlvBuffer,MALFUNCTION_ACTION,3);
+		else
+			/*	PutTlvAutho ( AUTO_RESPONSE_CODE, &sTlvInfo, sActionCode, 3);*/ /*Modif 171005 */ 
+			PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, sActionCode, 3);
+		nRetCode = SEVERE_ERROR;
+	}
+	else
+	{
+		GetTlvBuffer   (AUTO_SECURITY_DATA,sTlvBuffer,sSecurData,&nLength);
+		PutSecurityData(DESTINATION_PID,sSecurData, sPid,8);
+		PutSecurityData(DESTINATION_RESOURCE,sSecurData,sResource,6);
+		PutTlvBuffer(AUTO_SECURITY_DATA,sTlvBuffer,sSecurData,nLength);
+		InitTlvAutho    ( &sTlvInfo );
+		AnalyseTlvAutho ( sTlvBuffer , &sTlvInfo );
+		TlvToIso        ( nIndiceCtx , &sTlvInfo   , sIsoInfo , REQUEST );
+		nRetCode = ROUTAGE;
+	}
+
+	trace_event ( "Autho Routing End () ", PROCESSING ); 
+	return ( nRetCode );
+}
+
+
+/*************************************************************************************/
+/*************************************************************************************/
+
+
+int CheckReqTlvFields ( int nIndiceCtx, char *sTlvBuffer )
+{
+	char sMcc        	[ 4 + 1 ];
+	char sPCode      	[ 30 ];
+	char sIsoPosData 	[ 12 + 1 ];
+	char sTrackII 	[ 256 ];
+	char sExpiryDate 	[ 4 + 1 ];
+	char sTrackIIExpDate[ 4 + 1 ];
+	char sPan		[ 24 + 1 ];
+	char sCvv1		[ 3 + 1 ];
+	char sPvv		[ 4 + 1 ];
+	char sServiceCode	[ 3 + 1 ];
+	char sCardPan	[ 24 + 1 ];
+	char sLine       	[ MAX_LINE_TRC ];
+	char sNwPosData     [256 + 1]; 
+	char sPosCond       [12 + 1]; 
+	char sPinData       [256 + 1];
+	char sWork       	[256 + 1];
+	TSTlvPrivate    sTlvPrivateInfo;
+
+	int  nLength;
+
+	trace_event("Start CheckReqTlvFields()",PROCESSING);
+
+
+	memset (  sPCode      	, 0 , sizeof ( sPCode ));
+	memset (  sMcc       	, 0 , sizeof ( sMcc ));
+	memset (  sIsoPosData 	, 0 , sizeof ( sIsoPosData ));
+	memset (  sTrackII 		, 0 , sizeof ( sTrackII ));
+	memset (  sExpiryDate 	, 0 , sizeof ( sExpiryDate ));
+	memset (  sTrackIIExpDate 	, 0 , sizeof ( sTrackIIExpDate ));
+	memset (  sPan 		, 0 , sizeof ( sPan ));
+	memset (  sCardPan 		, 0 , sizeof ( sCardPan ));
+	memset (  sCvv1 		, 0 , sizeof ( sCvv1 ));
+	memset (  sPvv 		, 0 , sizeof ( sPvv ));
+	memset (  sServiceCode 	, 0 , sizeof ( sServiceCode ));
+	memset ( sNwPosData     , 0, sizeof(sNwPosData));
+	memset ( sPosCond       , 0, sizeof(sPosCond));
+
+
+	if ( GetTlvBuffer ( AUTO_PAN , sTlvBuffer , sCardPan , &nLength ) == SUCCES)
+		if ( GetTlvBuffer ( AUTO_TRACK2_DATA , sTlvBuffer , sTrackII , &nLength ) == SUCCES)
+		{
+			GetTrack2Data(sTrackII,sPan,sTrackIIExpDate,sServiceCode,sPvv,sCvv1);
+
+			if (memcmp(sCardPan,sPan,16) != 0)
+			{
+				/* HYJCC120502 */
+				PutEvent( sTlvBuffer , INVALID_ISO2, "Card Number In TrackII Diff Than Field 2"); 
+				PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_TRANSACTION_ACTION , 3);
+				trace_event("Check PAN  == TRACK II PAN  (NOK)",TRACE);
+				trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+				return (NOK);
+			}
+		}
+
+		/*	trace_event("-->AUTO_PAN OK<--",PROCESSING);*/
+
+		if ( GetTlvBuffer ( AUTO_EXPIRY_DATE , sTlvBuffer , sExpiryDate , &nLength ) == SUCCES)
+			if ( GetTlvBuffer ( AUTO_TRACK2_DATA , sTlvBuffer , sTrackII , &nLength ) == SUCCES)
+			{
+				GetTrack2Data(sTrackII,sPan,sTrackIIExpDate,sServiceCode,sPvv,sCvv1);
+
+				/*    	sprintf(sLine,"Check ExpiryDate %s == TrackII ExpiryDate %s",sExpiryDate, sTrackIIExpDate);
+				trace_event(sLine,TRACE);*/
+				if (memcmp(sExpiryDate,sTrackIIExpDate,4) != 0)
+				{
+					/* HYJCC120502 */
+					PutEvent( sTlvBuffer, INVALID_ISO2, "Expiry Date In TrackII Diff Than Field 14");
+					PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_TRANSACTION_ACTION , 3);
+					trace_event("Check EXP DATE == TRACK II EXP DATE  (NOK)",TRACE);
+					trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+					return (NOK);
+				}
+			}
+			/*	trace_event("-->AUTO_EXPIRY_DATE OK<--",PROCESSING);*/
+
+			memset(sNwPosData, 0, sizeof(sNwPosData));
+			memset(sPosCond, 0, sizeof(sPosCond));
+			if ( GetTlvBuffer ( AUTO_NETWORK_POS_DATA      , sTlvBuffer , sNwPosData , &nLength ) == SUCCES)
+			{
+				/*    	       sprintf(sLine,"Check NETWORK POS DATA %s", sNwPosData);
+				trace_event(sLine,TRACE);*/
+				InitTlvPrivate(&sTlvPrivateInfo);
+
+				AnalyseTlvPrivate ( sNwPosData , nLength , &sTlvPrivateInfo);
+				if ( GetTlvPrivate(POS_CONDITION_CODE_TAG ,&sTlvPrivateInfo,sPosCond , &nLength ) == SUCCES )
+				{
+					/*    	       		sprintf(sLine,"Pos Cond Code  %s", sPosCond);
+					trace_event(sLine,TRACE);*/
+					if ( !memcmp(sPosCond ,"03", 2   ))  /* Merchant Suspicious */
+					{
+						PutEvent( sTlvBuffer, INVALID_MERCHANT, "Merchant Suspicious");
+						PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, DO_NOT_HONOR , 3);
+						trace_event("Check  NETWORK POS DATA (NOK)",TRACE);
+						trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+						return (NOK);
+					}
+					/**Start MKB&RHA170708**/
+					else if ( !memcmp(sPosCond ,"01", 2   ))  /* Customer Not Present */
+					{
+						PutEvent( sTlvBuffer, INVALID_MERCHANT, "Customer Not Present Suspicious");
+						PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, REFER_TO_ISSUER_ACTION , 3);
+						trace_event("Check  NETWORK POS DATA (NOK)",TRACE);
+						trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+						return (NOK);
+					}
+					else if ( !memcmp(sPosCond ,"05", 2   ))  /* Card Not Present & Customer Present */
+					{
+						PutEvent( sTlvBuffer, INVALID_MERCHANT, "Card Not Present & Customer Present ");
+						PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, DO_NOT_HONOR , 3);
+						trace_event("Check  NETWORK POS DATA (NOK)",TRACE);
+						trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+						return (NOK);
+					}
+					/**End MKB&RHA170708**/
+				}
+			}
+
+			trace_event("-->AUTO_NETWORK_POS_DATA OK<--",PROCESSING);
+
+			if ( GetTlvBuffer ( AUTO_POS_DATA      , sTlvBuffer , sIsoPosData , &nLength ) == SUCCES)
+			{
+				/* sprintf(sLine,"Check POS DATA %s", sIsoPosData);
+				trace_event(sLine,TRACE);*/
+				if ( sIsoPosData [ 4 ] == '0' && sIsoPosData [ 5 ] == '0'   )  /* Cardholder present And Card Not Present */
+				{
+					/* HYJCC120502 */
+					PutEvent( sTlvBuffer, INVALID_MERCHANT, "Pos Data Invalid:Cardholder present and Card Not present"); 
+					PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, REFER_TO_ISSUER_ACTION , 3);
+					trace_event("Check  POS DATA (NOK)",TRACE);
+					trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+					return (NOK);
+
+				}
+			}
+			trace_event("-->AUTO_POS_DATA OK<--",PROCESSING);		
+
+
+			if ( GetTlvBuffer ( AUTO_POS_DATA      , sTlvBuffer , sIsoPosData , &nLength ) == SUCCES)
+				if ( GetTlvBuffer ( AUTO_MERCHANT_TYPE , sTlvBuffer , sMcc , &nLength ) == SUCCES)
+				{
+					/*    	sprintf(sLine,"Check MCC %s == POS DATA %s",sMcc, sIsoPosData);
+					trace_event(sLine,TRACE);*/
+					if (
+						( memcmp ( sMcc , "6011" , 4 ) == 0 ) &&
+						( sIsoPosData [ 7 ] != '1'    )  /* Cardholder Authentication Method != PIN */
+						)
+					{
+						/* HYJCC120502 */
+						PutEvent( sTlvBuffer, INVALID_MERCHANT, "Pos Data Invalid:MCC 6011 and PIN Metchod Diff than PIN "); 
+						PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_MERCHANT_ACTION , 3);
+						trace_event("Check MCC == POS DATA (NOK)",TRACE);
+						trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+						return (NOK);
+					}
+				}
+				trace_event("-->AUTO_POS_DATA OK<--",PROCESSING);
+
+				/******************************************RE12032008******************************************************************/
+				memset(sWork, 0, sizeof(sWork));
+				memset( sPinData, 0, sizeof(sPinData));
+
+				/**DEBUT**SKA020608 PIN NON OBLIGATOIRE POUR TRANSACTIONS CARDLESS****Rajout du test sur le Processing Code*****/
+
+				if (
+					( GetTlvBuffer ( AUTO_PROCESSING_CODE      , sTlvBuffer , sPCode , &nLength ) == SUCCES) &&
+					(memcmp (sPCode + 6, "18",2) != 0)
+					)		
+				{
+					/**FIN**SKA020608 PIN NON OBLIGATOIRE POUR TRANSACTIONS CARDLESS*******/
+
+					if (
+						( memcmp ( sMcc , "6011" , 4 ) == 0 ) &&
+						( GetTlvBuffer ( AUTO_PIN_DATA      , sTlvBuffer , sPinData , &nLength ) != SUCCES)
+						)
+					{
+						PutEvent( sTlvBuffer, INVALID_MERCHANT_ACTION, "MCC 6011 and PIN Does Not Exist");
+						PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_MERCHANT_ACTION , 3);
+						trace_event("PIN MISSING(NOK)",ERROR);
+						trace_event("End   CheckReqTlvFields(NOK)",ERROR);
+						/*	return (NOK); MMJ14042009*/
+					}
+
+				}
+				else                           
+				{
+
+					return (OK);
+				}
+
+				/*******************************************RE12032008*****************************************************************/
+
+				if ( GetTlvBuffer ( AUTO_PROCESSING_CODE      , sTlvBuffer , sPCode , &nLength ) == SUCCES)
+					if ( GetTlvBuffer ( AUTO_MERCHANT_TYPE , sTlvBuffer , sMcc , &nLength ) == SUCCES)
+					{
+						sprintf(sLine,"Check MCC %s == PROCESSING CODE  %s",sMcc, sPCode);
+						trace_event(sLine,TRACE);
+						if (
+							( !memcmp ( sMcc , "6011" , 4 ) &&
+							(
+							memcmp (sPCode + 6, "01",2) != 0 &&     /* Processing Code != Withrawal          */
+							memcmp (sPCode + 6, "30",2) != 0  &&    /* Processing Code != Authentificatioin  */
+							memcmp (sPCode + 6, "31",2) != 0  &&    /* Processing Code != Balance            */
+							memcmp (sPCode + 6, "38",2) != 0  &&    /* Processing Code != Short statement    */
+							memcmp (sPCode + 6, "39",2) != 0  &&    /* Processing Code != cheq Book          */
+							memcmp (sPCode + 6, "40",2) != 0  &&    /* Processing Code != Transfert          */  /* NG310703 */
+							memcmp (sPCode + 6, "49",2) != 0  &&    /* Processing Code != Bill Pay           */  /* NG310703 */
+							memcmp (sPCode + 6, "91",2) != 0  &&    /* Processing Code != Pin Change         */  /* MKB271008*/
+							memcmp (sPCode + 6, "50",2) != 0  &&    /* Processing Code != Bill Payement      */  /* MKB300508*/
+							memcmp (sPCode + 6, "95",2) != 0  &&    /* Processing Code != Pre Paiement       */  /* MKB300508*/
+							memcmp (sPCode + 6, "18",2) != 0  &&    /* Processing Code != Cardless           */  /* SKA020608*/
+							memcmp (sPCode + 6, "89",2) != 0  &&    /* Processing Code != Cost Inq           */  /* EBE150528*/
+							memcmp (sPCode + 6, "80",2) != 0  &&    /* Processing Code != Charity Donation */ /*AOU25072011 */
+							memcmp (sPCode + 6, "90",2) != 0        /* Processing Code != Pin change */ /* ACK PIN CHANGE MARCH2015 */
+							/** && memcmp (sPCode + 6, "96",2) != 0   **/  /* Processing Code != Achat Sur GAB  */
+							)
+							)
+							)
+						{
+							/* HYJCC120502 */
+							PutEvent( sTlvBuffer, INVALID_MERCHANT, "Mcc 6011 and Processing Code != Withdrawal 01"); 
+							PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_MERCHANT_ACTION , 3);
+							trace_event("Check MCC == PROCESSING CODE (NOK)",TRACE);
+							trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+							return (NOK);
+						}
+
+						if (
+							( !memcmp ( sMcc , "6010" , 4 ) &&
+							memcmp (sPCode + 6, "17",2) != 0 && memcmp (sPCode + 6, "01",2) != 0 )  /* Processing Code != Cash Advnace   */
+							)
+						{
+							/* HYJCC120502 */
+							PutEvent( sTlvBuffer, INVALID_MERCHANT, "Mcc 6010 and Processing Code != Cash Adavnce 17/01"); 
+							PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_MERCHANT_ACTION , 3);
+							trace_event(" 1 Check MCC == PROCESSING CODE (NOK)",TRACE);
+							trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+							return (NOK);
+						}
+
+						if (
+							( memcmp ( sMcc , "6011" , 4 ) !=0 &&
+							memcmp ( sMcc , "6010" , 4 ) !=0 &&
+							!memcmp (sPCode + 6, "01",2)     )  /* Processing Code = Withdrawal   */
+							)
+						{
+							/* HYJCC120502 */
+							PutEvent( sTlvBuffer, INVALID_MERCHANT, "Mcc != 6010 and 6011 and Processing Code = 01"); 
+							PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_MERCHANT_ACTION, 3);
+							trace_event("Check MCC == PROCESSING CODE (NOK)",TRACE);
+							trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+							return (NOK);
+						}
+						if (
+							( memcmp ( sMcc , "6010" , 4 ) !=0 &&
+							!memcmp (sPCode + 6, "17",2)     )  /* Processing Code = Cash Advance   */
+							)
+						{
+							/* HYJCC120502 */
+							PutEvent( sTlvBuffer, INVALID_MERCHANT, "Mcc != 6010 and Processing Code = 17"); 
+							PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_MERCHANT_ACTION , 3);
+							trace_event(" 2 Check MCC == PROCESSING CODE (NOK)",TRACE);
+							trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+							return (NOK);
+						}
+						/* Start HYO 07072009 : Not Required 
+						** START  MAW20041223 **
+						if (
+						( memcmp ( sMcc , "4814" , 4 ) && !memcmp (sPCode + 6, "96",2) )  
+						|| (!memcmp ( sMcc , "4814" , 4 ) &&  memcmp (sPCode + 6, "96",2) )  
+						)
+						{
+						PutEvent( sTlvBuffer, INVALID_MERCHANT, "Mcc = 4814 and ProcessingCode = 96 CANNOT BE DISASSOCIATED"); 
+						PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_MERCHANT_ACTION , 3);
+						trace_event("==> Mcc = 4814 and ProcessingCode = 96 CANNOT BE DISASSOCIATED <==",TRACE);
+						trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+						return (NOK);
+						}
+						** END    MAW20041223 **
+						End   HYO 07072009 : Not Required  */
+					}
+					trace_event("-->AUTO_PROCESSING_CODE OK<--",PROCESSING);
+
+					memset (  sPan      , 0 , sizeof ( sPan )); /** PA DSS*/
+					memset (  sCardPan      , 0 , sizeof ( sCardPan ));/** PA DSS*/
+					memset (  sTrackII      , 0 , sizeof ( sTrackII )); /** PA DSS*/
+					InitTlvPrivate(&sTlvPrivateInfo); /** PA DSS*/
+
+					trace_event("End   CheckReqTlvFields(OK)",PROCESSING);
+					return ( OK );
+}
+int CheckAdvTlvFields ( int nIndiceCtx, char *sTlvBuffer )
+{
+	char sMcc        	[ 4 + 1 ];
+	char sPCode      	[ 30 ];
+	char sIsoPosData 	[ 12 + 1 ];
+	char sTrackII 	[ 256 ];
+	char sExpiryDate 	[ 4 + 1 ];
+	char sTrackIIExpDate[ 4 + 1 ];
+	char sPan		[ 24 + 1 ];
+	char sCvv1		[ 3 + 1 ];
+	char sPvv		[ 4 + 1 ];
+	char sServiceCode	[ 3 + 1 ];
+	char sCardPan	[ 24 + 1 ];
+	char sLine       	[ MAX_LINE_TRC ];
+	int  nLength;
+
+	trace_event("Start CheckAdvTlvFields()",PROCESSING);
+
+
+	memset (  sPCode      	, 0 , sizeof ( sPCode ));
+	memset (  sMcc       	, 0 , sizeof ( sMcc ));
+	memset (  sIsoPosData 	, 0 , sizeof ( sIsoPosData ));
+	memset (  sTrackII 		, 0 , sizeof ( sTrackII ));
+	memset (  sExpiryDate 	, 0 , sizeof ( sExpiryDate ));
+	memset (  sTrackIIExpDate 	, 0 , sizeof ( sTrackIIExpDate ));
+	memset (  sPan 		, 0 , sizeof ( sPan ));
+	memset (  sCvv1 		, 0 , sizeof ( sCvv1 ));
+	memset (  sPvv 		, 0 , sizeof ( sPvv ));
+	memset (  sServiceCode 	, 0 , sizeof ( sServiceCode ));
+	memset (  sCardPan 		, 0 , sizeof ( sCardPan ));
+
+	if ( GetTlvBuffer ( AUTO_PAN , sTlvBuffer , sCardPan , &nLength ) == SUCCES)
+		if ( GetTlvBuffer ( AUTO_TRACK2_DATA , sTlvBuffer , sTrackII , &nLength ) == SUCCES)
+		{
+			GetTrack2Data(sTrackII,sPan,sTrackIIExpDate,sServiceCode,sPvv,sCvv1);
+
+			/*MKB060309 PCI Norme Integration */
+			if (debug_option == 1)
+			{
+				sprintf(sLine,"Check Crad Num   %s == TrackII Crad Num   %s",sCardPan, sPan);
+				trace_event(sLine,TRACE);
+			}
+
+			if (memcmp(sCardPan,sPan,16) != 0)
+			{
+				PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_TRANSACTION_ACTION , 3);
+				trace_event("Check PAN  == TRACK II PAN  (NOK)",TRACE);
+				trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+				return (NOK);
+			}
+		}
+
+		if ( GetTlvBuffer ( AUTO_EXPIRY_DATE , sTlvBuffer , sExpiryDate , &nLength ) == SUCCES)
+			if ( GetTlvBuffer ( AUTO_TRACK2_DATA , sTlvBuffer , sTrackII , &nLength ) == SUCCES)
+			{
+				GetTrack2Data(sTrackII,sPan,sTrackIIExpDate,sServiceCode,sPvv,sCvv1);
+
+				sprintf(sLine,"Check ExpiryDate %s == TrackII ExpiryDate %s",sExpiryDate, sTrackIIExpDate);
+				trace_event(sLine,TRACE);
+				if (memcmp(sExpiryDate,sTrackIIExpDate,4) != 0)
+				{
+					PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_TRANSACTION_ACTION , 3);
+					trace_event("Check EXP DATE == TRACK II EXP DATE  (NOK)",TRACE);
+					trace_event("End   CheckAdvTlvFields(NOK)",PROCESSING);
+					return (NOK);
+				}
+			}
+
+			if ( GetTlvBuffer ( AUTO_PROCESSING_CODE      , sTlvBuffer , sPCode , &nLength ) == SUCCES)
+				if ( GetTlvBuffer ( AUTO_MERCHANT_TYPE , sTlvBuffer , sMcc , &nLength ) == SUCCES)
+				{
+					sprintf(sLine,"Check MCC %s == PROCESSING CODE  %s",sMcc, sPCode);
+					trace_event(sLine,TRACE);
+					if (
+						( !memcmp ( sMcc , "6011" , 4 ) &&
+						memcmp (sPCode + 6, "01",2) != 0  &&    /* Processing Code != Withrawal   */
+						memcmp (sPCode + 6, "89",2) != 0      /* Processing Code != Cost Inq   */
+						)
+						)
+					{
+						PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_MERCHANT_ACTION , 3);
+						trace_event("Check MCC == PROCESSING CODE (NOK)",TRACE);
+						trace_event("End   CheckAdvTlvFields(NOK)",PROCESSING);
+						return (NOK);
+					}
+					if (
+						( !memcmp ( sMcc , "6010" , 4 ) &&
+						memcmp (sPCode + 6, "17",2) != 0 && memcmp (sPCode + 6, "01",2) != 0  )  /* Processing Code != Cash Advnace   */
+						)
+					{
+						PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_MERCHANT_ACTION , 3);
+						trace_event(" 3 Check MCC == PROCESSING CODE (NOK)",TRACE);
+						trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+						return (NOK);
+					}
+
+					if (
+						( memcmp ( sMcc , "6011" , 4 ) !=0 &&
+						memcmp ( sMcc , "6010" , 4 ) !=0 &&
+						!memcmp (sPCode + 6, "01",2)     )  /* Processing Code = Withdrawal   */
+						)
+					{
+						PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_MERCHANT_ACTION , 3);
+						trace_event("Check MCC == PROCESSING CODE (NOK)",TRACE);
+						trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+						return (NOK);
+					}
+					if (
+						( memcmp ( sMcc , "6010" , 4 ) !=0 &&
+						!memcmp (sPCode + 6, "17",2)     )  /* Processing Code = Cash Advance   */
+						)
+					{
+						PutTlvBuffer ( AUTO_RESPONSE_CODE, sTlvBuffer, INVALID_MERCHANT_ACTION , 3);
+						trace_event(" 4 Check MCC == PROCESSING CODE (NOK)",TRACE);
+						trace_event("End   CheckReqTlvFields(NOK)",PROCESSING);
+						return (NOK);
+					}
+				}
+
+				memset (  sCardPan      , 0 , sizeof ( sCardPan ));/** PA DSS*/
+				memset (  sPan      , 0 , sizeof ( sPan )); /** PA DSS*/
+				memset (  sTrackII      , 0 , sizeof ( sTrackII )); /** PA DSS*/
+
+				trace_event("End   CheckAdvTlvFields(OK)",PROCESSING);
+				return ( OK );
+}
+
+
+int AuthorLog ( int nIndiceCtx, TSIsoInfo *sIsoMsg, 
+	char *sCaptureCode, char *sRoutingCode ,
+	char  *sAuthoTable  )
+{
+	int                           nRetCode;
+	int                           length;
+	char                         sTlvBuffer[ LG_MAX + 1 ];
+	TSTlvAutho                   sTlvInfo;
+
+	trace_event ( "Start AuthorLogInsertion()", PROCESSING );
+	memset ( sTlvBuffer , 0,  sizeof ( sTlvBuffer ));
+	InitTlvAutho(&sTlvInfo);
+
+	IsoToTlv    ( nIndiceCtx , sIsoMsg   , &sTlvInfo );
+	PutTlvAutho ( AUTO_ROUTING_CODE, &sTlvInfo, sRoutingCode ,  6);
+	PutTlvAutho ( AUTO_CAPTURE_CODE, &sTlvInfo, sCaptureCode,  6);
+	PutTlvAutho ( AUTO_CUR_TABLE_INDICATOR , &sTlvInfo, sAuthoTable ,     3);
+	PutTlvAutho ( AUTO_AUTHO_FLAG          , &sTlvInfo,  "P" ,  1);
+	PutTlvAutho ( AUTO_AUTHOR_SRC  , &sTlvInfo , "E2" ,  2);
+	length = AuthoBuildTlv( sTlvBuffer, &sTlvInfo);
+
+	nRetCode = InsertionAuthoActivity ( nIndiceCtx , sTlvBuffer );
+	if ( nRetCode != OK )
+	{
+		PutTlvBuffer ( AUTO_CUR_TABLE_INDICATOR,sTlvBuffer,"SAF",3);
+		nRetCode = InsertionAuthoActivity ( nIndiceCtx , sTlvBuffer );
+		if ( nRetCode != OK )
+		{
+			trace_event  ( "SEVERE ERROR !!!!!", PROCESSING );
+			trace_event  ( "Can Not Insert Autho Activity File ", PROCESSING );
+			return ( SEVERE_ERROR );
+		}
+	}
+
+	trace_event ( "End AuthorLogInsertion()", PROCESSING );
+	return ( OK );
+}
+

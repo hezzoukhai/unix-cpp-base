@@ -1,0 +1,92 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetBackupSwitch  (int nIndiceCtx, TSNetworkSwitch *network_switch)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+        char   NETWORK_CODE           [ 2 ];
+        char   RESOURCE               [ 6 ];
+        char   MTI                    [ 4 ];
+        char   CREDIT_ALTERNATE_PORT  [ 6 ];
+        char   DEBIT_ALTERNATE_PORT   [ 6 ];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetBackupSwitch() ", PROCESSING );
+        memset ( NETWORK_CODE           ,0, 2 );
+        memset ( RESOURCE               ,0, 6 );
+        memset ( MTI                    ,0, 4 );
+        memset ( CREDIT_ALTERNATE_PORT  ,0, 6 );
+        memset ( DEBIT_ALTERNATE_PORT   ,0, 6 );
+
+	memcpy ( NETWORK_CODE,network_switch->network,2);
+	memcpy ( RESOURCE    ,network_switch->resource,6);
+	memcpy ( MTI         ,network_switch->mti,4);
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_card;
+	EXEC SQL EXECUTE
+	    DECLARE T_P7_NETWORK_SWITCH   P7_NETWORK_SWITCH%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_PARAM_GENERAL_ROWS.GET_P7_NETWORK_SWITCH
+						(   :NETWORK_CODE, 
+						    :RESOURCE     , 
+						    :MTI          , 
+	                                            T_P7_NETWORK_SWITCH 
+	                                        );
+
+
+	    IF :response_code = 0 THEN
+    :CREDIT_ALTERNATE_PORT := T_P7_NETWORK_SWITCH.ALTERNATE_ROUTING_CODE_CREDIT;
+    :CREDIT_ALTERNATE_PORT := T_P7_NETWORK_SWITCH.ALTERNATE_ROUTING_CODE_DEBIT;
+     	    END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+            memcpy ( network_switch->alternate_credit,  
+						CREDIT_ALTERNATE_PORT  ,  6 );
+            memcpy ( network_switch->alternate_debit, 
+						DEBIT_ALTERNATE_PORT   ,  6 );
+	    trace_event ( "End GetBackupSwitch( OK ) ", PROCESSING );
+	    return(OK);
+	}
+	trace_event ( "End GetBackupSwitch( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_card :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+            memcpy ( network_switch->alternate_credit,  
+						CREDIT_ALTERNATE_PORT  ,  6 );
+            memcpy ( network_switch->alternate_debit, 
+						DEBIT_ALTERNATE_PORT   ,  6 );
+	    trace_event ( "End GetBackupSwitch( OK ) ", PROCESSING );
+	    return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetBackupSwitch( NOK ) ", PROCESSING );
+	return( NOK );
+}

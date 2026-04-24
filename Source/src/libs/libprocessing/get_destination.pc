@@ -1,0 +1,68 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+int   GetDestination ( 	int   nIndiceCtx			,
+						char *sTlvBuffer 			, 
+						char *sDestResource      
+					  )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+ 	char       	T_dest_resource	 [ 6 + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetDestination() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof (T_tlv_auth.arr ));
+	T_tlv_auth.len = 0;
+ 	memset ( T_dest_resource	       ,  0  ,   sizeof ( T_dest_resource ));
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_dest;
+	EXEC SQL EXECUTE
+	BEGIN
+
+        -- :response_code := GET_DESTINATION( :T_tlv_auth  ,
+        --									  :T_dest_resource ); 
+		NULL;
+
+	END;
+	END-EXEC;
+
+    memcpy ( sDestResource , T_dest_resource , 6 );
+	sprintf(sLine,"End GetDestination(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_get_dest :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End GetDestination(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

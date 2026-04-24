@@ -1,0 +1,376 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <tlv_fields.h>
+#include <resources.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int GetRouting (		int   nIndiceCtx          ,
+                        char *sTlvBuffer          ,
+			   	        char *sInternationalCheck ,
+                        char *sPrimaryResource    ,
+                        char *sSecondaryResource
+                   )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+ 	char       	T_primary_resource	 [ 6 + 1];
+ 	char       	T_secondary_resource [ 6 + 1];
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetRouting() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+ 	memset( T_primary_resource	 ,0, sizeof(T_primary_resource));
+ 	memset( T_secondary_resource ,0, sizeof(T_secondary_resource));
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_routing;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_SWI_ROUTING.GET_ROUTING( 	:T_primary_resource,
+															:T_secondary_resource,
+															:T_tlv_auth
+														 );
+
+	END;
+	END-EXEC;
+
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+        memcpy(sPrimaryResource    , T_primary_resource, 	6);
+        memcpy(sSecondaryResource  , T_secondary_resource, 	6);
+		sprintf(sLine,"End   GetRouting(OK)[%s][%s] ",sPrimaryResource,sSecondaryResource);
+		trace_event (sLine , PROCESSING );
+		return(OK);
+	}	
+
+	
+	sprintf(sLine,"End GetRouting(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_get_routing :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.70s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End GetRouting(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+int GetAuthRouting (	int   nIndiceCtx          ,
+                        char *sTlvBuffer          ,
+                        char *sPrimaryResource    ,
+                        char *sSecondaryResource
+                   )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+ 	char       	T_primary_resource	 [ 6 + 1];
+ 	char       	T_secondary_resource [ 6 + 1];
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetAuthRouting() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+ 	memset( T_primary_resource	 ,0, sizeof(T_primary_resource));
+ 	memset( T_secondary_resource ,0, sizeof(T_secondary_resource));
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_auth_routing;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_SWI_ROUTING.GET_ROUTING( 	:T_primary_resource,
+															:T_secondary_resource,
+															:T_tlv_auth
+														 );
+
+	END;
+	END-EXEC;
+
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+        memcpy(sPrimaryResource    , T_primary_resource, 	6);
+        memcpy(sSecondaryResource  , T_secondary_resource, 	6);
+		sprintf(sLine,"End   GetAuthRouting(OK)[%s][%s] ",sPrimaryResource,sSecondaryResource);
+		trace_event (sLine , PROCESSING );
+		return(OK);
+	}	
+
+	
+	sprintf(sLine,"End GetAuthRouting(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_get_auth_routing :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.70s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End GetAuthRouting(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+int GetAuthRoutingChannel (	int   nIndiceCtx          ,
+							char  routing_var_opt	  ,
+							char *sTlvBuffer          ,
+							char *sPrimaryResource    ,
+							char *sSecondaryResource
+						)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+ 	char       	T_primary_resource	 [ 6 + 1];
+ 	char       	T_secondary_resource [ 6 + 1];
+	char		T_routing_var_opt	[ 1 + 1];
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetAuthRoutingChannel() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+ 	memset( T_primary_resource	 ,0, sizeof(T_primary_resource));
+ 	memset( T_secondary_resource ,0, sizeof(T_secondary_resource));
+	memset( T_routing_var_opt ,0, sizeof(T_routing_var_opt));
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+	T_routing_var_opt[0] = routing_var_opt;
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_auth_routing;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_SWI_ROUTING.GET_ROUTING( 	:T_primary_resource,
+															:T_secondary_resource,
+															:T_tlv_auth,
+															:T_routing_var_opt
+														 );
+
+	END;
+	END-EXEC;
+
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+        memcpy(sPrimaryResource    , T_primary_resource, 	6);
+        memcpy(sSecondaryResource  , T_secondary_resource, 	6);
+		sprintf(sLine,"End   GetAuthRoutingChannel(OK)[%s][%s] ",sPrimaryResource,sSecondaryResource);
+		trace_event (sLine , PROCESSING );
+		return(OK);
+	}	
+
+	
+	sprintf(sLine,"End GetAuthRoutingChannel(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_get_auth_routing :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.70s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End GetAuthRoutingChannel(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+
+int GetAcqNetSwitch (	int   nIndiceCtx          ,
+                        char *sTlvBuffer          ,
+                        char *sPrimaryResource    ,
+                        char *sSecondaryResource
+                   )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+ 	char       	T_primary_resource	 [ 6 + 1];
+ 	char       	T_secondary_resource [ 6 + 1];
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetAcqNetSwitch() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+ 	memset( T_primary_resource	 ,0, sizeof(T_primary_resource));
+ 	memset( T_secondary_resource ,0, sizeof(T_secondary_resource));
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_GetAcqNetSwitch;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_SWI_ROUTING.GET_ACQ_NET_ROUTING( :T_primary_resource,
+																	:T_secondary_resource,
+																	:T_tlv_auth);
+
+	END;
+	END-EXEC;
+
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+        memcpy(sPrimaryResource    , T_primary_resource, 	6);
+        memcpy(sSecondaryResource  , T_secondary_resource, 	6);
+		sprintf(sLine,"End   GetAcqNetSwitch(OK)[%s][%s] ",sPrimaryResource,sSecondaryResource);
+		trace_event (sLine , PROCESSING );
+		return(OK);
+	}	
+
+	
+	sprintf(sLine,"End GetAcqNetSwitch(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_GetAcqNetSwitch :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.70s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End GetAcqNetSwitch(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

@@ -1,0 +1,97 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      check_auc.pc                                       				             */
+/*                                                                             */
+/* Description                                                                 */
+/*      Check AUC 										                                         */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001LH     		26-09-2006   		LOUBNA HIDRAOUI					   		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <tlv_autho.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+/* MYJ231007:Mehdi Elyajizi veification DAC ignoré fonctionnalité MasterCard et DAC non envoyé systématiquement */
+int Get_Dac_Idn ( int nIndiceCtx, char 	*sTlvAuth, char *Dac )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+    char sEventCode [ 3 + 1];
+    int  nLength;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth [ LG_MAX + 1];
+ 	VARCHAR     T_tlv_warning [ 6 + 1];
+	VARCHAR			T_offline_data [2 + 1];
+	int		    response_code;
+	
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start get_dac_idn() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+		T_tlv_auth.len=0;
+	
+		memset ( T_tlv_warning.arr         ,  0  ,   sizeof(T_tlv_warning.arr )  );
+  	T_tlv_warning.len = 0;
+  	
+  	memset ( T_offline_data.arr         ,  0  ,   sizeof(T_offline_data.arr )  );
+  	T_offline_data.len = 0;
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+    memcpy ( T_tlv_auth.arr, sTlvAuth, strlen ( sTlvAuth ));
+    T_tlv_auth.len =  strlen ( sTlvAuth );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_dac_idn;
+	EXEC SQL EXECUTE
+	BEGIN
+
+        :response_code := PCRD_P7_CTRL_EMV_SECURITY.GET_IDN_DAC( :T_tlv_auth,
+        																												 :T_tlv_warning,
+        																												 :T_offline_data);
+	END;
+	END-EXEC;
+
+    if ( response_code == 0 )
+    {   	
+   /***Linux 
+    memcpy ( Dac , T_offline_data.arr  , 			4  );	
+   */
+    memcpy ( Dac , T_offline_data.arr  , 			4  );	
+    sprintf(sLine,"End End get_dac_idn (%d,%.6s)", response_code,T_tlv_warning.arr);
+    trace_event(sLine,PROCESSING);
+	  return(response_code); 
+     }
+ sprintf(sLine,"End get_dac_idn( %d )", response_code);
+ trace_event(sLine,PROCESSING);
+ return(response_code);
+
+ err_get_dac_idn :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End get_dac_idn(SYSTEM_MALFUNCTION)", PROCESSING);
+ 	return( SYSTEM_MALFUNCTION );
+}
+/* MYJ231007:Mehdi Elyajizi veification DAC ignoré fonctionnalité MasterCard et DAC non envoyé systématiquement */

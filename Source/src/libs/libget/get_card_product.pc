@@ -1,0 +1,349 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetCardProduct  (int nIndiceCtx, TSCardProduct *card_product)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC ];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	char   BANK_CODE [ 6 ];
+ 	char   PRODUCT_CODE [ 3 ];
+ 	char   ON_US_PRODUCT_FLAG [ 1 ];
+ 	char   PRODUCT_TYPE [ 2 ];
+ 	char   NETWORK_CODE [ 2 ];
+ 	char   NETWORK_CARD_TYPE [ 2 ];
+ 	char   SERVICE_CODE [ 3 ];
+ 	char   BUSINESS_CARD_FLAG [ 1 ];
+ 	char   COBRANDED_CARD_FLAG [ 1 ];
+ 	char   PURCHASE_CARD_FLAG [ 1 ];
+ 	char   SERVICES_SETUP_INDEX [ 4 ];
+ 	char   VIP_RESPONSE_TRANSLATION [ 4 ];
+ 	char   CURRENCY_CODE [ 3 ];
+ 	char   LIMITS_INDEXES [ 4 ];
+ 	char   PERIODICITY_CODE [ 3 ];
+ 	char   ENABLE_CARD_LIMITS_EXCEPTION [ 1 ];
+ 	char   PROD_PIN_OFFSET_PVV [ 3 ];
+ 	char   PROD_CVV1 [ 1 ];
+ 	char   PROD_CVV2 [ 1 ];
+ 	char   PROD_CCD [ 1 ];
+ 	char   PROD_TELECODE [ 1 ];
+ 	char   OFF_LINE_ATM_PERIOD [ 3 ];
+ 	double OFF_LINE_ATM_LIMIT_ONUS;
+ 	double OFF_LINE_ATM_LIMIT_OFFUS;
+ 	char   ROT_MEM_OPTION [ 1 ];
+ 	char   ROT_MEM_CTRL_LIMIT [ 1 ];
+ 	char   ROT_MEM_CTRL_AVAILABLE [ 1 ];
+ 	char   ROT_MEM_SCANF_ISO2_ISO3 [ 1 ];
+ 	char   ROT_MEM_LAST_USAGE_DATE [ 1 ];
+ 	char   ISO3_SMART_PROC_MODE [ 7 ];
+ 	char   CHK_EXP_DATE_OPT [ 1 ];
+ 	char   CHK_START_EXP_DATE_OPT [ 1 ];
+ 	char   CHK_PIN_OPT [ 3 ];
+ 	char   CHK_CVV1_OPT [ 1 ];
+ 	char   CHK_CVV2_OPT [ 1 ];
+ 	char   DELIVERY_FLAG [ 1 ];
+ 	char   CARD_CARRIER_OPTION [ 1 ];
+ 	char   ADVICE_OPTION [ 1 ];
+ 	int    VALIDITY_CODE_FIRST;
+ 	int    VALIDITY_CODE_RENEWAL;
+ 	char   CHARGING_CONDITION [ 3 ];
+ 	char   SETTLEMENT_PERIOD [ 1 ];
+ 	char   SETTLEMENT_PERIOD_CASH [ 1 ];
+ 	char   MARKUP_CODE [ 2 ];
+ 	char   SCENARIO_CODE [ 1 ];
+ 	char   AUT_LVL_CARD [ 1 ];
+ 	char   AUT_LVL_BANKING_ACCOUNT [ 1 ];
+ 	char   AUT_LVL_CLIENT [ 1 ];
+ 	char   AUT_LVL_SHADOW_ACCOUNT [ 1 ];
+ 	char   ISO3_SMART_OPTION [ 1 ];
+ 	char   DEFAULT_LANGUAGE_CODE [ 3 ];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetCardProduct() ", PROCESSING );
+
+ 	memset ( BANK_CODE 		, 0 ,  6 );
+ 	memset ( PRODUCT_CODE 		, 0 ,  3 );
+ 	memset ( ON_US_PRODUCT_FLAG 	, 0 ,  1 );
+ 	memset ( PRODUCT_TYPE 		, 0 ,  2 );
+ 	memset ( NETWORK_CODE 		, 0 ,  2 );
+ 	memset ( NETWORK_CARD_TYPE 	, 0 ,  2 );
+ 	memset ( SERVICE_CODE 		, 0 ,  3 );
+ 	memset ( BUSINESS_CARD_FLAG 	, 0 ,  1 );
+ 	memset ( COBRANDED_CARD_FLAG 	, 0 ,  1 );
+ 	memset ( PURCHASE_CARD_FLAG 	, 0 ,  1 );
+ 	memset ( SERVICES_SETUP_INDEX 	, 0 ,  4 );
+ 	memset ( VIP_RESPONSE_TRANSLATION 	, 0 ,  4 );
+ 	memset ( CURRENCY_CODE 		, 0 ,  3 );
+ 	memset ( LIMITS_INDEXES 	, 0 ,  4 );
+ 	memset ( PERIODICITY_CODE 	, 0 ,  3 );
+ 	memset ( ENABLE_CARD_LIMITS_EXCEPTION 	, 0 ,  1 );
+ 	memset ( PROD_PIN_OFFSET_PVV 		, 0 ,  3 );
+ 	memset ( PROD_CVV1 		, 0 ,  1 );
+ 	memset ( PROD_CVV2 		, 0 ,  1 );
+ 	memset ( PROD_CCD 		, 0 ,  1 );
+ 	memset ( PROD_TELECODE 		, 0 ,  1 );
+ 	memset ( OFF_LINE_ATM_PERIOD 	, 0 ,  3 );
+ 	OFF_LINE_ATM_LIMIT_ONUS   = 0;
+ 	OFF_LINE_ATM_LIMIT_OFFUS  = 0;
+ 	memset ( ROT_MEM_OPTION 	, 0 ,  1 );
+ 	memset ( ROT_MEM_CTRL_LIMIT 	, 0 ,  1 );
+ 	memset ( ROT_MEM_CTRL_AVAILABLE	, 0 ,  1 );
+ 	memset ( ROT_MEM_SCANF_ISO2_ISO3 , 0 ,  1 );
+ 	memset ( ROT_MEM_LAST_USAGE_DATE, 0 ,  1 );
+ 	memset ( ISO3_SMART_PROC_MODE 	, 0 ,  7 );
+ 	memset ( CHK_EXP_DATE_OPT 	, 0 ,  1 );
+ 	memset ( CHK_START_EXP_DATE_OPT , 0 ,  1 );
+ 	memset ( CHK_PIN_OPT 		, 0 ,  3 );
+ 	memset ( CHK_CVV1_OPT 		, 0 ,  1 );
+ 	memset ( CHK_CVV2_OPT 		, 0 ,  1 );
+ 	memset ( DELIVERY_FLAG 		, 0 ,  1 );
+ 	memset ( CARD_CARRIER_OPTION 	, 0 ,  1 );
+ 	memset ( ADVICE_OPTION 		, 0 ,  1 );
+ 	VALIDITY_CODE_FIRST   = 0;
+ 	VALIDITY_CODE_RENEWAL = 0;
+ 	memset ( CHARGING_CONDITION 	, 0 ,  3 );
+ 	memset ( SETTLEMENT_PERIOD 	, 0 ,  1 );
+ 	memset ( SETTLEMENT_PERIOD_CASH , 0 ,  1 );
+ 	memset ( MARKUP_CODE 		, 0 ,  2 );
+ 	memset ( SCENARIO_CODE 		, 0 ,  1 );
+ 	memset ( AUT_LVL_CARD 		, 0 ,  1 );
+ 	memset ( AUT_LVL_BANKING_ACCOUNT, 0 ,  1 );
+ 	memset ( AUT_LVL_CLIENT 	, 0 ,  1 );
+ 	memset ( AUT_LVL_SHADOW_ACCOUNT , 0 ,  1 );
+ 	memset ( ISO3_SMART_OPTION 	, 0 ,  1 );
+ 	memset ( DEFAULT_LANGUAGE_CODE 	, 0 ,  3 );
+
+
+ 	memset ( BANK_CODE    , card_product->bank_code    , 6 );
+ 	memset ( PRODUCT_CODE , card_product->product_code , 3 );
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_card_product;
+	EXEC SQL EXECUTE
+	    DECLARE T_CARD_PRODUCT   CARD_PRODUCT%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_PARAM_CARD_ROWS.GET_CARD_PRODUCT
+						(   :BANK_CODE, 
+						    :PRODUCT_CODE, 
+	                                             T_CARD_PRODUCT 
+	                                        );
+	    IF :response_code = 0 THEN
+ 	      :BANK_CODE 		:= T_CARD_PRODUCT.BANK_CODE;  
+ 	      :PRODUCT_CODE 		:= T_CARD_PRODUCT.PRODUCT_CODE;  
+ 	      :ON_US_PRODUCT_FLAG 	:= T_CARD_PRODUCT.ON_US_PRODUCT_FLAG;
+ 	      :PRODUCT_TYPE 		:= T_CARD_PRODUCT.PRODUCT_TYPE;
+ 	      :NETWORK_CODE 		:= T_CARD_PRODUCT.NETWORK_CODE;
+ 	      :NETWORK_CARD_TYPE 	:= T_CARD_PRODUCT.NETWORK_CARD_TYPE;
+ 	      :SERVICE_CODE 		:= T_CARD_PRODUCT.SERVICE_CODE;
+ 	      :BUSINESS_CARD_FLAG 	:= T_CARD_PRODUCT.BUSINESS_CARD_FLAG;
+ 	      :COBRANDED_CARD_FLAG 	:= T_CARD_PRODUCT.COBRANDED_CARD_FLAG;
+ 	      :PURCHASE_CARD_FLAG 	:= T_CARD_PRODUCT.PURCHASE_CARD_FLAG;
+ 	      :SERVICES_SETUP_INDEX 	:= T_CARD_PRODUCT.SERVICES_SETUP_INDEX;
+ 	      :VIP_RESPONSE_TRANSLATION := 
+                                        T_CARD_PRODUCT.VIP_RESPONSE_TRANSLATION;
+ 	      :CURRENCY_CODE 		:= T_CARD_PRODUCT.CURRENCY_CODE;
+ 	      :LIMITS_INDEXES 	:= T_CARD_PRODUCT.LIMITS_INDEXES;
+ 	      :PERIODICITY_CODE 	:= T_CARD_PRODUCT.PERIODICITY_CODE;
+              :ENABLE_CARD_LIMITS_EXCEPTION 	:= 
+                                    T_CARD_PRODUCT.ENABLE_CARD_LIMITS_EXCEPTION;
+ 	      :PROD_PIN_OFFSET_PVV 	:= T_CARD_PRODUCT.PROD_PIN_OFFSET_PVV;
+ 	      :PROD_CVV1 		:= T_CARD_PRODUCT.PROD_CVV1;
+ 	      :PROD_CVV2 		:= T_CARD_PRODUCT.PROD_CVV2;
+ 	      :PROD_CCD 		:= T_CARD_PRODUCT.PROD_CCD;
+ 	      :PROD_TELECODE 		:= T_CARD_PRODUCT.PROD_TELECODE;
+ 	      :OFF_LINE_ATM_PERIOD 	:= T_CARD_PRODUCT.OFF_LINE_ATM_PERIOD;
+ 	      :OFF_LINE_ATM_LIMIT_ONUS := 
+                                        T_CARD_PRODUCT.OFF_LINE_ATM_LIMIT_ONUS;
+ 	      :OFF_LINE_ATM_LIMIT_OFFUS := 
+                                       T_CARD_PRODUCT.OFF_LINE_ATM_LIMIT_OFFUS;
+ 	      :ROT_MEM_OPTION 	:= T_CARD_PRODUCT.ROT_MEM_OPTION;
+ 	      :ROT_MEM_CTRL_LIMIT 	:= T_CARD_PRODUCT.ROT_MEM_CTRL_LIMIT;
+ 	      :ROT_MEM_CTRL_AVAILABLE := T_CARD_PRODUCT.ROT_MEM_CTRL_AVAILABLE;
+ 	      :ROT_MEM_SCANF_ISO2_ISO3 := 
+                                        T_CARD_PRODUCT.ROT_MEM_SCANF_ISO2_ISO3;
+ 	      :ROT_MEM_LAST_USAGE_DATE :=T_CARD_PRODUCT.ROT_MEM_LAST_USAGE_DATE;
+ 	      :ISO3_SMART_PROC_MODE 	:= T_CARD_PRODUCT.ISO3_SMART_PROC_MODE;
+ 	      :CHK_EXP_DATE_OPT 	:= T_CARD_PRODUCT.CHK_EXP_DATE_OPT;
+ 	      :CHK_START_EXP_DATE_OPT := T_CARD_PRODUCT.CHK_START_EXP_DATE_OPT;
+ 	      :CHK_PIN_OPT 		:= T_CARD_PRODUCT.CHK_PIN_OPT;
+ 	     :CHK_CVV1_OPT 		:= T_CARD_PRODUCT.CHK_CVV1_OPT;
+ 	     :CHK_CVV2_OPT 		:= T_CARD_PRODUCT.CHK_CVV2_OPT;
+ 	     :DELIVERY_FLAG 		:= T_CARD_PRODUCT.DELIVERY_FLAG;
+ 	     :CARD_CARRIER_OPTION 	:= T_CARD_PRODUCT.CARD_CARRIER_OPTION;
+ 	     :ADVICE_OPTION 		:= T_CARD_PRODUCT.ADVICE_OPTION;
+ 	     :VALIDITY_CODE_FIRST    := T_CARD_PRODUCT.VALIDITY_CODE_FIRST;
+ 	     :VALIDITY_CODE_RENEWAL  := T_CARD_PRODUCT.VALIDITY_CODE_RENEWAL;
+ 	     :CHARGING_CONDITION 	:= T_CARD_PRODUCT.CHARGING_CONDITION;
+ 	     :SETTLEMENT_PERIOD 	:= T_CARD_PRODUCT.SETTLEMENT_PERIOD;
+ 	     :SETTLEMENT_PERIOD_CASH := T_CARD_PRODUCT.SETTLEMENT_PERIOD_CASH;
+ 	     :MARKUP_CODE 		:= T_CARD_PRODUCT.MARKUP_CODE;
+ 	     :SCENARIO_CODE 		:= T_CARD_PRODUCT.SCENARIO_CODE;
+ 	     :AUT_LVL_CARD 		:= T_CARD_PRODUCT.AUT_LVL_CARD;
+ 	     :AUT_LVL_BANKING_ACCOUNT := T_CARD_PRODUCT.AUT_LVL_BANKING_ACCOUNT;
+ 	     :AUT_LVL_CLIENT 	:= T_CARD_PRODUCT.AUT_LVL_CLIENT;
+ 	     :AUT_LVL_SHADOW_ACCOUNT := T_CARD_PRODUCT.AUT_LVL_SHADOW_ACCOUNT;
+ 	     :ISO3_SMART_OPTION 	:= T_CARD_PRODUCT.ISO3_SMART_OPTION;
+ 	     :DEFAULT_LANGUAGE_CODE 	:= T_CARD_PRODUCT.DEFAULT_LANGUAGE_CODE;
+ 	     END IF;
+	END;
+	END-EXEC;
+
+      if ( response_code == 0 )
+      {
+
+ 	memcpy ( card_product->on_us_product_flag , ON_US_PRODUCT_FLAG 	, 1 );
+ 	memcpy ( card_product->product_type ,  PRODUCT_TYPE 		, 2 );
+ 	memcpy ( card_product->network_code ,  NETWORK_CODE , 2);
+ 	memcpy ( card_product->network_card_type ,   NETWORK_CARD_TYPE , 2 );
+ 	memcpy ( card_product->service_code , SERVICE_CODE , 3);
+ 	memcpy ( card_product->business_card_flag ,  BUSINESS_CARD_FLAG , 1);
+ 	memcpy ( card_product->cobranded_card_flag , COBRANDED_CARD_FLAG , 1);
+ 	memcpy ( card_product->purchase_card_flag ,  PURCHASE_CARD_FLAG , 1 );
+ 	memcpy ( card_product->services_setup_index ,SERVICES_SETUP_INDEX , 4 );
+ 	memcpy ( card_product->vip_response_translation
+				,	VIP_RESPONSE_TRANSLATION 	, 4);
+ 	memcpy ( card_product->currency_code ,  CURRENCY_CODE 		, 3 );
+ 	memcpy ( card_product->limits_indexes , LIMITS_INDEXES ,  	  4 );
+ 	memcpy ( card_product->periodicity_code , PERIODICITY_CODE 	, 3 );
+
+ 	memcpy ( card_product->enable_card_limits_exception , ENABLE_CARD_LIMITS_EXCEPTION 	, 1 );
+ 	memcpy ( card_product->prod_pin_offset_pvv ,  PROD_PIN_OFFSET_PVV , 3 );
+ 	memcpy ( card_product->prod_cvv1 ,  PROD_CVV1 , 1 );
+ 	memcpy ( card_product->prod_cvv2 ,  PROD_CVV2 , 1 );
+ 	memcpy ( card_product->prod_ccd ,  PROD_CCD , 1 );
+ 	memcpy ( card_product->prod_telecode ,PROD_TELECODE , 1);
+ 	memcpy ( card_product->off_line_atm_period , OFF_LINE_ATM_PERIOD , 3 );
+ 	card_product->off_line_atm_limit_onus =  OFF_LINE_ATM_LIMIT_ONUS;
+ 	card_product->off_line_atm_limit_offus =  OFF_LINE_ATM_LIMIT_OFFUS;
+ 	memcpy ( card_product->rot_mem_option ,  ROT_MEM_OPTION , 1 );
+ 	memcpy ( card_product->rot_mem_ctrl_limit ,  ROT_MEM_CTRL_LIMIT , 1 );
+ 	memcpy ( card_product->rot_mem_ctrl_available,ROT_MEM_CTRL_AVAILABLE,1);
+ 	memcpy (card_product->rot_mem_scanf_iso2iso3,ROT_MEM_SCANF_ISO2_ISO3,1);
+ 	memcpy ( card_product->rot_mem_last_usage_date
+			,ROT_MEM_LAST_USAGE_DATE, 1);
+ 	memcpy ( card_product->iso3_smart_proc_mode 
+			, ISO3_SMART_PROC_MODE 	, 7);
+ 	memcpy ( card_product->chk_exp_date_opt 
+			,   CHK_EXP_DATE_OPT 	, 1 );
+ 	memcpy ( card_product->chk_start_exp_date_opt
+			,CHK_START_EXP_DATE_OPT , 1);
+ 	memcpy ( card_product->chk_pin_opt ,  CHK_PIN_OPT , 3 );
+ 	memcpy ( card_product->chk_cvv1_opt ,  CHK_CVV1_OPT , 1 );
+ 	memcpy ( card_product->chk_cvv2_opt ,  CHK_CVV2_OPT , 1 );
+ 	memcpy ( card_product->delivery_flag ,  DELIVERY_FLAG , 1 );
+ 	memcpy ( card_product->card_carrier_option ,  CARD_CARRIER_OPTION , 1 );
+ 	memcpy ( card_product->advice_option ,   ADVICE_OPTION 	, 1 );
+        card_product->validity_code_first  = VALIDITY_CODE_FIRST;
+        card_product->validity_code_renewal= VALIDITY_CODE_RENEWAL;
+
+ 	memcpy ( card_product->charging_condition , CHARGING_CONDITION 	, 3);
+ 	memcpy ( card_product->settlement_period  , SETTLEMENT_PERIOD 	, 1 );
+ 	memcpy ( card_product->settlement_period_cash 
+			,SETTLEMENT_PERIOD_CASH , 1);
+ 	memcpy ( card_product->markup_code ,  MARKUP_CODE 		, 2 );
+ 	memcpy ( card_product->scenario_code ,  SCENARIO_CODE 		, 1 );
+ 	memcpy ( card_product->aut_lvl_card ,  AUT_LVL_CARD 		, 1 );
+ 	memcpy ( card_product->aut_lvl_banking_account,
+				AUT_LVL_BANKING_ACCOUNT, 1);
+ 	memcpy ( card_product->aut_lvl_client ,  AUT_LVL_CLIENT 	, 1 );
+ 	memcpy ( card_product->aut_lvl_shadow_account,
+				AUT_LVL_SHADOW_ACCOUNT , 	1);
+ 	memcpy ( card_product->iso3_smart_option ,   ISO3_SMART_OPTION 	, 1 );
+ 	memcpy ( card_product->default_language_code, DEFAULT_LANGUAGE_CODE, 3);
+
+	trace_event ( "End GetCardProduct( OK ) ", PROCESSING );
+	return(OK);
+     }
+	trace_event ( "End GetCardProduct( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_card_product:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+     if (memcmp(detail,"ORA-01405",9) == 0)
+     {
+ 	memcpy ( card_product->on_us_product_flag , ON_US_PRODUCT_FLAG 	, 1 );
+ 	memcpy ( card_product->product_type ,  PRODUCT_TYPE 		, 2 );
+ 	memcpy ( card_product->network_code ,  NETWORK_CODE , 2);
+ 	memcpy ( card_product->network_card_type ,   NETWORK_CARD_TYPE , 2 );
+ 	memcpy ( card_product->service_code , SERVICE_CODE , 3);
+ 	memcpy ( card_product->business_card_flag ,  BUSINESS_CARD_FLAG , 1);
+ 	memcpy ( card_product->cobranded_card_flag , COBRANDED_CARD_FLAG , 1);
+ 	memcpy ( card_product->purchase_card_flag ,  PURCHASE_CARD_FLAG , 1 );
+ 	memcpy ( card_product->services_setup_index ,SERVICES_SETUP_INDEX , 4 );
+ 	memcpy ( card_product->vip_response_translation
+				,	VIP_RESPONSE_TRANSLATION 	, 4);
+ 	memcpy ( card_product->currency_code ,  CURRENCY_CODE 		, 3 );
+ 	memcpy ( card_product->limits_indexes , LIMITS_INDEXES ,  	  4 );
+ 	memcpy ( card_product->periodicity_code , PERIODICITY_CODE 	, 3 );
+
+ 	memcpy ( card_product->enable_card_limits_exception , ENABLE_CARD_LIMITS_EXCEPTION 	, 1 );
+ 	memcpy ( card_product->prod_pin_offset_pvv ,  PROD_PIN_OFFSET_PVV , 3 );
+ 	memcpy ( card_product->prod_cvv1 ,  PROD_CVV1 , 1 );
+ 	memcpy ( card_product->prod_cvv2 ,  PROD_CVV2 , 1 );
+ 	memcpy ( card_product->prod_ccd ,  PROD_CCD , 1 );
+ 	memcpy ( card_product->prod_telecode ,PROD_TELECODE , 1);
+ 	memcpy ( card_product->off_line_atm_period , OFF_LINE_ATM_PERIOD , 3 );
+ 	card_product->off_line_atm_limit_onus =  OFF_LINE_ATM_LIMIT_ONUS;
+ 	card_product->off_line_atm_limit_offus =  OFF_LINE_ATM_LIMIT_OFFUS;
+ 	memcpy ( card_product->rot_mem_option ,  ROT_MEM_OPTION , 1 );
+ 	memcpy ( card_product->rot_mem_ctrl_limit ,  ROT_MEM_CTRL_LIMIT , 1 );
+ 	memcpy ( card_product->rot_mem_ctrl_available,ROT_MEM_CTRL_AVAILABLE,1);
+ 	memcpy (card_product->rot_mem_scanf_iso2iso3,ROT_MEM_SCANF_ISO2_ISO3,1);
+ 	memcpy ( card_product->rot_mem_last_usage_date
+			,ROT_MEM_LAST_USAGE_DATE, 1);
+ 	memcpy ( card_product->iso3_smart_proc_mode 
+			, ISO3_SMART_PROC_MODE 	, 7);
+ 	memcpy ( card_product->chk_exp_date_opt 
+			,   CHK_EXP_DATE_OPT 	, 1 );
+ 	memcpy ( card_product->chk_start_exp_date_opt
+			,CHK_START_EXP_DATE_OPT , 1);
+ 	memcpy ( card_product->chk_pin_opt ,  CHK_PIN_OPT , 3 );
+ 	memcpy ( card_product->chk_cvv1_opt ,  CHK_CVV1_OPT , 1 );
+ 	memcpy ( card_product->chk_cvv2_opt ,  CHK_CVV2_OPT , 1 );
+ 	memcpy ( card_product->delivery_flag ,  DELIVERY_FLAG , 1 );
+ 	memcpy ( card_product->card_carrier_option ,  CARD_CARRIER_OPTION , 1 );
+ 	memcpy ( card_product->advice_option ,   ADVICE_OPTION 	, 1 );
+        card_product->validity_code_first  = VALIDITY_CODE_FIRST;
+        card_product->validity_code_renewal= VALIDITY_CODE_RENEWAL;
+
+ 	memcpy ( card_product->charging_condition , CHARGING_CONDITION 	, 3);
+ 	memcpy ( card_product->settlement_period  , SETTLEMENT_PERIOD 	, 1 );
+ 	memcpy ( card_product->settlement_period_cash 
+			,SETTLEMENT_PERIOD_CASH , 1);
+ 	memcpy ( card_product->markup_code ,  MARKUP_CODE 		, 2 );
+ 	memcpy ( card_product->scenario_code ,  SCENARIO_CODE 		, 1 );
+ 	memcpy ( card_product->aut_lvl_card ,  AUT_LVL_CARD 		, 1 );
+ 	memcpy ( card_product->aut_lvl_banking_account,
+				AUT_LVL_BANKING_ACCOUNT, 1);
+ 	memcpy ( card_product->aut_lvl_client ,  AUT_LVL_CLIENT 	, 1 );
+ 	memcpy ( card_product->aut_lvl_shadow_account,
+				AUT_LVL_SHADOW_ACCOUNT , 	1);
+ 	memcpy ( card_product->iso3_smart_option ,   ISO3_SMART_OPTION 	, 1 );
+ 	memcpy ( card_product->default_language_code, DEFAULT_LANGUAGE_CODE, 3);
+
+	        trace_event ( "End GetCardProduct( OK ) ", PROCESSING );
+		return(OK);
+      }
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetCardProduct( NOK ) ", PROCESSING );
+	return( NOK );
+}

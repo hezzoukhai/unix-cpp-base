@@ -1,0 +1,96 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <resources.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetCommandMsg  (int pIndexCtx, char *pCardNbr, char *pNetwork, char *pCommand, char *pMessage)
+{
+	struct sqlca sqlca;
+	char   sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         vCardNbr        [  22 + 1 ];
+ 	char            vNetwork        [   2 + 1 ];
+ 	VARCHAR         vCommand        [ 256 + 1 ];
+ 	VARCHAR         vMessage        [2000 + 1 ];
+	int             response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[pIndexCtx].ctx;
+
+        trace_event("START GetCommandMsg()", FATAL);
+
+       /** ********* **/
+        memset(vCardNbr.arr, 0, sizeof(vCardNbr.arr));
+        vCardNbr.len = 0;
+        memcpy(vCardNbr.arr, pCardNbr, strlen(pCardNbr));
+        vCardNbr.len = strlen(pCardNbr);
+	/*MKB060309 PCI Norme Integration */
+	if (debug_option == 1)
+      	sprintf(sLine, "vCardNbr.arr=[%s], vCardNbr.len=[%d]", vCardNbr.arr, vCardNbr.len);
+	else
+      	sprintf(sLine, "vCardNbr.arr=[************], vCardNbr.len=[%d]", vCardNbr.len);
+        	trace_event(sLine, FATAL);
+
+       /** ********* **/
+        memset(vNetwork, 0, sizeof(vNetwork));
+        memcpy(vNetwork, pNetwork, strlen(pNetwork));
+        sprintf(sLine, "vNetwork=[%s]", vNetwork);
+        trace_event(sLine, FATAL);
+
+       /** ********* **/
+        memset(vCommand.arr, 0, sizeof(vCommand.arr));
+        vCommand.len = 0;
+        memcpy(vCommand.arr, pCommand, strlen(pCommand));
+        vCommand.len = strlen(pCommand);
+        sprintf(sLine, "vCommand.arr=[%s], vCommand.len=[%d]", vCommand.arr, vCommand.len);
+        trace_event(sLine, FATAL);
+
+       /** ********* **/
+        memset(vMessage.arr, 0, sizeof(vMessage.arr));
+        vMessage.len = 0;
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_cmd_msg;
+	EXEC SQL EXECUTE
+	BEGIN
+
+           :response_code := PCRD_EMV_GET_TOOLS.GET_COMMAND_MESSAGE ( 
+                                                              :vCardNbr,
+                                                              :vNetwork,
+                                                              :vCommand,
+                                                              :vMessage
+                                                              );
+
+        END;
+        END-EXEC;
+
+   if ( response_code == 0 )
+   {
+      memcpy(pMessage, vMessage.arr, vMessage.len);
+      sprintf(sLine, "pMessage=[%.60s]", pMessage);
+      trace_event(sLine, FATAL);
+	  memset(vCardNbr.arr, 0, sizeof(vCardNbr.arr));
+      trace_event ("End   GetCommandMsg(OK)", FATAL );
+      return(OK);
+   }
+
+   trace_event ("End   GetCommandMsg(NOK)", FATAL );
+   return(NOK);
+
+err_get_cmd_msg:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.80s",sqlca.sqlerrm.sqlerrmc);
+        trace_event(sLine, FATAL);
+	memset(vCardNbr.arr, 0, sizeof(vCardNbr.arr));
+        trace_event ("End   GetCommandMsg(ERROR)", FATAL );
+	return( ERROR );
+}

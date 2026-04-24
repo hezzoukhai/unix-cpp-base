@@ -1,0 +1,100 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_state.pc                                                           */
+/*                                                                             */
+/* Description                                                                 */
+/*      ATM State Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+
+#include <define.h>
+
+#include <dbl_paramdef.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+     /********************************************************************
+     **  GetAllStates(pProfile, pState)                       		**
+     **  Descri : charge la table des states			     **
+     **  Entree : pProfile -> code profil enregistre dans la base  **
+     **  Sortie : pState -> structure dbl_param qui recevra la      **
+     **         la chaine state(.data) et salangueur (.len).	     **
+     **  Return : OK -> fonctionnement normal.			     ** 
+     **		  ERROR -> erreur ORACLE.			     **
+     **  Auteur : Younes OUADI (le 27/11/1997).			     **
+     *****************************************************************/
+
+int GetAllStates(nIndexCtx,pTerminalNumber,pAcqBank/*ICH270715*/,pState)
+int			nIndexCtx;
+char		*pTerminalNumber;
+char		*pAcqBank/*ICH270715*/;
+dbl_param	*pState;
+{
+   char		detail[MAX_LINE_TRC];
+   struct sqlca sqlca;
+
+
+   EXEC SQL BEGIN DECLARE SECTION;
+      char		plBankCode		[    6+1];
+      char		plProfileCode	[    3+1];
+      varchar	plState			[20000+1];
+      int		plRetour;
+   EXEC SQL END DECLARE SECTION;
+
+sprintf(detail, "Start GetAllStates(%.8s,%.6s)", pTerminalNumber, pAcqBank/*ICH270715*/);
+trace_event(detail,PROCESSING);
+
+   /* initialisation des variables PL/SQL */
+   memset(plBankCode,	0,	sizeof(plBankCode));
+   memset(plProfileCode,0,	sizeof(plProfileCode));
+   memset(plState.arr,	0,	sizeof(plState.arr));
+   plState.len = 0;
+   
+	memcpy(plBankCode,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	
+   plRetour = GetTerminalProfile(nIndexCtx,
+				pTerminalNumber, plBankCode, plProfileCode);
+   if(plRetour != OK)
+   {
+      trace_event("End   GetAllStates(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+   EXEC SQL WHENEVER SQLERROR GOTO GetAllStates_err;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+   EXEC SQL EXECUTE
+      BEGIN
+         :plRetour := PCRD_GET_DBLPARAM_2.ALL_STATES(
+                                               :plBankCode,
+                                               :plProfileCode,
+                                               :plState);
+      END;
+   END-EXEC;
+
+   if (plRetour == NOK)
+   {
+      trace_event("End   GetAllStates(NOK)", PROCESSING);
+      return(NOK);
+   }
+
+   memcpy(pState->data, plState.arr, plState.len);
+   pState->len = plState.len;
+
+   trace_event("End   GetAllStates(OK)",PROCESSING);
+   return (OK);
+
+GetAllStates_err :
+   sprintf(detail,"End   GetAllStates(%s,X) -> %s",pTerminalNumber,sqlca.sqlerrm.sqlerrmc);
+   trace_event(detail,ERROR);
+   return(ERROR);
+}

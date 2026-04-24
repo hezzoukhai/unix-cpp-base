@@ -1,0 +1,88 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*                                                                             */
+/*                                                                             */
+/* Description                                                                 */
+/*                                                                             */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-10-2002   		Youssef KHALOUFI    		Initial Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <tlv_fields.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int  SetLoanDataToPos ( int nIndiceCtx , char *sTlvBuffer )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	trace_event ( "Start SetLoanDataToPos() ", PROCESSING );
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_SetLoanDataToPos;
+	EXEC SQL EXECUTE
+	BEGIN
+         :response_code := PCRD_CRD_LOAN_TOOLS.SET_DATA_LOAN(:T_tlv_auth );
+    END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		trace_event("End SetLoanDataToPos(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	
+	sprintf(sLine,"End SetLoanDataToPos(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_SetLoanDataToPos :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine,"End SetLoanDataToPos(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+}
+

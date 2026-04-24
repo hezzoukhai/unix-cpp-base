@@ -1,0 +1,121 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetProductSwitch  (int nIndiceCtx, TSProductSwitch *product_switch)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+   	char  PRODUCT_CODE    [ 3];
+   	char  MTI             [ 4];
+   	char  PROCESSING_CODE [ 2];
+   	char  FUNCTION_CODE   [ 3];
+   	char  SOURCE_ACCOUNT  [ 2];
+   	char  DESTINATION_ACCOUNT  [ 2];
+
+   	char  ROUTING_CREDIT [ 6];
+   	char  ROUTING_DEBIT  [ 6];
+   	char  ALTERNATE_ROUTING_CREDIT [ 6];
+   	char  ALTERNATE_ROUTING_DEBIT  [ 6];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetProductSwitch() ", PROCESSING );
+
+   	memset (  PRODUCT_CODE    , 0,  3 );
+   	memset (  MTI             , 0,  4 );
+   	memset (  PROCESSING_CODE , 0,  2 );
+   	memset (  FUNCTION_CODE   , 0,  3 );
+   	memset (  SOURCE_ACCOUNT  , 0,  2 );
+   	memset (  DESTINATION_ACCOUNT  , 0,  2 );
+
+   	memset (  ROUTING_CREDIT , 0,  6 );
+   	memset (  ROUTING_DEBIT  , 0,  6 );
+   	memset (  ALTERNATE_ROUTING_CREDIT , 0,  6 );
+   	memset (  ALTERNATE_ROUTING_DEBIT  , 0,  6 );
+
+     memcpy ( PRODUCT_CODE ,product_switch->product_code  ,2);
+     memcpy ( MTI          ,product_switch->mti ,6);
+     memcpy ( PROCESSING_CODE,product_switch->processing_code,2);
+     memcpy ( FUNCTION_CODE ,product_switch->function_code  ,2);
+     memcpy( SOURCE_ACCOUNT ,product_switch->source_account,2);
+     memcpy( DESTINATION_ACCOUNT ,product_switch->destination_account  ,2);
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_product_switch;
+	EXEC SQL EXECUTE
+	    DECLARE T_P7_PRODUCT_SWITCH   P7_PRODUCT_SWITCH%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_PARAM_GENERAL_ROWS.GET_P7_PRODUCT_SWITCH
+						(   :PRODUCT_CODE, 
+						    :MTI, 
+						    :PROCESSING_CODE, 
+						    :FUNCTION_CODE, 
+						    :SOURCE_ACCOUNT, 
+						    :DESTINATION_ACCOUNT, 
+	                                             T_P7_PRODUCT_SWITCH 
+	                                        );
+
+
+	   IF :response_code = 0 THEN
+	   :ROUTING_CREDIT := T_P7_PRODUCT_SWITCH.ROUTING_CODE_CREDIT;
+	   :ALTERNATE_ROUTING_CREDIT := T_P7_PRODUCT_SWITCH.ALTERNATE_ROUTING_CODE_CREDIT;
+	   :ROUTING_DEBIT  := T_P7_PRODUCT_SWITCH.ROUTING_CODE_DEBIT;
+	   :ALTERNATE_ROUTING_DEBIT  := T_P7_PRODUCT_SWITCH.ALTERNATE_ROUTING_CODE_DEBIT;
+	    END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+            memcpy ( product_switch->routing_credit, 
+						ROUTING_CREDIT     ,  6 );
+            memcpy ( product_switch->alternate_credit,  
+					       ALTERNATE_ROUTING_CREDIT,6);
+            memcpy ( product_switch->routing_debit,  
+					       ROUTING_DEBIT     ,  6 );
+            memcpy ( product_switch->alternate_debit, 
+					       ALTERNATE_ROUTING_DEBIT,6);
+	    trace_event ( "End GetProductSwitch( OK ) ", PROCESSING );
+	    return(OK);
+	}
+	trace_event ( "End GetProductSwitch( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_product_switch:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+            memcpy ( product_switch->routing_credit, 
+						ROUTING_CREDIT     ,  6 );
+            memcpy ( product_switch->alternate_credit,  
+					       ALTERNATE_ROUTING_CREDIT,6);
+            memcpy ( product_switch->routing_debit,  
+					       ROUTING_DEBIT     ,  6 );
+            memcpy ( product_switch->alternate_debit, 
+					       ALTERNATE_ROUTING_DEBIT,6);
+	    trace_event ( "End GetProductSwitch( OK ) ", PROCESSING );
+	    return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetProductSwitch( NOK ) ", PROCESSING );
+	return( NOK );
+}

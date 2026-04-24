@@ -1,0 +1,435 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      pcrd_donation_donations.pc                                              */
+/*                                                                             */
+/* Description                                                                 */
+/*      Account Tools Management                                               */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		22-11-2011  		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#include <langue.h>
+#include <donation.h>
+#include <paramdef.h>
+#include <iso_hps.h>
+#include <param_ctx.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+  /***********************************************************************
+  **  nom	: GetDonationList()											**
+  **  desc	: chargement des comptes d'un porteur					**
+  **  entree	: P7IsoInfo	-> tampon PowerSEVEN					**
+  **		  	firstAccountSeq-> sequence du premier compte			**
+  **  sortie	: donationList	-> liste de six comptes				**
+  **		  donationListSize-> nombre de comptes charge			**
+  **  retour	: OK	-> chargement reussi						**
+  **		  NOK	-> chargement de 1 compte						**
+  **		  ERROR	-> erreur fatal									**
+  **  auteur	: Younes OUADI (25 Oct 1998)						**
+  ***********************************************************************/
+int GetDonationList(	
+					int			nIndexCtx,
+					TSIsoInfo   *P7IsoInfo,
+					int			firstAccountSeq,
+					char		pTransCode,
+					donation_s	donationList	[  7],
+					int			*donationListSize)
+{
+
+	struct sqlca sqlca;
+	int		cpt;
+	char 	sLine[MAX_LINE_TRC];
+	int 	lgField;
+
+EXEC SQL BEGIN DECLARE SECTION;
+    char		plTransCode					[ 5];
+	
+    varchar		plDonationNumber1			[25];
+    varchar		pldonationAraWording1	[31];
+    varchar		pldonationEngWording1	[31];
+
+    varchar		plDonationNumber2			[25];
+    varchar		pldonationAraWording2	[31];
+    varchar		pldonationEngWording2	[31];
+                                    
+    varchar		plDonationNumber3			[25];
+    varchar		pldonationAraWording3	[31];
+    varchar		pldonationEngWording3	[31];
+                                 
+    varchar		plDonationNumber4			[25];
+    varchar		pldonationAraWording4	[31];
+    varchar		pldonationEngWording4	[31];
+                                    
+    varchar		plDonationNumber5			[25];
+    varchar		pldonationAraWording5	[31];
+    varchar		pldonationEngWording5	[31];
+                                    
+    varchar		plDonationNumber6			[25];
+    varchar		pldonationAraWording6	[31];
+    varchar		pldonationEngWording6	[31];
+
+	varchar		plDonationNumber7			[25];
+    varchar		pldonationAraWording7	[31];
+    varchar		pldonationEngWording7	[31];
+	
+    int			plStartPosition;
+    int			plDonationsNumber;
+    int			plRetour;
+EXEC SQL END DECLARE SECTION;
+
+	trace_event("Start GetDonationList() ", PROCESSING);
+
+	/* Initialisation des variables C */
+	for(cpt = 0; cpt < MAX_DONATION; cpt++)
+	{
+		memset(donationList[cpt].donationNumber,		0,	25);
+		memset(donationList[cpt].donationAraWording,	0,	31);
+		memset(donationList[cpt].donationEngWording,	0,	31);
+		donationList[cpt].donationAvailable	= NO;
+	}
+	*donationListSize = 0;
+
+	memset(plDonationNumber1.arr,			0, sizeof(plDonationNumber1.arr));
+	memset(pldonationAraWording1.arr,		0, sizeof(pldonationAraWording1.arr));
+	memset(pldonationEngWording1.arr,		0, sizeof(pldonationEngWording1.arr));
+	plDonationNumber1.len		= 2;
+	pldonationAraWording1.len	= 2;
+	pldonationEngWording1.len	= 2;
+
+	memset(plDonationNumber2.arr,			0, sizeof(plDonationNumber2.arr));
+	memset(pldonationAraWording2.arr,		0, sizeof(pldonationAraWording2.arr));
+	memset(pldonationEngWording2.arr,		0, sizeof(pldonationEngWording2.arr));
+	plDonationNumber2.len		= 2;
+	pldonationAraWording2.len	= 2;
+	pldonationEngWording2.len	= 2;
+
+	memset(plDonationNumber3.arr,			0, sizeof(plDonationNumber3.arr));
+	memset(pldonationAraWording3.arr,		0, sizeof(pldonationAraWording3.arr));
+	memset(pldonationEngWording3.arr,		0, sizeof(pldonationEngWording3.arr));
+	plDonationNumber3.len		= 2;
+	pldonationAraWording3.len	= 2;
+	pldonationEngWording3.len	= 2;
+
+	memset(plDonationNumber4.arr,			0, sizeof(plDonationNumber4.arr));
+	memset(pldonationAraWording4.arr,		0, sizeof(pldonationAraWording4.arr));
+	memset(pldonationEngWording4.arr,		0, sizeof(pldonationEngWording4.arr));
+	plDonationNumber4.len		= 2;
+	pldonationAraWording4.len	= 2;
+	pldonationEngWording4.len	= 2;
+
+	memset(plDonationNumber5.arr,			0,sizeof(plDonationNumber5.arr));
+	memset(pldonationAraWording5.arr,		0,sizeof(pldonationAraWording5.arr));
+	memset(pldonationEngWording5.arr,		0,sizeof(pldonationEngWording5.arr));
+	plDonationNumber5.len		= 2;
+	pldonationAraWording5.len	= 2;
+	pldonationEngWording5.len	= 2;
+
+	memset(plDonationNumber6.arr,			0, sizeof(plDonationNumber6.arr));
+	memset(pldonationAraWording6.arr,		0, sizeof(pldonationAraWording6.arr));
+	memset(pldonationEngWording6.arr,		0, sizeof(pldonationEngWording6.arr));
+	plDonationNumber6.len		= 2;
+	pldonationAraWording6.len	= 2;
+	pldonationEngWording6.len	= 2;
+
+	memset(plDonationNumber7.arr,			0, sizeof(plDonationNumber7.arr));
+	memset(pldonationAraWording7.arr,		0, sizeof(pldonationAraWording7.arr));
+	memset(pldonationEngWording7.arr,		0, sizeof(pldonationEngWording7.arr));
+	plDonationNumber7.len		= 2;
+	pldonationAraWording7.len	= 2;
+	pldonationEngWording7.len	= 2;
+
+	dump_p7_struct(P7IsoInfo);
+
+
+
+	memset(plTransCode, 0, sizeof(plTransCode));
+
+	GetTransCode(pTransCode,plTransCode);
+	plStartPosition = firstAccountSeq;
+
+	sprintf (sLine," Start Position               : %d", plStartPosition);
+	trace_event(sLine,TRACE);
+	sprintf (sLine," Trans Code                   : %s", plTransCode);
+	trace_event(sLine,TRACE);
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO get_donation_list_err;
+	EXEC SQL EXECUTE
+	DECLARE
+      v_enr_charity1		PCRD_ATM_CHARITY.CHARITY_ROW;
+      v_enr_charity2		PCRD_ATM_CHARITY.CHARITY_ROW;
+      v_enr_charity3		PCRD_ATM_CHARITY.CHARITY_ROW;
+      v_enr_charity4		PCRD_ATM_CHARITY.CHARITY_ROW;
+      v_enr_charity5		PCRD_ATM_CHARITY.CHARITY_ROW;
+      v_enr_charity6		PCRD_ATM_CHARITY.CHARITY_ROW;
+      v_enr_charity7		PCRD_ATM_CHARITY.CHARITY_ROW;
+	  v_env_info_trace      global_vars.env_info_trace_type := NULL;
+	  
+    BEGIN
+
+	:plRetour := PCRD_ATM_CHARITY.GET_CHARITY_LIST_FOR_ATM(
+                                       :plStartPosition,
+                                       :plTransCode,
+                                       v_enr_charity1,
+                                       v_enr_charity2,
+                                       v_enr_charity3,
+                                       v_enr_charity4,
+                                       v_enr_charity5,
+                                       v_enr_charity6,
+                                       v_enr_charity7,
+                                       :plDonationsNumber);
+
+      IF :plRetour = DECLARATION_CST.OK THEN
+        :plDonationNumber1				:= v_enr_charity1.bas_charity_code;
+        :pldonationAraWording1		:= v_enr_charity1.bas_charity_abrv_ara; 
+        :pldonationEngWording1		:= v_enr_charity1.bas_charity_abrv_eng;
+		
+        IF :plDonationsNumber > 1 THEN
+          :plDonationNumber2			:= v_enr_charity2.bas_charity_code;
+          :pldonationAraWording2	:= v_enr_charity2.bas_charity_abrv_ara; 
+          :pldonationEngWording2	:= v_enr_charity2.bas_charity_abrv_eng;
+        END IF;                                   
+		
+        IF :plDonationsNumber > 2 THEN
+          :plDonationNumber3			:= v_enr_charity3.bas_charity_code;
+          :pldonationAraWording3	:= v_enr_charity3.bas_charity_abrv_ara; 
+          :pldonationEngWording3	:= v_enr_charity3.bas_charity_abrv_eng;
+        END IF;                                   
+		
+        IF :plDonationsNumber > 3 THEN
+          :plDonationNumber4			:= v_enr_charity4.bas_charity_code;
+          :pldonationAraWording4	:= v_enr_charity4.bas_charity_abrv_ara; 
+          :pldonationEngWording4	:= v_enr_charity4.bas_charity_abrv_eng;
+        END IF;                                   
+		
+        IF :plDonationsNumber > 4 THEN
+          :plDonationNumber5			:= v_enr_charity5.bas_charity_code;
+          :pldonationAraWording5	:= v_enr_charity5.bas_charity_abrv_ara; 
+          :pldonationEngWording5	:= v_enr_charity5.bas_charity_abrv_eng;
+        END IF;                                   
+		
+        IF :plDonationsNumber > 5 THEN
+          :plDonationNumber6			:= v_enr_charity6.bas_charity_code;
+          :pldonationAraWording6	:= v_enr_charity6.bas_charity_abrv_ara; 
+          :pldonationEngWording6	:= v_enr_charity6.bas_charity_abrv_eng;
+        END IF;                                   
+		
+        IF :plDonationsNumber > 6 THEN
+          :plDonationNumber7			:= v_enr_charity7.bas_charity_code;
+          :pldonationAraWording7	:= v_enr_charity7.bas_charity_abrv_ara; 
+          :pldonationEngWording7	:= v_enr_charity7.bas_charity_abrv_eng;
+        END IF;		                               
+      END IF;
+    END;
+  END-EXEC;
+
+  if(plRetour != OK)
+  {
+    sprintf(sLine, "End   GetDonationList(%d)", plRetour);
+    trace_event(sLine, ERROR);
+    return (plRetour);
+  }
+  /* recuperation du contenu des variable PL/SQL */
+  *donationListSize = plDonationsNumber;
+
+  memcpy(donationList[0].donationNumber,plDonationNumber1.arr, plDonationNumber1.len);
+  memcpy(donationList[0].donationAraWording,pldonationAraWording1.arr, pldonationAraWording1.len);
+  memcpy(donationList[0].donationEngWording,pldonationEngWording1.arr, pldonationEngWording1.len);
+  donationList[0].donationAvailable	= YES;
+
+  if(*donationListSize > 1)
+  {
+    memcpy(donationList[1].donationNumber,plDonationNumber2.arr, plDonationNumber2.len);
+    memcpy(donationList[1].donationAraWording,pldonationAraWording2.arr, pldonationAraWording2.len);
+    memcpy(donationList[1].donationEngWording,pldonationEngWording2.arr, pldonationEngWording2.len);
+    donationList[1].donationAvailable	= YES;
+  }
+
+  if(*donationListSize > 2)
+  {
+    memcpy(donationList[2].donationNumber,plDonationNumber3.arr, plDonationNumber3.len);
+    memcpy(donationList[2].donationAraWording,pldonationAraWording3.arr, pldonationAraWording3.len);
+    memcpy(donationList[2].donationEngWording,pldonationEngWording3.arr, pldonationEngWording3.len);
+    donationList[2].donationAvailable	= YES;
+  }
+
+  if(*donationListSize > 3)
+  {
+    memcpy(donationList[3].donationNumber,plDonationNumber4.arr, plDonationNumber4.len);
+    memcpy(donationList[3].donationAraWording,pldonationAraWording4.arr, pldonationAraWording4.len);
+    memcpy(donationList[3].donationEngWording,pldonationEngWording4.arr, pldonationEngWording4.len);
+    donationList[3].donationAvailable	= YES;
+  }
+
+  if(*donationListSize > 4)
+  {
+    memcpy(donationList[4].donationNumber,plDonationNumber5.arr, plDonationNumber5.len);
+    memcpy(donationList[4].donationAraWording,pldonationAraWording5.arr, pldonationAraWording5.len);
+    memcpy(donationList[4].donationEngWording,pldonationEngWording5.arr, pldonationEngWording5.len);
+    donationList[4].donationAvailable	= YES;
+  }
+
+  if(*donationListSize > 5)
+  {
+    memcpy(donationList[5].donationNumber,plDonationNumber6.arr, plDonationNumber6.len);
+    memcpy(donationList[5].donationAraWording,pldonationAraWording6.arr, pldonationAraWording6.len);
+    memcpy(donationList[5].donationEngWording,pldonationEngWording6.arr, pldonationEngWording6.len);
+    donationList[5].donationAvailable	= YES;
+  }
+  
+  if(*donationListSize > 6)
+  {
+    memcpy(donationList[6].donationNumber,plDonationNumber7.arr, plDonationNumber7.len);
+    memcpy(donationList[6].donationAraWording,pldonationAraWording7.arr, pldonationAraWording7.len);
+    memcpy(donationList[6].donationEngWording,pldonationEngWording7.arr, pldonationEngWording7.len);
+    donationList[6].donationAvailable	= YES;
+  }
+   PutIsoField(ISO_RESPONSE_CODE, P7IsoInfo, "085", 3);
+
+  sprintf(sLine, "donation 1 number : %.25s", donationList[0].donationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 1 description e : %.20s",donationList[0].donationEngWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 2 number : %.25s", donationList[1].donationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 2 description e : %.20s",donationList[1].donationEngWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 3 number : %.25s", donationList[2].donationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 3 description e : %.20s",donationList[2].donationEngWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 4 number : %.25s", donationList[3].donationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 4 description e : %.20s",donationList[3].donationEngWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 5 number : %.25s", donationList[4].donationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 5 description e : %.20s",donationList[4].donationEngWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 6 number : %.25s", donationList[5].donationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 6 description e : %.20s",donationList[5].donationEngWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 7 number : %.25s", donationList[6].donationNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "donation 7 description e : %.20s",donationList[6].donationEngWording);
+  trace_event(sLine, PROCESSING);
+  
+	sprintf(sLine, "End   GetDonationList(OK %d)", *donationListSize);
+	trace_event(sLine, PROCESSING);
+	return (OK);
+
+get_donation_list_err :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   GetDonationList(ERROR)", ERROR);
+    return (ERROR);
+}
+/***********************************************************************
+  **  nom	: GetDonationParams()								     	**
+  **  desc	: chargement des parametres d'affichage sur le GAB			**
+  **  entree	: v_acquirer_bank					                    **
+  **  sortie	: v_sDisplayStart	-> Right/Left			            **
+  **		      v_sDisplayOnATM-> Yes/No			                    **
+  **  retour	: OK	-> chargement reussi						    **
+  **		      NOK	-> prendre les valeurs par default              **
+  **		      ERROR	-> erreur fatal									**
+  ***********************************************************************/
+int GetDonationParams  (int nIndiceCtx, 
+						char *v_acquirer_bank,
+						char *v_sDisplayStart,
+						char *v_sDisplayOnATM
+)
+{
+        struct sqlca sqlca;
+        
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        char  T_acquirer_bank [ 6+1];
+        char  T_display_start [ 1+1];
+        char  T_display_flag  [ 1+1];
+        int   response_code;
+        EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+		char detail [ MAX_LINE_TRC];
+        trace_event ( "Start GetDonationParams() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+        memset ( T_acquirer_bank            ,  0  ,   sizeof(T_acquirer_bank)  );
+        memset ( T_display_start            ,  0  ,   sizeof(T_display_start)  );
+        memset ( T_display_flag             ,  0  ,   sizeof(T_display_flag )  );
+        memset ( detail                     ,  0  ,   sizeof(detail )  );
+
+
+/****************************************************************************/
+/*      CHAMP CLE    / INITIALISTATION                                                       */
+/****************************************************************************/
+
+        memcpy ( T_acquirer_bank , v_acquirer_bank , strlen(v_acquirer_bank));
+        memcpy ( T_display_start , "L" , 1);
+        memcpy ( T_display_flag  , "Y" , 1);
+		
+
+/****************************************************************************/
+/*      LECTURE                                                             */
+/****************************************************************************/
+
+        response_code = 909;
+        EXEC SQL WHENEVER SQLERROR GOTO err_get_params;
+        EXEC SQL EXECUTE
+
+        BEGIN
+
+       :response_code := PCRD_ATM_CHARITY.GET_CHARITY_PARAMS  (     :T_acquirer_bank,
+																	:T_display_flag,
+																	:T_display_start);
+		END;
+        END-EXEC;
+
+        if ( response_code == 0 )
+        {
+                memcpy(v_sDisplayOnATM, T_display_flag,1);
+                memcpy(v_sDisplayStart, T_display_start,1);
+
+                trace_event ( "End GetDonationParams( OK ) ", PROCESSING );
+                return(OK);
+        }
+		
+        trace_event ( "End GetDonationParams( NOK ) ", PROCESSING );
+        return(OK);/* Ignore NOK Reply */
+
+err_get_params :
+        EXEC SQL WHENEVER SQLERROR CONTINUE;
+        sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+        if (memcmp(detail,"ORA-01405",9) == 0)
+        {
+                memcpy(v_sDisplayOnATM, T_display_flag,1);
+                memcpy(v_sDisplayStart, T_display_start,1);
+                trace_event ( "End GetDonationParams( OK ) ", PROCESSING );
+                return(OK);
+        }
+
+        trace_event (  detail , ERROR );
+        trace_event ( "End GetDonationParams( NOK ) ", PROCESSING );
+        return( NOK );
+}
+
+
+
+
+
+

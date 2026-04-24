@@ -1,0 +1,733 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      resource.pc                                                                 */
+/*                                                                             */
+/* Description                                                                 */
+/*      Resource Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <ndc_param.h>
+#include <thr_ndc_extern.h>
+
+/**************************************************************************/
+/*Fonction increment_mess_received                       		  */
+/*--------------------------------                                        */
+/* Description : Cette fonction a pour but mettre a jour la table         */
+/*		 TERMINAL_ATM_WATCH_ACTIVITY suite a la reception d'un new message     */
+/* Entree      : Numero de terminal                                       */
+/* Sortie      : OK   si l'update est sans probleme                       */
+/*               ERROR  si probleme                                       */
+/*  Date/Auteur: 29/05/96 M. Mortady                                      */
+/*  Revision   : 06/09/96 M.Mortady                                       */ 
+/* 		 remplacer terminal_date_time & duration                  */
+/*               par record_date_time                                     */
+/*               la table watch est remplacee par TERMINAL_ATM_WATCH_ACTIVITY          */
+/*                                                                        */
+/**************************************************************************/
+int increment_message_received(int	 nIndexCtx,char *V_terminal_number,char *V_AcqBank)
+
+{
+	struct sqlca sqlca; /**Linux ***/
+	char       sLine[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR 	T_terminal_number[15+1];
+	varchar       T_AcqBank  	 	[6+1];/*ICH270715*/ 
+	int			hRet;
+	EXEC SQL END DECLARE SECTION;
+
+
+	sprintf(sLine, "Start increment_mess_received(%.15s,%s)",V_terminal_number,V_AcqBank);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+
+	memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+	T_terminal_number.len = strlen(V_terminal_number);
+
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO increment_mess_received_error; 
+
+	EXEC SQL EXECUTE
+		BEGIN
+		:hRet := PCRD_ATM_WATCH.INCREMENT_MESSAGE_REC(:T_terminal_number,:T_AcqBank/*ICH270715*/);
+	END;
+	END-EXEC;
+
+	if(hRet != OK) {
+		sprintf(sLine, "End   increment_mess_received(%d)", hRet);
+		trace_event(sLine, PROCESSING);
+		return (NOK);
+	}
+	trace_event("End  increment_mess_received(OK) ",PROCESSING);
+	return (OK);
+
+
+increment_mess_received_error     : 
+	sprintf(sLine, "%s", sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   increment_mess_received(ERROR)",PROCESSING);
+	return(ERROR);
+
+}
+
+/**************************************************************************/
+/*Fonction increment_mess_sent				  		  */
+/*----------------------------                                            */
+/* Description : Cette fonction apour but mettre a jour de la table       */
+/*		 TERMINAL_ATM_WATCH_ACTIVITY suite a l'envoie d'un new message         */
+/* Entree      : Numero de terminal                                       */
+/* Sortie      : OK   si l'update est sans probleme                       */
+/*               ERROR  si probleme                                       */
+/*  Date/Auteur: 29/05/96 M. Mortady                                      */
+/*  Revision   : 06/09/96 M.Mortady                                       */
+/*               remplacer terminal_date_time & duration     		  */
+/*	         par record_date_time                                	  */
+/*               la table watch est remplacee par TERMINAL_ATM_WATCH_ACTIVITY   	  */
+/*                                                                        */
+/**************************************************************************/
+int increment_message_sent(int	 nIndexCtx,char *V_terminal_number,char  *V_AcqBank)
+{
+	struct sqlca sqlca; /**Linux ***/
+	char       sLine[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR 	T_terminal_number[15+1];
+	varchar      	T_AcqBank  	     [6+1];/*ICH270715*/ 
+	int			hRet;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start increment_message_sent(%.15s,%.6s)",V_terminal_number,V_AcqBank);
+	trace_event(sLine,PROCESSING);
+
+	memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+	memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+	T_terminal_number.len = strlen(V_terminal_number);
+
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);	
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO  increment_mess_sent_error; 
+
+	EXEC SQL EXECUTE
+		BEGIN
+		:hRet := PCRD_ATM_WATCH.INCREMENT_MESSAGE_SEND(:T_terminal_number,:T_AcqBank/*ICH270715*/);
+	END;
+	END-EXEC;
+
+	if(hRet != OK) {
+		sprintf(sLine, "End   increment_mess_send(%d)", hRet);
+		trace_event(sLine, PROCESSING);
+		return (NOK);
+	}
+	trace_event("End   increment_message_sent(OK)",PROCESSING);
+	return(OK);
+
+increment_mess_sent_error     : 
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End increment_message_sent(ERROR)",PROCESSING);
+	return(ERROR);
+
+}
+
+
+/**************************************************************************/
+/*Fonction increment_pick_up  				  		  */
+/*----------------------------                                            */
+/* Description : Cette fonction a pour but mettre a jour la table         */
+/*		 TERMINAL_ATM_WATCH_ACTIVITY lors d'un pick_up d'une carte             */
+/* Entree      : Numero de terminal                                       */
+/* Sortie      : OK   si l'update est sans probleme                       */
+/*               ERROR  si probleme                                       */
+/*  Date/Auteur: 29/05/96 M. Mortady                                      */
+/*  Revision   : 06/09/96 M.Mortady                                       */
+/*               remplacer terminal_date_time & duration     		  */
+/*	         par record_date_time                                	  */
+/*               la table watch est remplacee par TERMINAL_ATM_WATCH_ACTIVITY   	  */
+/*                                                                        */
+/**************************************************************************/
+int increment_pick_up(int	 nIndexCtx,char *V_terminal_number,char *V_AcqBank,char *V_reason_code)
+{
+	struct sqlca sqlca; /**Linux ***/
+	char       sLine[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR 	T_terminal_number[15+1];
+	varchar        T_AcqBank  	 	 [6+1];/*ICH270715*/ 
+	char		T_reason_code    [ 4+1];
+	int			hRet;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine,"Start increment_pick_up(%s,%s,%s)",V_terminal_number,V_AcqBank,V_reason_code);
+	trace_event(sLine,PROCESSING);
+
+
+	memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+	memset(T_reason_code, 0, sizeof(T_reason_code));
+	memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+	T_terminal_number.len = strlen(V_terminal_number);
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+	memcpy(T_reason_code, V_reason_code, 4);
+
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO increment_pick_up_error; 
+
+	EXEC SQL EXECUTE
+		BEGIN
+		:hRet := PCRD_ATM_WATCH.INCREMENT_PICK_UP(:T_terminal_number,:T_AcqBank/*ICH270715*/,:T_reason_code);
+	END;
+	END-EXEC;
+
+	if(hRet != OK) {
+		sprintf(sLine, "End   increment_pick_up(%d)", hRet);
+		trace_event(sLine, PROCESSING);
+		return (NOK);
+	}
+	trace_event("End   increment_pick_up(OK)",PROCESSING);
+	return(OK);
+
+increment_pick_up_error             :
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   increment_pick_up(ERROR) ",PROCESSING);
+	return(ERROR);
+
+
+}
+
+/**************************************************************************/
+/*Fonction insertion_pickup              		  		  */
+/*----------------------------                                            */
+/* Description : Cette fonction apour but d'inserer une carte pick_up     */
+/*    		 ds la table pick_up                                      */
+/* Entree      : Numero de terminal                                       */
+/*		 Numero de la carte                                       */
+/*		 code raison de capture de la carte                       */
+/* Sortie     :  OK si l'insertion ds la table pick_up est sans probleme  */
+/*               ERROR  si probleme                                       */
+/*               Modification du code d'erreur                            */
+/*                                                                        */
+/**************************************************************************/
+int insertion_pickup(
+		int  nIndexCtx,
+		char *V_card_number,
+		char *V_terminal_number,
+		char *V_AcqBank		  ,
+		char *V_IssBank		  ,/*ICH20190522 Add issuing Bank*/
+		char *V_reason_code    ,
+		char *V_mcc    	      ,
+		char *V_outlet         )
+{
+	struct sqlca sqlca; /**Linux ***/
+	char       sLine[MAX_LINE_TRC];
+	char       CardTrunc[22 +1];
+
+	memset(CardTrunc, 0, sizeof(CardTrunc));
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR 	T_terminal_number[15+1];
+	varchar      	T_AcqBank  	 	 [6+1];/*ICH270715*/ 
+	VARCHAR      	T_IssBank  	 	 [6+1];/*ICH20190522*/ 
+	VARCHAR		T_card_number    [22+1];
+	VARCHAR		T_outlet         [15+1];
+	char		T_reason_code    [ 4+1];
+	char		T_mcc    		 [ 4+1];
+	int			hRet;
+	EXEC SQL END DECLARE SECTION;
+
+	if( debug_option == 1 )
+	{
+		sprintf(sLine,"Start insertion_pickup(%s,%s,%s,%s) ",V_terminal_number,V_AcqBank,V_IssBank,V_card_number);
+	}
+	else
+	{
+		sprintf(sLine,"Start insertion_pickup(%s,%s,%s,%s) ",V_terminal_number,V_AcqBank,V_IssBank,"******");
+	}
+	trace_event(sLine,PROCESSING);
+
+	trim(V_outlet,strlen(V_outlet));
+	trace_event("===================================================",PROCESSING);
+	
+	
+	sprintf(sLine,"Reason Code : %s ",V_reason_code);
+	trace_event(sLine,PROCESSING);
+	sprintf(sLine,"Terminal Number : %s ",V_terminal_number);
+	trace_event(sLine,PROCESSING);
+	sprintf(sLine,"Acq Bank code : %s ",V_AcqBank);
+	trace_event(sLine,PROCESSING);
+	sprintf(sLine,"Outlet Number : <%s> ",V_outlet);
+	trace_event(sLine,PROCESSING);
+	sprintf(sLine,"Mcc  : %s ",V_mcc);
+	trace_event(sLine,PROCESSING);
+	trace_event("===================================================",PROCESSING);
+
+	memset(T_reason_code, 0, sizeof(T_reason_code));
+	memset(T_mcc, 		  0, sizeof(T_mcc));
+	memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+	memset(T_AcqBank.arr,		  0, sizeof(T_AcqBank.arr));/*ICH270715*/ 
+	memset(T_IssBank.arr,		  0, sizeof(T_IssBank.arr));/*ICH20190522*/         
+	memset(T_outlet.arr, 		  0, sizeof(T_outlet.arr));
+
+	memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+	T_terminal_number.len = strlen(V_terminal_number);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+	memcpy(T_IssBank.arr, V_IssBank, strlen(V_IssBank));
+	T_IssBank.len = strlen(V_IssBank);
+
+	memcpy(T_outlet.arr, V_outlet, strlen(V_outlet));
+	T_outlet.len = strlen(V_outlet);
+
+	memset(T_card_number.arr, 0, sizeof(T_card_number.arr));
+	memcpy(T_card_number.arr, V_card_number, strlen(V_card_number)); 
+	T_card_number.len = strlen(V_card_number);
+	memcpy(T_reason_code, V_reason_code, 4);
+	memcpy(T_mcc, V_mcc, 4);
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO insert_pick_up_error;
+
+	EXEC SQL EXECUTE
+		BEGIN
+		:hRet := PCRD_ATM_WATCH.INSERT_PICK_UP(:T_card_number,
+		:T_terminal_number,
+		:T_AcqBank,/*ICH270715*/  
+		:T_IssBank,/*ICH20190522*/  
+		:T_reason_code,
+		:T_mcc,
+		:T_outlet);
+	END;
+	END-EXEC;
+
+	memset(T_card_number.arr, 0, sizeof(T_card_number.arr)); /* PCI */
+	if(hRet != OK) {
+		sprintf(sLine, "End   insertion_pickup(%d)", hRet);
+		trace_event(sLine, PROCESSING);
+		return (NOK);
+	}
+
+	trace_event("End   insertion_pickup(OK) ",PROCESSING);
+	return(OK);
+
+insert_pick_up_error         :
+	memset(T_card_number.arr, 0, sizeof(T_card_number.arr)); /* PCI */
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   insertion_pickup(ERROR) ",PROCESSING);
+	return(ERROR);
+
+}
+
+
+/**************************************************************************/
+/*Fonction maj_cassette                  		  		  */
+/*----------------------------                                            */
+/* Description : Cette fonction a pour but la mise a jour                 */
+/*		 des caracteristiques de chaque une des 4 cassettes       */
+/* Entree      : Numero de terminal                                       */
+/*		 Identification de la cassette1                           */
+/*		 Etat de la cassette1                                     */
+/*		 Type de billet de la cassette1                           */
+/*		 Montant restant ds la cassette1                           */
+/*		 Identification de la cassette2                           */
+/*		 Etat de la cassette2                                     */
+/*		 Type de billet de la cassette2                           */
+/*		 Montant restant ds la cassette2                           */
+/*		 Identification de la cassette3                           */
+/*		 Etat de la cassette3                                     */
+/*		 Type de billet de la cassette3                           */
+/*		 Montant restant ds la cassette3                           */
+/*		 Identification de la cassette4                           */
+/*		 Etat de la cassette4                                     */
+/*		 Type de billet de la cassette4                           */
+/*		 Montant restant ds la cassette4                           */
+/*		                                                          */
+/* Sortie      : OK     si l'update est sans probleme                     */
+/*               ERROR  si probleme                                       */
+/* Date/Auteur : 29/05/96 A. Alaoui                                       */
+/* Revision    : 06/09/96 M.Mortady                                       */
+/*               la table watch est remplacee par terminal_atm_watch_warning    	  */
+/*		 Ajout de traitement concernant la cassette4              */
+/*               Modification du code d'erreur                            */
+/*                                                                        */
+/**************************************************************************/
+int maj_cassette(
+				int  nIndexCtx,
+				char *V_terminal_number,
+				char *V_AcqBank,
+				char *V_cassette_1,
+				char *V_status_1,
+				char *V_notes_type_1,
+				int  V_montant_1,
+				char *V_cassette_2,
+				char *V_status_2,
+				char *V_notes_type_2,
+				int  V_montant_2,
+				char *V_cassette_3,
+				char *V_status_3,
+				char *V_notes_type_3,
+				int  V_montant_3,
+				char *V_cassette_4,
+				char *V_status_4,
+				char *V_notes_type_4,
+				int  V_montant_4)
+{
+	struct sqlca sqlca; /**Linux ***/
+	char       sLine[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR 			T_terminal_number[15+1];
+	varchar      	    T_AcqBank  	 	 [6+1];/*ICH270715*/ 
+	char            T_cassette_1  [7+1];
+	char            T_status_1    [1+1];
+	char            T_notes_type_1[2+1];
+	int             T_montant_1;
+	char            T_cassette_2  [7+1];
+	char            T_status_2    [1+1];
+	char            T_notes_type_2[2+1];
+	int             T_montant_2;
+	char            T_cassette_3  [7+1];
+	char            T_status_3    [1+1];
+	char            T_notes_type_3[2+1];
+	int             T_montant_3;
+	char            T_cassette_4  [7+1];
+	char            T_status_4    [1+1];
+	char            T_notes_type_4[2+1];
+	int             T_montant_4;
+	int				hRet;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine,"Start  maj_cassette(%s,%.6s) ",V_terminal_number,V_AcqBank);
+	trace_event(sLine,PROCESSING);
+
+	memset(T_cassette_1, 0, sizeof(T_cassette_1));
+	memset(T_status_1, 0, sizeof(T_status_1));
+	memset(T_notes_type_1, 0, sizeof(T_notes_type_1));
+
+	memset(T_cassette_2, 0, sizeof(T_cassette_2));
+	memset(T_status_2, 0, sizeof(T_status_2));
+	memset(T_notes_type_2, 0, sizeof(T_notes_type_2));
+
+	memset(T_cassette_3, 0, sizeof(T_cassette_3));
+	memset(T_status_3, 0, sizeof(T_status_3));
+	memset(T_notes_type_3, 0, sizeof(T_notes_type_3));
+
+	memset(T_cassette_4, 0, sizeof(T_cassette_4));
+	memset(T_status_4, 0, sizeof(T_status_4));
+	memset(T_notes_type_4, 0, sizeof(T_notes_type_4));
+
+	memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+	memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+	T_terminal_number.len = strlen(V_terminal_number);
+
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank); 
+
+	memcpy(T_cassette_1,  V_cassette_1,     7);
+	memcpy(T_status_1,    V_status_1,       1);
+	memcpy(T_notes_type_1,V_notes_type_1,   2);
+	T_montant_1 = V_montant_1;
+
+	memcpy(T_cassette_2,  V_cassette_2,     7);
+	memcpy(T_status_2,    V_status_2,       1);
+	memcpy(T_notes_type_2,V_notes_type_2,   2);
+	T_montant_2 = V_montant_2;
+
+	memcpy(T_cassette_3,  V_cassette_3,     7);
+	memcpy(T_status_3,    V_status_3,       1);
+	memcpy(T_notes_type_3,V_notes_type_3,   2);
+	T_montant_3 = V_montant_3;
+
+	memcpy(T_cassette_4,  V_cassette_4,     7);
+	memcpy(T_status_4,    V_status_4,       1);
+	memcpy(T_notes_type_4,V_notes_type_4,   2);
+	T_montant_4 = V_montant_4;
+	trace_event("================================================================",PROCESSING);
+	sprintf(sLine," TERMINAL NUMBER <<%s>> ",T_terminal_number.arr);
+	trace_event(sLine,PROCESSING);
+	sprintf(sLine," CASSETTE ID <<%s>>, Status <<%s>>,Type <<%s>>, Montant <<%d>> ",T_cassette_1,T_status_1,T_notes_type_1,T_montant_1);
+	trace_event(sLine,PROCESSING);
+	sprintf(sLine," CASSETTE ID <<%s>>, Status <<%s>>,Type <<%s>>, Montant <<%d>> ",T_cassette_2,T_status_2,T_notes_type_2,T_montant_2);
+	trace_event(sLine,PROCESSING);
+	sprintf(sLine," CASSETTE ID <<%s>>, Status <<%s>>,Type <<%s>>, Montant <<%d>> ",T_cassette_3,T_status_3,T_notes_type_3,T_montant_3);
+	trace_event(sLine,PROCESSING);
+	sprintf(sLine," CASSETTE ID <<%s>>, Status <<%s>>,Type <<%s>>, Montant <<%d>> ",T_cassette_4,T_status_4,T_notes_type_4,T_montant_4);
+	trace_event(sLine,PROCESSING);
+	trace_event("================================================================",PROCESSING);
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR  GOTO  maj_cassette_error;
+
+	EXEC SQL EXECUTE
+		BEGIN
+		:hRet := PCRD_ATM_WATCH.ATM_MAJ_CASSETTE(
+		:T_terminal_number ,
+		:T_AcqBank/*ICH270715*/,
+		:T_cassette_1   ,
+		:T_status_1     ,
+		:T_notes_type_1 ,
+		:T_montant_1 ,
+		:T_cassette_2   ,
+		:T_status_2     ,
+		:T_notes_type_2 ,
+		:T_montant_2 ,
+		:T_cassette_3   ,
+		:T_status_3     ,
+		:T_notes_type_3 ,
+		:T_montant_3 ,
+		:T_cassette_4  ,
+		:T_status_4   ,
+		:T_notes_type_4 ,
+		:T_montant_4);
+	END;
+	END-EXEC;
+
+	if(hRet != OK) {
+		sprintf(sLine, "End   maj_cassette(%d)", hRet);
+		trace_event(sLine, PROCESSING);
+		return (NOK);
+	}
+	trace_event("End  maj_cassette(OK) ",PROCESSING);
+	return(OK);
+
+maj_cassette_error :
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End  maj_cassette(ERROR) ",PROCESSING);
+	return(ERROR);
+
+
+}
+
+/**************************************************************************/
+/*Fonction update_cassette               		  		  */
+/*----------------------------                                            */
+/* Description : Cette fonction a pour but la mise a jour                 */
+/*		des caracteristiques des cassettes suite a une operation  */
+/*		de retrait						  */
+/* Entree      : Numero de terminal                                       */
+/*		 Nombre de billets retires de la cassette1                */
+/*		 Nombre de billets retires de la cassette2                */
+/*		 Nombre de billets retires de la cassette3                */
+/*		 Nombre de billets retires de la cassette4                */
+/*		                                                          */
+/* Sortie      : OK   si l'update est sans probleme                       */
+/*               ERROR  si probleme                                       */
+/*               NOK    si le terminal n'appartient pas soit a la table   */
+/*		 terminal soit a la table terminal_atm_watch_warning                   */
+/* Date/Auteur : 29/05/96 M. Mortady                                      */
+/* Revision    : 06/09/96 M.Mortady                                       */
+/*              .Ajout de traitement des cassette3 et 4                   */
+/*              .Modification du traitement de l'etat de la cassette      */
+/*              .la table watch est remplacee par TERMINAL_ATM_WATCH_ACTIVITY          */
+/*              .L'appel au alert est supprime                            */
+/*		 Modification du code d'erreur                            */
+/**************************************************************************/
+/*****Begin MKB290408*****/
+/**************************************************************************/
+/*Fonction maj_cash_depo                                                  */
+/*----------------------------                                            */
+/* Description : Cette fonction a pour but la mise a jour                 */
+/*               des caracteristiques des cassettes cash-deposit          */ 
+/* Entree      : Numero de terminal                                       */
+/*               noterefunded                                             */
+/*               noterejected                                             */
+/*               noteencashed                                             */
+/*               notetoescrow                                             */
+/* Sortie      : OK     si l'update est sans probleme                     */
+/*               ERROR  si probleme                                       */
+/* Date/Auteur : 10/12/07 A.A.KHACHLA                                     */
+/**************************************************************************/
+int maj_cash_depo(
+					int  nIndexCtx,
+					char *V_terminal_number,
+					char *V_AcqBank,/*ICH270715*/
+					int  V_noterefunded,
+					int  V_noterejected,
+					int  V_noteencashed,
+					int  V_notetoescrow)
+{
+	struct sqlca sqlca;
+	char       sLine[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR                         T_terminal_number[15+1];
+	varchar       T_AcqBank  	 	[6+1];/*ICH270715*/ 
+	int             T_noterefunded;
+	int             T_noterejected;
+	int             T_noteencashed;
+	int             T_notetoescrow;
+	int             hRet;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine,"Start  maj_cash_depo(%s,%s) ",V_terminal_number,V_AcqBank /*ICH270715*/);
+	trace_event(sLine,PROCESSING);
+
+	memset(T_terminal_number.arr,0,sizeof(T_terminal_number.arr));
+	T_terminal_number.len = 0;
+	memcpy(T_terminal_number.arr, V_terminal_number, 8);
+	T_terminal_number.len = 8;
+
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+	T_noterefunded = V_noterefunded;
+	T_noterejected = V_noterejected;
+	T_notetoescrow = V_notetoescrow;
+	T_noteencashed = V_noteencashed;
+	trace_event("================================================================",PROCESSING);
+	sprintf(sLine," TERMINAL NUMBER <<%s>> ",T_terminal_number.arr);
+	trace_event(sLine,PROCESSING);
+	sprintf(sLine," Total notes refunded   <<%d>>",T_noterejected);
+	trace_event(sLine,PROCESSING);
+	sprintf(sLine," Total notes rejected   <<%d>>",T_notetoescrow);
+	trace_event(sLine,PROCESSING);
+	sprintf(sLine," Total notes encashed   <<%d>>",T_noteencashed);
+	trace_event(sLine,PROCESSING);
+	sprintf(sLine," Total notes to escrow  <<%d>>",T_noterefunded);
+	trace_event(sLine,PROCESSING);
+	trace_event("================================================================",PROCESSING);
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR  GOTO  maj_cassette_error;
+
+	EXEC SQL EXECUTE
+		BEGIN
+		:hRet := PCRD_ATM_CDM_TOOLS_1.CASH_DEPOSIT_MAJ_CASSETTE(
+		:T_terminal_number ,
+		:T_AcqBank,/*ICH270715*/
+		:T_noterefunded   ,
+		:T_noterejected   ,
+		:T_notetoescrow   ,
+		:T_noteencashed);
+	END;
+	END-EXEC;
+
+	if(hRet != OK) {
+		sprintf(sLine, "End   maj_cassette(%d)", hRet);
+		trace_event(sLine, PROCESSING);
+		return (NOK);
+	}
+	trace_event("End  maj_cash_depo(OK) ",PROCESSING);
+	return(OK);
+
+maj_cassette_error :
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End  maj_cassette(ERROR) ",PROCESSING);
+	return(ERROR);
+
+
+}
+/*****End MKB290408*****/
+
+
+int maj_atm_cassettes(
+				int  nIndexCtx,
+				char *V_terminal_number,
+				char *V_AcqBank,
+				int  nNotesCassette_1,
+				int  nNotesCassette_2,
+				int  nNotesCassette_3,
+				int  nNotesCassette_4,
+				int  nNotesRefunded,
+				int  nNotesRejected,
+				int  nNotesEncashed,
+				int  nNotesEscrowed
+				)
+{
+	struct sqlca sqlca;
+	char       sLine[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR 			T_terminal_number[15+1];
+	varchar      	    T_AcqBank  	 	 [6+1];
+	int            	T_notes_cassette_1;
+	int            	T_notes_cassette_2;
+	int            	T_notes_cassette_3;
+	int            	T_notes_cassette_4;
+	int             T_notes_refunded;
+	int             T_notes_rejected;
+	int             T_notes_encashed;
+	int             T_notes_escrowed;
+	
+	int				hRet;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine,"Start  maj_atm_cassettes(%s,%.6s) ",V_terminal_number,V_AcqBank);
+	trace_event(sLine,PROCESSING);
+
+
+	memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+	memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+	T_terminal_number.len = strlen(V_terminal_number);
+
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank); 
+
+	T_notes_cassette_1 = nNotesCassette_1;
+	T_notes_cassette_2 = nNotesCassette_2;
+	T_notes_cassette_3 = nNotesCassette_3;
+	T_notes_cassette_4 = nNotesCassette_4;
+	
+	T_notes_refunded = nNotesRefunded;
+	T_notes_rejected = nNotesRejected;
+	T_notes_encashed = nNotesEncashed;
+	T_notes_escrowed = nNotesEscrowed;
+	
+	
+	
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR  GOTO  maj_atm_cassette_err;
+
+	EXEC SQL EXECUTE
+		BEGIN
+		:hRet := PCRD_ATM_WATCH.MAJ_ATM_CASSETTES(
+													:T_terminal_number ,
+													:T_AcqBank,
+													:T_notes_cassette_1   ,
+													:T_notes_cassette_2     ,
+													:T_notes_cassette_3 ,
+													:T_notes_cassette_4 ,
+													:T_notes_refunded   ,
+													:T_notes_rejected     ,
+													:T_notes_encashed ,
+													:T_notes_escrowed );
+	END;
+	END-EXEC;
+
+	if(hRet != OK) {
+		sprintf(sLine, "End   maj_atm_cassettes(%d)", hRet);
+		trace_event(sLine, PROCESSING);
+		return (NOK);
+	}
+	trace_event("End  maj_atm_cassettes(OK) ",PROCESSING);
+	return(OK);
+
+maj_atm_cassette_err :
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End  maj_atm_cassettes(ERROR) ",PROCESSING);
+	return(ERROR);
+
+
+}
+

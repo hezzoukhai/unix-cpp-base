@@ -1,0 +1,234 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <tlv_autho.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int UpdateTranPosWatchAct  ( int nIndiceCtx , char *sTlvBuffer)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+	int				nRetCode;
+
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+ 	VARCHAR   	T_tlv_warning [ 6 + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+
+    trace_event ( "Start UpdateTranPosWatchAct () ", PROCESSING );
+
+
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+    
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	memset ( T_tlv_warning.arr         ,  0  ,   sizeof(T_tlv_warning.arr )  );
+	T_tlv_warning.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UpdateTranPosWatchAct;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response_code := PCRD_POS_WATCH_ACT_TOOLS.UPDATE_TRAN_POS_WATCH_ACTV( 
+																:T_tlv_auth,
+																:T_tlv_warning); 
+	END;
+	END-EXEC;
+
+    if (response_code != OK)
+      {
+         PrintTlvBuffer ( T_tlv_auth.arr);
+      }    
+     memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+
+	 /*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+	sprintf(sLine,"End UpdateTranPosWatchAct (%d,%.6s)", response_code,
+														  T_tlv_warning.arr);
+	trace_event(sLine,PROCESSING);
+
+
+	return(response_code);
+
+err_UpdateTranPosWatchAct :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+	trace_event("End UpdateTranPosWatchAct (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+int UpdateSlPosWatchAct  ( int nIndiceCtx , char *sTlvBuffer)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+	int				nRetCode;
+
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+ 	VARCHAR   	T_tlv_warning [ 6 + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+    trace_event ( "Start UpdateSlPosWatchAct () ", PROCESSING );
+
+    
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	memset ( T_tlv_warning.arr         ,  0  ,   sizeof(T_tlv_warning.arr )  );
+	T_tlv_warning.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UpdateSlPosWatchAct;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response_code := PCRD_POS_WATCH_ACT_TOOLS.UPDATE_SL_POS_WATCH_ACTV( 
+																:T_tlv_auth,
+																:T_tlv_warning); 
+	END;
+	END-EXEC;
+	
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine,"End UpdateSlPosWatchAct (%d,%.6s)", response_code, T_tlv_warning.arr);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_UpdateSlPosWatchAct :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+	trace_event("End UpdateSlPosWatchAct (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+int UpdateParamPosWatchAct  ( int nIndiceCtx , char *sTlvBuffer)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+	int				nRetCode;
+
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+ 	VARCHAR   	T_tlv_warning [ 6 + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+    trace_event ( "Start UpdateParamPosWatchAct () ", PROCESSING );
+
+    PrintTlvBuffer (  sTlvBuffer );
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	memset ( T_tlv_warning.arr         ,  0  ,   sizeof(T_tlv_warning.arr )  );
+	T_tlv_warning.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UpdateParamPosWatchAct;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response_code := PCRD_POS_WATCH_ACT_TOOLS.UPDATE_PARAM_POS_WATCH_ACTV( 
+																:T_tlv_auth,
+																:T_tlv_warning); 
+	END;
+	END-EXEC;
+	
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine,"End UpdateParamPosWatchAct (%d,%.6s)", response_code, T_tlv_warning.arr);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_UpdateParamPosWatchAct :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+	trace_event("End UpdateParamPosWatchAct (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

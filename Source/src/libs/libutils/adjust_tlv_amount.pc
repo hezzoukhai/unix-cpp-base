@@ -1,0 +1,358 @@
+#include <stdio.h>
+#include <define.h>
+#include <dump.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+extern double atof();
+
+int AdjustTlvAmount (  int nIndiceCtx , char *iso_amount , char *currency , char *tlv_amount )
+{
+	struct sqlca sqlca;
+
+        char sLine[ MAX_LINE_TRC ];
+        char sAmount[ 18 + 1 ];
+        double   rapport;
+        int  nLength;
+
+    	EXEC SQL BEGIN DECLARE SECTION;
+		char   	T_currency[ 3 + 1];
+	   	int		retour;
+	   	int		exponent;
+        	double   value;
+          	int      response_code;
+	EXEC SQL END DECLARE SECTION;
+	
+	sprintf(sLine,"Start AdjustTlvAmount (%.18s), (%.3s)",iso_amount,currency);
+	trace_event(sLine,TRACE);
+
+    	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+		
+
+	memset ( T_currency    , 0         ,  sizeof ( T_currency ));
+        memcpy ( T_currency    , currency  ,  3 );
+
+        exponent= -3;
+
+        EXEC SQL WHENEVER SQLERROR GOTO err_adjust_tlv_amount;
+        EXEC SQL EXECUTE
+        BEGIN
+        :response_code := PCRD_GET_PARAM_GENERAL_ROWS.GET_CURRENCY_EXPONENT (  :T_currency,
+                                                                               :exponent
+									    );
+        END;
+        END-EXEC;
+        if (  response_code == OK )
+        {
+		     if      (exponent ==  0) exponent = 1;
+		     else if (exponent ==  1) exponent = 10;
+		     else if (exponent ==  2) exponent = 100;
+		     else if (exponent ==  3) exponent = 1000;
+
+             rapport = 1000/exponent;
+             value = atof ( iso_amount ) * rapport;
+             memset  ( sAmount    , 0  , sizeof ( sAmount ));
+             sprintf (  sAmount   , "%018.0f", value );
+             memcpy  (  tlv_amount , sAmount , 18 );
+
+             sprintf(sLine,"End AdjustTlvAmount(OK)");
+             trace_event(sLine,PROCESSING);
+
+             return(OK);
+       }
+
+
+    sprintf(sLine,"End AdjustTlvAmount(NOK %d)", response_code);
+    trace_event(sLine,PROCESSING);
+    return(NOK);
+
+err_adjust_tlv_amount :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+    trace_event (  sLine , ERROR );
+    trace_event("End AdjustTlvAmount(MALFUNCTION)", ERROR );
+    return( NOK );
+}
+
+int AdjustIsoAmount (  int nIndiceCtx , char *tlv_amount , char *currency , char *iso_amount )
+{
+	struct sqlca sqlca;
+
+        char sLine[ MAX_LINE_TRC ];
+        char sAmount[ 18 + 1 ];
+        double   rapport = 0.0;
+        double   value = 0.0;
+        int  nLength = 0;
+
+	
+
+
+	    EXEC SQL BEGIN DECLARE SECTION;
+		   char   	T_currency[ 3 + 1];
+		   int		exponent;
+           int      response_code;
+	    EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+        EXEC SQL WHENEVER SQLERROR GOTO err_adjust_iso_amount;
+
+	memset(sLine, 0, sizeof(sLine));
+/*	sprintf(sLine, "Start AdjustIsoAmount(%.18s,%.3s)", tlv_amount, currency);
+	trace_event(sLine, PROCESSING);*/
+
+        memset ( T_currency    , 0  ,  sizeof ( T_currency ));  
+        /*trace_event("Debug AdjustIsoAmount  0 1", PROCESSING);*/
+	memcpy ( T_currency    , currency  ,  3 );                      
+        /*trace_event("Debug AdjustIsoAmount 0 2", PROCESSING);*/
+	/*exponent= -3;*/                                                   
+	exponent= 0;                                                   
+        /*trace_event("Debug AdjustIsoAmount 0 3", PROCESSING);*/
+        response_code = -1;
+        /*trace_event("Debug AdjustIsoAmount 0 4", PROCESSING);*/
+
+        EXEC SQL EXECUTE
+        BEGIN
+			
+        :response_code := PCRD_GET_PARAM_GENERAL_ROWS.GET_CURRENCY_EXPONENT (  :T_currency,
+                                                                               :exponent
+	 																		 );
+        END;
+        END-EXEC;
+        /*trace_event("Debug AdjustIsoAmount 0 5", PROCESSING);*/
+        if (  response_code == OK )
+        {
+             /*trace_event("Debug AdjustIsoAmount 0 6", PROCESSING);*/
+		     if      (exponent ==  0) exponent = 1;
+		     else if (exponent ==  1) exponent = 10;
+		     else if (exponent ==  2) exponent = 100;
+		     else if (exponent ==  3) exponent = 1000;
+
+             /*trace_event("Debug AdjustIsoAmount 1", PROCESSING);*/
+             rapport = (exponent * 1.0)/1000.0;
+             /*trace_event("Debug AdjustIsoAmount 2", PROCESSING);*/
+             value = atof ( tlv_amount ) * rapport;
+             /*trace_event("Debug AdjustIsoAmount 3", PROCESSING);*/
+             memset  ( sAmount    , 0         , sizeof ( sAmount ));
+             sprintf (  sAmount   , "%012.0f" , value );
+             memcpy  (  iso_amount , sAmount  , 12 );
+               iso_amount[12] ='\0';
+    		/* sprintf(sLine,"End AdjustIsoAmount(OK) %s %f %d",sAmount,value,exponent);
+    		 trace_event(sLine,PROCESSING);*/
+    		 return(OK);
+          }
+
+    sprintf(sLine,"End AdjustIsoAmount(NOK %d)", response_code);
+    trace_event(sLine,PROCESSING);
+    return(NOK);
+
+err_adjust_iso_amount :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+    trace_event (  sLine , ERROR );
+    trace_event("End AdjustIsoAmount(NOK)", PROCESSING);
+    return( NOK );
+}
+
+int AdjustTlvRate (   char *iso_rate , char *tlv_rate )
+{
+	struct sqlca sqlca;
+        char sLine[ MAX_LINE_TRC ];
+        char sData[ MAX_LINE_TRC ];
+        char sRate[ 14 + 1 ];
+        char sNbDecimales [ 1 + 1 ];
+        char sIsoRate [ 256 + 1 ];
+        double dIsoRate =  0; 
+        int  nNbDecimales;
+        int  nb_decimales , i, nLength;
+
+       memset ( sNbDecimales , 0 , sizeof ( sNbDecimales ));
+       memcpy ( sNbDecimales , iso_rate , 1 );
+       nNbDecimales = atoi ( sNbDecimales );
+       memset (  sIsoRate , 0 , sizeof ( sIsoRate  ));
+       memcpy (  sIsoRate , iso_rate + 1 , strlen ( iso_rate ) - 1 );
+       dIsoRate = atof ( sIsoRate );
+
+       for ( i = 0 ; i < nNbDecimales ; i ++ ) dIsoRate = dIsoRate/10.0;
+       dIsoRate = 1000000.0 * dIsoRate;
+       memset  (  sRate    , 0         , sizeof ( sRate ));
+       sprintf (  sRate    , "%014.0f" , dIsoRate        );
+       memcpy  (  tlv_rate , sRate     , 14              );
+      
+       return ( OK );
+}
+
+/*****************************************************************************/
+/* Fonction convert_amount                                           	     */
+/* -----------------------                                                   */
+/*  Fonction : fonction qui converti en ajoutant le markup.                  */
+/*  Entree   : Le montant a convertir                                        */
+/*             Le code monnaie du montant original                           */
+/*             Le code monnaie cible                                         */
+/*             Le code monnaie de base                                       */
+/*             La date de conversion                                         */
+/*             La flag du taux a utiliser 0 Vente 1 Achat                    */
+/*             le flag markup qui indique si le markup est a calculer ou pas */
+/*             0 Pas de markup  1 Markup                                     */
+/*  Sortie   : Le montant converti                              	     */
+/*  Retour   : OK,NOK, MALFUNCTION				             */	
+/*  Auteur   : 03/04/03 I. HASSANI                                           */
+/*  Revision :                                                               */
+/*****************************************************************************/
+int     swi_convert_amount(
+                    int   nIndexCtx,
+                    char *V_bank_code,
+                    char *V_origin_currency,
+                    char *V_rate_origin,
+                    char *V_mode_conversion,
+                    char *V_destination_currency, 
+                    char *V_amount, 
+                    char *V_destination_amount
+                    )
+
+{
+
+char	P_amount             [13];
+char	P_destination_amount [13];
+char    sLine[MAX_LINE_TRC];
+
+EXEC SQL BEGIN DECLARE SECTION;
+    char	T_bank_code [7];
+	char    T_origin_currency	    [ 4];
+	char    T_rate_origin			[ 2];
+	char    T_mode_conversion		[ 2];
+	char    T_destination_currency	[ 4];
+	double  T_amount = 0.000;
+	char	T_origin_conversion_date [ 4];
+
+	double  T_converted_amount;
+	double markup = 0.000;
+	char    T_source_currency	    [4];
+	
+	int     T_buying_flag;
+	int     T_markup_flag;
+	char	T_actual_conversion_date[ 4];
+	char	T_rate			        [ 8];
+	char	P_converted_amount [13];
+
+	int	RespCode;
+EXEC SQL END DECLARE SECTION;
+
+
+sprintf(sLine, "Start swi_convert_amount(%.6s, %.12s, %.3s, %.3s)", 
+               V_bank_code, V_amount, 
+               V_origin_currency, V_destination_currency);
+trace_event(sLine, PROCESSING);
+
+memset(T_bank_code,        0, sizeof(T_bank_code));
+memset(T_origin_currency,        0, sizeof(T_origin_currency));
+memset(T_rate_origin,        0, sizeof(T_rate_origin));
+memset(T_destination_currency,   0, sizeof(T_destination_currency));
+memset(T_rate,                   0, sizeof(T_rate));
+memset(P_amount,                 0, sizeof(P_amount));
+memset(P_destination_amount,       0, sizeof(P_destination_amount));
+memset(T_actual_conversion_date, 0, sizeof(T_actual_conversion_date));
+memset(P_converted_amount, 0, sizeof(P_converted_amount));
+memset(T_mode_conversion, 0, sizeof(T_mode_conversion));
+
+
+
+memcpy(T_bank_code, V_bank_code, 6);
+
+
+memcpy(T_origin_currency, V_origin_currency, 3);
+
+
+memcpy(T_destination_currency, V_destination_currency, 3);
+
+
+memcpy(P_amount, V_amount, 12);
+T_amount = atoi(P_amount);
+adjust_amount_numeric(nIndexCtx, &T_amount, T_origin_currency);
+
+
+
+T_converted_amount = NOK;
+
+
+EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+EXEC SQL WHENEVER SQLERROR GOTO conv_error;
+EXEC SQL EXECUTE
+DECLARE
+vConvDate                DATE:=SYSDATE;
+v_rate_iso_str_format    VARCHAR2(12):='00000001';
+BEGIN
+
+   :RespCode :=PCRD_GENERAL_TOOLS.SWI_CONVERT_CURRENCY_AMOUNT(
+			   :T_bank_code,
+			   :T_origin_currency,
+			   'C', --:T_rate_origin,
+			   'B', --:T_mode_conversion,
+			   :T_destination_currency,
+		           :T_amount,
+			   SYSDATE,
+		           '',
+		           :T_converted_amount,
+			   vConvDate, --SYSDATE,
+			   v_rate_iso_str_format,
+			   :markup, 
+			   NULL, --TRUE,
+			   '', --'00',
+			   NULL, --FALSE,
+			   '' --'DF'  
+			   );
+
+
+
+
+END;
+END-EXEC;
+
+if (T_converted_amount < 0) 
+{
+		memset(V_destination_amount, '0', 12); 
+		trace_event("End   swi_convert_amount(NOK)",PROCESSING);
+		return(NOK);
+}
+
+amount_to_iso(&T_converted_amount, V_destination_currency);
+sprintf(P_converted_amount, "%012.0f", T_converted_amount);
+memcpy(V_destination_amount,        P_converted_amount,       12);
+
+sprintf(sLine,"End   swi_convert_amount(%.12s)",V_destination_amount);
+
+trace_event(sLine,PROCESSING);
+return(OK);
+
+conv_error :
+EXEC SQL WHENEVER SQLERROR CONTINUE;
+
+   sprintf(sLine, " ==> RespCode = [%d], T_converted_amount=[%12.3f]", RespCode, T_converted_amount);
+   trace_event(sLine, PROCESSING);
+   if(memcmp(sqlca.sqlerrm.sqlerrmc, "ORA-01405", 9) == 0)
+   {
+        trace_event("====> ORA-01405 <====", PROCESSING);
+        if (T_converted_amount < 0)
+        {
+                        memset(V_destination_amount, '0', 12);
+                        trace_event("End   swi_convert_amount(NOK)",PROCESSING);
+                        return(NOK);
+        }
+        
+        amount_to_iso(nIndexCtx, &T_converted_amount, V_destination_currency);
+        sprintf(P_converted_amount, "%012.0f", T_converted_amount);
+        memcpy(V_destination_amount,        P_converted_amount,       12);
+        
+        sprintf(sLine,"End   swi_convert_amount(%.12s)",V_destination_amount);
+        
+        trace_event(sLine,PROCESSING);
+        return(OK);
+   }
+
+sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+trace_event(sLine, ERROR);
+
+trace_event("End   swi_convert_amount(NOK)",PROCESSING);
+return(NOK);
+}

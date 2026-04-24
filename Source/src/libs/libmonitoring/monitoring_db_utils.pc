@@ -1,0 +1,127 @@
+/*****************************************************************************\
+* Initial version: E.BENZIT
+*
+*
+*
+*
+\*****************************************************************************/
+
+#include <stdio.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <string.h> /* TBO25112014 */
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+/****************************************************************************/
+/*  GetSwitchMonResourceId()                                                */
+/****************************************************************************/
+int  GetSwitchMonResourceId(int  nIndexCtx, char* szNodeId, char  *pResourceId)
+{
+
+	struct sqlca sqlca;
+	char	sLine[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	char		T_resource_id	[7];
+	char		T_node_id		[5];
+	int        result;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start GetSwitchMonResourceId(%s)", szNodeId);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_resource_id, 0, sizeof(T_resource_id));
+	memset(T_node_id, 0, sizeof(T_node_id));
+	memcpy(T_node_id, szNodeId, 4);
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO get_fn_err;
+	EXEC SQL EXECUTE
+	BEGIN
+		/*:result := PCRD_SW_MONITORING_TOOLS.GET_SWITCH_MONITORING_RES(:T_resource_id , :T_node_id);*/ /*  ZEH30102014(PROD00011515) */
+		:result := PCRD_SW_MONITORING_TOOLS.GET_SWITCH_MONITORING_RES(:T_node_id , :T_resource_id); 	/*  ZEH30102014(PROD00011515) */
+	END;
+	END-EXEC;
+
+	if (result != OK)
+	{
+		sprintf(sLine, "End   GetSwitchMonResourceId(NOK): No Switch monitoring defined for Node id: %s", szNodeId);
+		trace_event(sLine, ERROR);
+		return (NOK);
+	}
+
+
+
+	memcpy(pResourceId, T_resource_id, 6); 
+	pResourceId[6] = '\0'; 
+	sprintf(sLine,"End   GetSwitchMonResourceId(OK)[%s]", pResourceId); /* TBO25112014 ajout de sLine, */
+	trace_event(sLine, PROCESSING);
+
+	return (OK);
+
+
+get_fn_err:
+	sprintf(sLine, "End GetSwitchMonResourceId(MALFUNCTION)|%s", sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	return (NOK);
+}
+/****************************************************************************/
+/*  GetSwitchMonResourcePid()   IBO20200508                                 */
+/****************************************************************************/
+int  GetSwitchMonResourcePid (int  nIndexCtx, char  *szNodeId, char  *pResourceId, pid_t* nPid )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_node_id			[4 + 1];
+        char       T_resource_id		[6 + 1];
+		pid_t	   T_pid;
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf (sLine,"Start  GetSwitchMonResourcePid(%s)", szNodeId);
+   trace_event (sLine, PROCESSING);
+
+   memset (T_node_id,       	0, sizeof(T_node_id));
+   memset (T_resource_id,       0, sizeof(T_resource_id));
+   T_pid =  -1;
+
+   memcpy (T_node_id, szNodeId, 4);
+   
+   
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO get_fn_err;
+	EXEC SQL EXECUTE
+   	BEGIN
+      :result := PCRD_SW_MONITORING_TOOLS.GET_SW_MONITORING_RES_PID (	:T_node_id,
+																		:T_resource_id,
+																		:T_pid			);
+
+   	END;
+   	END-EXEC;
+
+
+   if( result == OK )
+   {
+		*nPid = T_pid;
+      	memcpy (pResourceId,    T_resource_id,   6);
+	  	pResourceId[6]='\0';
+	  	sprintf(sLine,"End GetSwitchMonResourcePid(OK): [%s,%d]",pResourceId,*nPid);
+      	trace_event (sLine, PROCESSING);
+      	return (OK);
+   }
+   else
+   {
+      	trace_event ("End GetSwitchMonResourcePid(NOK)", PROCESSING);
+      	return (NOK);
+   }
+
+	get_fn_err:
+	sprintf(sLine, "End GetSwitchMonResourcePid(MALFUNCTION)|%s", sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	return (NOK);
+}

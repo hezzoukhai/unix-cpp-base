@@ -1,0 +1,351 @@
+
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      pcrd_accounts.pc                                                       */
+/*                                                                             */
+/* Description                                                                 */
+/*      Account Tools Management                                               */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#include <langue.h>
+#include <account.h>
+#include <paramdef.h>
+#include <iso_hps.h>
+#include <param_ctx.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+  /***********************************************************************
+  **  nom	: GetAccountRemittanceList()											**
+  **  desc	: chargement des comptes d'un porteur					**
+  **  entree	: P7IsoInfo	-> tampon PowerSEVEN					**
+  **		  	firstAccountSeq-> sequence du premier compte			**
+  **  sortie	: accountList	-> liste de six comptes				**
+  **		  accountListSize-> nombre de comptes charge			**
+  **  retour	: OK	-> chargement reussi						**
+  **		  NOK	-> chargement de 1 compte						**
+  **		  ERROR	-> erreur fatal									**
+  **  auteur	: Younes OUADI (24 Oct 1998)						**
+  ***********************************************************************/
+GetAccountRemittanceList(	nIndexCtx,
+				P7IsoInfo, 
+				firstAccountSeq, 
+				pTransCode, 
+				accountList, 
+				accountListSize)
+
+int			nIndexCtx;
+TSIsoInfo   *P7IsoInfo;
+int			firstAccountSeq;
+char		pTransCode;
+account_s	accountList	[  6];
+int			*accountListSize;
+{
+   struct sqlca sqlca;
+int		cpt;
+char 	sLine[MAX_LINE_TRC];
+char 	tmpField[LG_MAX];
+int 	lgField;
+
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar		plCardNumber		[22];
+    char		plTransCode			[ 5];
+    varchar		plAccountNumber1	[24+1];
+    varchar		plAccountWording1	[30];
+    varchar		plAccountType1		[ 2];
+    char		plAccountCurrency1	[ 3+1];
+
+    varchar		plAccountNumber2	[24];
+    varchar		plAccountWording2	[32];
+    varchar		plAccountType2		[ 2];
+    char		plAccountCurrency2	[ 3+1];
+
+    varchar		plAccountNumber3	[24];
+    varchar		plAccountWording3	[32];
+    varchar		plAccountType3		[ 2];
+    char		plAccountCurrency3	[ 3+1];
+
+    varchar		plAccountNumber4	[24];
+    varchar		plAccountWording4	[32];
+    varchar		plAccountType4		[ 2];
+    char		plAccountCurrency4	[ 3+1];
+
+    varchar		plAccountNumber5	[24];
+    varchar		plAccountWording5	[32];
+    varchar		plAccountType5		[ 2];
+    char		plAccountCurrency5	[ 3+1];
+
+    varchar		plAccountNumber6	[24];
+    varchar		plAccountWording6	[32];
+    varchar		plAccountType6		[ 2];
+    char		plAccountCurrency6	[ 3+1];
+
+    int			plStartPosition;
+    int			plAccountsNumber;
+    int			plRetour;
+EXEC SQL END DECLARE SECTION;
+
+trace_event("Start GetAccountRemittanceList() ", PROCESSING);
+memset(tmpField, 0, sizeof(tmpField));
+/* Initialisation des variables C */
+for(cpt = 0; cpt < MAX_ACCOUNT; cpt++)
+{
+    memset(accountList[cpt].accountNumber,	0,	25);
+    memset(accountList[cpt].accountWording,	0,	31);
+    memset(accountList[cpt].accountType,	0,	 3);
+    memset(accountList[cpt].accountCurrency,	0,	 4);
+    accountList[cpt].accountAvailable	= NO;
+}
+*accountListSize = 0;
+
+memset(plAccountNumber1.arr,		0, sizeof(plAccountNumber1.arr));
+memset(plAccountWording1.arr,		0, sizeof(plAccountWording1.arr));
+memset(plAccountType1.arr,		0, sizeof(plAccountType1.arr));
+memset(plAccountCurrency1,		0, sizeof(plAccountCurrency1));
+plAccountNumber1.len	= 2;
+plAccountWording1.len	= 2;
+plAccountType1.len		= 2;
+
+memset(plAccountNumber2.arr,		0, sizeof(plAccountNumber2.arr));
+memset(plAccountWording2.arr,		0, sizeof(plAccountWording2.arr));
+memset(plAccountType2.arr,			0, sizeof(plAccountType2.arr));
+memset(plAccountCurrency2,			0, sizeof(plAccountCurrency2));
+plAccountNumber2.len	= 2;
+plAccountWording2.len	= 2;
+plAccountType2.len		= 2;
+
+memset(plAccountNumber3.arr,		0, sizeof(plAccountNumber3.arr));
+memset(plAccountWording3.arr,		0, sizeof(plAccountWording3.arr));
+memset(plAccountType3.arr,		0, sizeof(plAccountType3.arr));
+memset(plAccountCurrency3,		0, sizeof(plAccountCurrency3));
+plAccountNumber3.len	= 2;
+plAccountWording3.len	= 2;
+plAccountType3.len		= 2;
+
+memset(plAccountNumber4.arr,		0, sizeof(plAccountNumber4.arr));
+memset(plAccountWording4.arr,		0, sizeof(plAccountWording4.arr));
+memset(plAccountType4.arr,			0, sizeof(plAccountType4.arr));
+memset(plAccountCurrency4,			0, sizeof(plAccountCurrency4));
+plAccountNumber4.len	= 2;
+plAccountWording4.len	= 2;
+plAccountType4.len		= 2;
+
+memset(plAccountNumber5.arr,		0,sizeof(plAccountNumber5.arr));
+memset(plAccountWording5.arr,		0,sizeof(plAccountWording5.arr));
+memset(plAccountType5.arr,			0,sizeof(plAccountType5.arr));
+memset(plAccountCurrency5,			0,sizeof(plAccountCurrency5));
+plAccountNumber5.len	= 2;
+plAccountWording5.len	= 2;
+plAccountType5.len		= 2;
+
+memset(plAccountNumber6.arr,		0, sizeof(plAccountNumber6.arr));
+memset(plAccountWording6.arr,		0, sizeof(plAccountWording6.arr));
+memset(plAccountType6.arr,		0, sizeof(plAccountType6.arr));
+memset(plAccountCurrency6,		0, sizeof(plAccountCurrency6));
+plAccountNumber6.len	= 2;
+plAccountWording6.len	= 2;
+plAccountType6.len	= 2;
+dump_p7_struct(P7IsoInfo);
+
+memset(plCardNumber.arr, 0, sizeof(plCardNumber.arr));
+plCardNumber.len = 0;
+
+
+if (GetIsoField( ISO_CARD_NBR, P7IsoInfo, tmpField, &lgField) == SUCCES)
+{
+	memcpy(plCardNumber.arr,tmpField,lgField);
+	plCardNumber.len	= lgField;
+}
+else
+{
+    sprintf(sLine, "End   GetAccountRemittanceList(Card Number Empty)");
+    trace_event(sLine, ERROR);
+    return (NOK);
+}
+memset(plTransCode, 0, sizeof(plTransCode));
+
+GetTransCode(pTransCode,plTransCode);
+plStartPosition = firstAccountSeq;
+
+/*MKB060309 PCI Norme Integration */
+if (debug_option == 1)
+{
+	sprintf (sLine," Card Number                  : %s", plCardNumber.arr);
+	trace_event(sLine,TRACE);
+}
+sprintf (sLine," Start Position               : %d", plStartPosition);
+trace_event(sLine,TRACE);
+sprintf (sLine," Trans Code                   : %s", plTransCode);
+trace_event(sLine,TRACE);
+
+
+EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+EXEC SQL EXECUTE
+DECLARE
+      v_enr_account1		PCRD_ACCOUNTS_DATA.ACCOUNT_ROW;
+      v_enr_account2		PCRD_ACCOUNTS_DATA.ACCOUNT_ROW;
+      v_enr_account3		PCRD_ACCOUNTS_DATA.ACCOUNT_ROW;
+      v_enr_account4		PCRD_ACCOUNTS_DATA.ACCOUNT_ROW;
+      v_enr_account5		PCRD_ACCOUNTS_DATA.ACCOUNT_ROW;
+      v_enr_account6		PCRD_ACCOUNTS_DATA.ACCOUNT_ROW;
+      v_enr_account7		PCRD_ACCOUNTS_DATA.ACCOUNT_ROW;
+      v_enr_account8		PCRD_ACCOUNTS_DATA.ACCOUNT_ROW;
+	v_env_info_trace      global_vars.env_info_trace_type := NULL;
+    BEGIN
+
+      :plRetour := PCRD_ACCOUNTS_DATA.GET_ACCOUNTS(
+                                       :plCardNumber,
+                                       :plStartPosition,
+                                       TRUE,
+                                       :plTransCode,
+                                       v_enr_account1,
+                                       v_enr_account2,
+                                       v_enr_account3,
+                                       v_enr_account4,
+                                       v_enr_account5,
+                                       v_enr_account6,
+                                       v_enr_account7,
+                                       v_enr_account8,
+                                       :plAccountsNumber);
+
+      IF :plRetour = DECLARATION_CST.OK THEN
+        :plAccountNumber1	:= v_enr_account1.bas_account_number;
+        :plAccountWording1	:= v_enr_account1.bas_account_wording;
+        :plAccountType1		:= v_enr_account1.bas_account_type;
+        :plAccountCurrency1	:= v_enr_account1.bas_account_currency_code;
+        IF :plAccountsNumber > 1 THEN
+          :plAccountNumber2		:= v_enr_account2.bas_account_number;
+          :plAccountWording2	:= v_enr_account2.bas_account_wording;
+          :plAccountType2		:= v_enr_account2.bas_account_type;
+          :plAccountCurrency2	:= v_enr_account2.bas_account_currency_code;
+        END IF;
+        IF :plAccountsNumber > 2 THEN
+          :plAccountNumber3		:= v_enr_account3.bas_account_number;
+          :plAccountWording3	:= v_enr_account3.bas_account_wording;
+          :plAccountType3		:= v_enr_account3.bas_account_type;
+          :plAccountCurrency3	:= v_enr_account3.bas_account_currency_code;
+        END IF;
+        IF :plAccountsNumber > 3 THEN
+          :plAccountNumber4		:= v_enr_account4.bas_account_number;
+          :plAccountWording4	:= v_enr_account4.bas_account_wording;
+          :plAccountType4		:= v_enr_account4.bas_account_type;
+          :plAccountCurrency4	:= v_enr_account4.bas_account_currency_code;
+        END IF;
+        IF :plAccountsNumber > 4 THEN
+          :plAccountNumber5		:= v_enr_account5.bas_account_number;
+          :plAccountWording5	:= v_enr_account5.bas_account_wording;
+          :plAccountType5		:= v_enr_account5.bas_account_type;
+          :plAccountCurrency5	:= v_enr_account5.bas_account_currency_code;
+        END IF;
+        IF :plAccountsNumber > 5 THEN
+          :plAccountNumber6		:= v_enr_account6.bas_account_number;
+          :plAccountWording6	:= v_enr_account6.bas_account_wording;
+          :plAccountType6		:= v_enr_account6.bas_account_type;
+          :plAccountCurrency6	:= v_enr_account6.bas_account_currency_code;
+        END IF;
+      END IF;
+    END;
+  END-EXEC;
+
+  if(plRetour != OK)
+  {
+    sprintf(sLine, "End   GetAccountRemittanceList(%d)", plRetour);
+    trace_event(sLine, ERROR);
+    return (plRetour);
+  }
+  /* recuperation du contenu des variable PL/SQL */
+  *accountListSize = plAccountsNumber;
+
+  memcpy(accountList[0].accountNumber,plAccountNumber1.arr, plAccountNumber1.len);
+  memcpy(accountList[0].accountWording,plAccountWording1.arr, plAccountWording1.len);
+  memcpy(accountList[0].accountType,plAccountType1.arr, plAccountType1.len);
+  memcpy(accountList[0].accountCurrency,plAccountCurrency1, 3);
+  accountList[0].accountAvailable	= YES;
+
+  if(*accountListSize > 1)
+  {
+    memcpy(accountList[1].accountNumber,plAccountNumber2.arr, plAccountNumber2.len);
+    memcpy(accountList[1].accountWording,plAccountWording2.arr, plAccountWording2.len);
+    memcpy(accountList[1].accountType,plAccountType2.arr, plAccountType2.len);
+    memcpy(accountList[1].accountCurrency,plAccountCurrency2, 3);
+    accountList[1].accountAvailable	= YES;
+  }
+
+  if(*accountListSize > 2)
+  {
+    memcpy(accountList[2].accountNumber,plAccountNumber3.arr, plAccountNumber3.len);
+    memcpy(accountList[2].accountWording,plAccountWording3.arr, plAccountWording3.len);
+    memcpy(accountList[2].accountType,plAccountType3.arr, plAccountType3.len);
+    memcpy(accountList[2].accountCurrency,plAccountCurrency3, 3);
+    accountList[2].accountAvailable	= YES;
+  }
+
+  if(*accountListSize > 3)
+  {
+    memcpy(accountList[3].accountNumber,plAccountNumber4.arr, plAccountNumber4.len);
+    memcpy(accountList[3].accountWording,plAccountWording4.arr, plAccountWording4.len);
+    memcpy(accountList[3].accountType,plAccountType4.arr, plAccountType4.len);
+    memcpy(accountList[3].accountCurrency,plAccountCurrency4, 3);
+    accountList[3].accountAvailable	= YES;
+  }
+
+  if(*accountListSize > 4)
+  {
+    memcpy(accountList[4].accountNumber,plAccountNumber5.arr, plAccountNumber5.len);
+    memcpy(accountList[4].accountWording,plAccountWording5.arr, plAccountWording5.len);
+    memcpy(accountList[4].accountType,plAccountType5.arr, plAccountType5.len);
+    memcpy(accountList[4].accountCurrency,plAccountCurrency5, 3);
+    accountList[4].accountAvailable	= YES;
+  }
+
+  if(*accountListSize > 5)
+  {
+    memcpy(accountList[5].accountNumber,plAccountNumber6.arr, plAccountNumber6.len);
+    memcpy(accountList[5].accountWording,plAccountWording6.arr, plAccountWording6.len);
+    memcpy(accountList[5].accountType,plAccountType6.arr, plAccountType6.len);
+    memcpy(accountList[5].accountCurrency,plAccountCurrency6, 3);
+    accountList[5].accountAvailable	= YES;
+  }
+
+   PutIsoField(ISO_RESPONSE_CODE, P7IsoInfo, "085", 3);
+
+  sprintf(sLine, "account 1 number : %.24s", accountList[0].accountNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "account 1 wording e : %.20s",accountList[0].accountWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "account 2 number : %.24s", accountList[1].accountNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "account 2 wording e : %.20s",accountList[1].accountWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "account 3 number : %.24s", accountList[2].accountNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "account 3 wording e : %.20s",accountList[2].accountWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "account 4 number : %.24s", accountList[3].accountNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "account 4 wording e : %.20s",accountList[3].accountWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "account 5 number : %.24s", accountList[4].accountNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "account 5 wording e : %.20s",accountList[4].accountWording);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "account 6 number : %.24s", accountList[5].accountNumber);
+  trace_event(sLine, PROCESSING);
+  sprintf(sLine, "account 6 wording e : %.20s",accountList[5].accountWording);
+  trace_event(sLine, PROCESSING);
+
+sprintf(sLine, "End   GetAccountRemittanceList(OK %d)", *accountListSize);
+trace_event(sLine, PROCESSING);
+return (OK);
+}
+
+
+
+

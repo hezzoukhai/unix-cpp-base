@@ -1,0 +1,162 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      dbl_util.pc                                                            */
+/*                                                                             */
+/* Description                                                                 */
+/*       Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <define.h>
+#include <atmcmd.h>
+#include <param_ctx.h>
+#include <langue.h>
+#include <dblcmd.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+void GetTransCode(char TransCodes, char *TransCoded)
+
+{
+   struct sqlca sqlca;
+char 	sLine[MAX_LINE_TRC];
+
+sprintf(sLine, "Start GetTransCode(%c)", TransCodes);
+trace_event(sLine, PROCESSING);
+
+switch(TransCodes){
+	case ARABIC : memcpy(TransCoded,"ARA",3);
+				break;
+	case FRENSH : memcpy(TransCoded,"FRE",3);
+				break;
+	default :
+			memcpy(TransCoded,"ENG",3);
+}
+TransCoded[3] = '\0';
+sprintf(sLine, "End   GetTransCode(%s)", TransCoded);
+trace_event(sLine, PROCESSING);
+return;
+}
+
+/******************************************************************************/
+/* Fonction watch_status.                                                     */
+/* ---------------------                                                      */
+/* Description : Cette fonction a pour but de mettre a jour la table des      */
+/*               ressource pour la ressource ATM2                             */
+/* Entree      : Nouveau status.                                              */
+/* Sortie      : NOK si erreur                                                */
+/*               OK Sinon                                                     */
+/* Date/Auteur : 16/09/96 A. ALAOUI                                           */
+/* Revision    :                                                              */
+/******************************************************************************/
+watch_status(status)
+int status;
+{
+   trace_event("Start watch_status()", PROCESSING);
+   trace_event("End   watch_status()", PROCESSING);
+   return(OK);
+}
+
+/* =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- */
+/* =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- */
+int     GetMonth(nIndexCtx,offset, month, flag)
+int		nIndexCtx;
+int     offset;
+char    month[ 9];
+char	flag;
+{
+   char   sLine[MAX_LINE_TRC];
+   struct sqlca sqlca;
+
+
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR             vDate[8];
+	VARCHAR				vflag[2];
+    int                 vOffset;
+    int                 plRetour;
+EXEC SQL END DECLARE SECTION;
+	memset(vDate.arr,0,sizeof(vDate.arr));
+	vDate.len = 4;
+	memset(vflag.arr,0,sizeof(vflag.arr));
+	vflag.len = 1;
+    vOffset = offset;
+	/*memcpy(vflag.arr,flag,1); EBE140523*/
+	vflag.arr[0] = flag;
+
+   EXEC SQL WHENEVER SQLERROR GOTO getMonthErr;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL EXECUTE
+      BEGIN
+         :plRetour := PCRD_ATM_TOOLS_3.GET_MONTH(:vflag,
+                                             	 :vOffset,
+												 :vDate);
+      END;
+   END-EXEC;
+
+
+if (plRetour == NOK)
+{
+   trace_event("End   GetMonth(NOK)", PROCESSING);
+   return(NOK);
+}
+
+memcpy(month, vDate.arr, vDate.len);
+trace_event("End   GetMonth(OK)", PROCESSING);
+return (OK);
+
+getMonthErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   GetMonth(ERROR)", ERROR);
+    return (ERROR);
+}
+
+/* =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- */
+/* =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- =-= -=- */
+int	TransMonth(pMonth)
+char	pMonth	[ 9];
+{
+   char   sLine[MAX_LINE_TRC];
+   char	lNewMonth	[15];
+
+   sprintf(sLine, "Start TransMonth(%.8s)", pMonth);
+   trace_event(sLine, PROCESSING);
+
+   memset(lNewMonth,	0, sizeof(lNewMonth));
+
+   memcpy(lNewMonth,	pMonth+4, 4);
+
+   if(memcmp(pMonth, "JAN", 3) == 0)	  memcpy(lNewMonth+4, "  @_#Z_", 7);
+   else if(memcmp(pMonth, "FEB", 3) == 0) memcpy(lNewMonth+4, " @_\"@_M", 7);
+   else if(memcmp(pMonth, "MAR", 3) == 0) memcpy(lNewMonth+4, "   C@#X", 7);
+   else if(memcmp(pMonth, "APR", 3) == 0) memcpy(lNewMonth+4, "  T_@&\"", 7);
+   else if(memcmp(pMonth, "MAY", 3) == 0) memcpy(lNewMonth+4, "    ^#X", 7);
+   else if(memcmp(pMonth, "JUN", 3) == 0) memcpy(lNewMonth+4, "  [_Z[_", 7);
+   else if(memcmp(pMonth, "JUL", 3) == 0) memcpy(lNewMonth+4, " A[_U[_", 7);
+   else if(memcmp(pMonth, "AUG", 3) == 0) memcpy(lNewMonth+4, "    (DL", 7);
+   else if(memcmp(pMonth, "SEP", 3) == 0) memcpy(lNewMonth+4, "  @_Z(D", 7);
+   else if(memcmp(pMonth, "OCT", 3) == 0) memcpy(lNewMonth+4, " @_[(Q\"", 7);
+   else if(memcmp(pMonth, "NOV", 3) == 0) memcpy(lNewMonth+4, "  @&Z[Z", 7);
+   else if(memcmp(pMonth, "DEC", 3) == 0) memcpy(lNewMonth+4, "  @&Z,>", 7);
+
+   memset(pMonth,	0, 12);
+
+   memcpy(pMonth,	lNewMonth, 11);
+
+
+sprintf(sLine, "End   TransMonth(%.8s)", pMonth);
+trace_event(sLine, PROCESSING);
+return (OK);
+}
+
+

@@ -1,0 +1,116 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int CheckATC (		int   nIndiceCtx          ,
+					char  *sPan		   ,
+					char  *sSeqNum,
+					char  *sExpiryDate,
+					char * sAtc ,
+					char  *sTlvBuffer
+                	)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+        	VARCHAR          T_Pan			[22 + 1];
+            int				T_SeqNum;
+			char			 T_Expiry_Date	[4 + 1];
+            VARCHAR          T_ATC			[4 + 1];
+            VARCHAR          T_TLV_BUFFER [LG_MAX];
+		int response_code = 0;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start CheckATC() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_Pan.arr            ,0    ,   sizeof(T_Pan.arr )  );
+	T_Pan.len = 0;
+	memset ( T_ATC.arr            ,0    ,   sizeof(T_ATC.arr )  );
+	T_ATC.len = 0;
+	memset ( T_Expiry_Date     ,0    ,   sizeof(T_Expiry_Date )  );
+	memset ( T_TLV_BUFFER.arr     ,0    ,   sizeof(T_TLV_BUFFER.arr )  );
+	T_TLV_BUFFER.len = 0;
+
+
+
+	memcpy ( T_Pan.arr     ,  sPan   ,   strlen(sPan)  );
+	T_Pan.len = strlen(sPan);
+	memcpy ( T_ATC.arr     ,  sAtc   ,   strlen(sAtc)  );
+	T_ATC.len = strlen(sAtc);
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+
+	memcpy ( T_TLV_BUFFER.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer)  );
+	T_TLV_BUFFER.len = strlen(sTlvBuffer);
+	memcpy ( T_Expiry_Date     ,  sExpiryDate   ,   4  );
+	
+	T_SeqNum = atoi(sSeqNum);
+	
+	
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_CheckATC;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_CTRL_EMV_SECURITY.CHECK_ATC( :T_Pan, :T_SeqNum, :T_Expiry_Date, :T_ATC, :T_TLV_BUFFER); 
+
+	END;
+	END-EXEC;
+        
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	/* PCI */
+	memset ( T_Pan.arr            ,0    ,   sizeof(T_Pan.arr )  );
+	memset ( T_ATC.arr            ,0    ,   sizeof(T_ATC.arr )  );
+    memset ( T_Expiry_Date        ,0    ,   sizeof(T_Expiry_Date )  );
+    memset ( T_TLV_BUFFER.arr     ,0    ,   sizeof(T_TLV_BUFFER.arr )  );
+
+
+	if (response_code == OK)
+	{
+		trace_event("End CheckATC(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	sprintf(sLine,"End CheckATC(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_CheckATC:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+    memset ( T_Pan.arr            ,0    ,   sizeof(T_Pan.arr )  );
+    memset ( T_ATC.arr            ,0    ,   sizeof(T_ATC.arr )  );
+    memset ( T_Expiry_Date        ,0    ,   sizeof(T_Expiry_Date )  );
+    memset ( T_TLV_BUFFER.arr     ,0    ,   sizeof(T_TLV_BUFFER.arr )  );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+	trace_event("End CheckATC(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

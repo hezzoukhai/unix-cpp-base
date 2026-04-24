@@ -1,0 +1,69 @@
+#include <define.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/******************************************************************************/
+/* Fonction GetTerminalMode.                                                  */
+/* -----------------                                                          */
+/* Description : Cette fonction a pour but de determiner lo mode du terminal  */
+/*               diebold.            					      */
+/* retour      : NOK si erreur                                                */
+/*               OK Sinon                                                     */
+/* Date/Auteur : 24/05/2005 Adil HMAMI 					      */
+/* Revision    :                                                              */
+/******************************************************************************/
+int GetTerminalMode(int nIndexCtx, char* pTermNbr, int* TerminalMode)
+{
+struct sqlca sqlca;
+char sLine [MAX_LINE_TRC];
+
+EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         hTerminalNumber[15];
+        int             hTerminalMode;
+        int             hretour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start GetTerminalMode(%.15s)", pTermNbr);
+trace_event(sLine, PROCESSING);
+
+        memset(hTerminalNumber.arr,     0,sizeof(hTerminalNumber.arr));
+        hTerminalNumber.len = 0;
+	hTerminalMode = 0;
+        memcpy(hTerminalNumber.arr, pTermNbr, strlen(pTermNbr));
+        hTerminalNumber.len = strlen(pTermNbr);
+
+	EXEC SQL WHENEVER SQLERROR GOTO getTerminalModeErr;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+	EXEC SQL EXECUTE
+	BEGIN
+        :hretour := PCRD_DBL_GET_TERMINAL_MODE.GetTerminalMode(
+                                                        :hTerminalNumber,
+                                                        :hTerminalMode
+                                                     );
+	END;
+	END-EXEC;
+
+	if(hretour != OK)
+	{
+  	  sprintf(sLine,"could not get terminal mode for terminal :%.15",
+				hTerminalNumber.arr);
+  	  trace_event(sLine, ERROR);
+  	  trace_event("End   GetTerminalMode(NOK)", PROCESSING);
+ 	  return(NOK);
+	}
+
+	*TerminalMode = hTerminalMode;
+
+sprintf(sLine, "End GetTerminalMode(%d)",TerminalMode);
+trace_event(sLine,PROCESSING);
+return(OK);
+
+getTerminalModeErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   GetTerminalMode(ERROR)", ERROR);
+    return (ERROR);
+}

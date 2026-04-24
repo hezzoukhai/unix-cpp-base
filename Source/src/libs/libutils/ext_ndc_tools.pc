@@ -1,0 +1,125 @@
+#include <stdio.h>
+
+#include <define.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/****************************************************************************/
+/*  ToNdcShortStatement()                                                   */
+/*  Translate external statement to internal statement                      */
+/****************************************************************************/
+int  ToNdcShortStatement (  int   nIndexCtx, 
+char  *pResourceId,
+char  *pLabelCodeFlag,
+char  *pLang,
+char  *pData)
+{
+
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	char       T_Lang            [1 +1];
+	char       T_LabelCodeFlag   [1 +1];
+	char       T_ResourceCode    [2 +1];
+	VARCHAR    T_Data         [1024 +1];
+	int        result;
+	EXEC SQL END DECLARE SECTION;
+
+	trace_event ("Start  ToNdcShortStatement()", PROCESSING);
+
+	memset (T_Lang,        0, sizeof(T_Lang));
+	memset (T_ResourceCode,  0, sizeof(T_ResourceCode));
+	memset (T_Data.arr,    0, sizeof(T_Data.arr));
+	T_Data.len = 0;
+
+	memcpy (T_Data.arr,    pData, strlen(pData));
+	T_Data.len = strlen(pData);
+
+	memcpy (T_ResourceCode,  pResourceId, 2);
+	memcpy (T_Lang,          pLang, strlen(pLang));
+	memcpy (T_LabelCodeFlag, pLabelCodeFlag, strlen(pLabelCodeFlag));
+
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+	EXEC SQL WHENEVER SQLERROR GOTO get_acq_id_err;
+	EXEC SQL EXECUTE
+	BEGIN
+
+	:result := PCRD_ATM_TOOLS.TRANSLATE_DATA (	:T_ResourceCode   ,
+	:T_LabelCodeFlag,
+	:T_Lang         ,        				
+	:T_Data);         				
+	END;
+	END-EXEC;
+
+	if (result == OK)
+	{
+		memcpy (pData, T_Data.arr, T_Data.len);
+
+		trace_event ("End  ToNdcShortStatement(OK)", PROCESSING);
+		return (OK);
+	}
+	else
+	{
+		trace_event ("End  ToNdcShortStatement(NOK)", PROCESSING);
+		return (NOK);
+	}
+
+	get_acq_id_err:
+	trace_event ("End  ToNdcShortStatement(MALFUNCTION)", PROCESSING);
+	return (NOK);
+}
+
+/****************************************************************************/
+/*  update_cashsend_tries_pin()                                           */
+/* update_cashsend_tries_pin                                              */
+/****************************************************************************/
+
+int update_cashsend_tries_pin  ( int    nIndiceCtx            ,
+char   *p_bank_code           ,
+char   *p_card_number         ,
+char   *p_payer_reference  
+)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION; 
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	sprintf(sLine,"Start update_cashsend_tries_pin [%s][%s])", p_payer_reference,p_bank_code );
+	trace_event ( sLine, PROCESSING );
+
+	
+	/****************************************************************************/
+	/*      Appel PL/SQL                                                       */
+	/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_InsertCashSend;
+	EXEC SQL EXECUTE
+	BEGIN
+	:response_code := PCRD_CASHSEND_SERVICES.UPDATE_CASHSEND_TRIES_PIN(
+	:p_bank_code           ,
+	:p_card_number         ,
+	:p_payer_reference    
+	); 
+	END;
+	END-EXEC;
+
+	return(response_code);
+
+	err_InsertCashSend :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End update_cashsend_tries_pin (SYSTEM_MALFUNCTION)", PROCESSING);
+	trace_event("DETAILS", PROCESSING);
+	
+	return( SYSTEM_MALFUNCTION );
+}

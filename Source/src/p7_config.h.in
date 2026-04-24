@@ -1,0 +1,37 @@
+#ifndef POWERCARD_CONFIG_H_IN
+#define POWERCARD_CONFIG_H_IN
+
+
+#cmakedefine BO_ISS_ST_CORE
+#cmakedefine BO_ACQ_ST_CORE
+#cmakedefine BO_ACH_ST_CORE
+#cmakedefine BO_POS_ST_CORE
+#cmakedefine BO_ATM_ST_CORE
+#cmakedefine BO_ISS_AU_CORE
+#cmakedefine FO_ISS_ST_CORE
+#cmakedefine FO_ISS_SA_CORE
+#cmakedefine FO_SWI_SA_CORE
+#cmakedefine FO_SWI_ST_CORE
+#cmakedefine FO_POS_ST_CORE
+#cmakedefine FO_POS_SA_CORE
+#cmakedefine FO_ATM_ST_CORE
+#cmakedefine FO_ATM_SA_CORE
+
+#cmakedefine FO_ACT_ARCH
+
+#cmakedefine INTERFACE_CIS
+#cmakedefine INTERFACE_MDS
+#cmakedefine INTERFACE_BASE1
+#cmakedefine INTERFACE_SMS
+#cmakedefine INTERFACE_SMT
+#cmakedefine INTERFACE_HOST
+#cmakedefine INTERFACE_CBAE
+#cmakedefine INTERFACE_JCB
+#cmakedefine INTERFACE_CUP
+#cmakedefine INTERFACE_T24
+
+#cmakedefine P7_COMM_NO_TLS
+#cmakedefine HSM_BOX
+
+
+#endif

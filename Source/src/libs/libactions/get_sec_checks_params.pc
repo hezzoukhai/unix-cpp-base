@@ -1,0 +1,91 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <tlv_fields.h>
+#include <resources.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int GetSecurityChecksParams (    int   nIndiceCtx          ,
+								char *sTlvBuffer          )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetSecurityChecksParams() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_sec_checks_param;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_LOAD_ISS_DATA.LOAD_SECURITY_CHECKS_PARAMS(:T_tlv_auth);
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		trace_event ( "End   GetSecurityChecksParams() ", PROCESSING );
+		return(OK);
+	}	
+
+    dump_buffer(sTlvBuffer,strlen(sTlvBuffer),'A','X','X');
+
+	sprintf(sLine,"End GetSecurityChecksParams(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_get_sec_checks_param :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI*/
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End GetSecurityChecksParams(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

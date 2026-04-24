@@ -1,0 +1,134 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_last_transaction.pc                                                  */
+/*                                                                             */
+/* Description                                                                 */
+/*      Get Last Transaction                                                    */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#include <paramdef.h>
+#include <langue.h>
+#include <param_ctx.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/******************************************************************************/
+/* Fonction get_last_transaction                                              */
+/* -----------------------------	                                      */
+/* Description : Fonction qui recupere le numero de compte pour une carte     */
+/*		 donne.         					      */
+/* Entree      : le numero de compte					      */
+/*               le code da la banque					      */
+/*               le numero de la carte					      */
+/* Sortie      : OK						              */
+/*               NOK                   			                      */
+/*               MALFUNCTION                                                  */
+/* Date/Auteur : 04/05/2007 A. HMAMI                                          */
+/* Revision    :                                                              */
+/******************************************************************************/
+int    get_last_trx(nIndexCtx,
+                    slCardNumber,
+                    sLastTrxAmount,
+                    sLastTrxAccount,
+                    sLastTrxDate,
+                    sLastTrxTerminal)
+int	        nIndexCtx;
+char            *slCardNumber;
+char            *sLastTrxAmount;
+char            *sLastTrxAccount;
+char            *sLastTrxDate;
+char            *sLastTrxTerminal;
+{
+
+char		sLine[80];
+
+EXEC SQL BEGIN DECLARE SECTION;
+  VARCHAR 	T_card_number  [22];
+  VARCHAR 	T_transaction_amount [22];
+  VARCHAR 	T_source_account [22];
+  VARCHAR 	T_transmission_date [22];
+  VARCHAR 	T_terminal_id     [22];
+  int	 	response_code;
+EXEC SQL END DECLARE SECTION;
+
+/*MKB060309 PCI Norme Integration */
+if (debug_option == 1)
+{
+	sprintf(sLine, "Start get_last_trx(%.22s)", slCardNumber);
+	trace_event(sLine, PROCESSING);
+}
+
+memset(T_card_number.arr, 0, sizeof(T_card_number.arr));
+T_card_number.len = 0; 
+
+memset(T_transaction_amount.arr, 0, sizeof(T_transaction_amount.arr));
+T_transaction_amount.len = 0;
+
+memset(T_source_account.arr, 0, sizeof(T_source_account.arr));
+T_source_account.len = 0;
+
+memset(T_transmission_date.arr, 0, sizeof(T_transmission_date.arr));
+T_transmission_date.len = 0;
+
+memset(T_terminal_id.arr, 0, sizeof(T_terminal_id.arr));
+T_terminal_id.len = 0;
+
+memcpy(T_card_number.arr, slCardNumber, strlen(slCardNumber));
+T_card_number.len = strlen(slCardNumber);
+
+response_code = 909;
+EXEC SQL WHENEVER SQLERROR GOTO account_card;
+EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+EXEC SQL EXECUTE
+DECLARE 
+BEGIN
+	:response_code   :=  PCRD_ATM_DBLTOOLS.GET_LAST_TRANSACTION(:T_card_number,
+    	                                                                    :T_transaction_amount,
+        	                                                            :T_source_account,
+            	                                                            :T_transmission_date,
+                	                                                    :T_terminal_id);
+	
+
+END;
+END-EXEC;
+
+if (response_code == OK)
+{
+	memcpy(sLastTrxAmount, T_transaction_amount.arr, T_transaction_amount.len);
+        sprintf(sLine, "transaction_amount(%.24s)", sLastTrxAmount);
+	trace_event(sLine, PROCESSING);
+
+	memcpy(sLastTrxAccount, T_source_account.arr, T_source_account.len);
+        sprintf(sLine, "source_account(%.24s)", sLastTrxAccount);
+	trace_event(sLine, PROCESSING);
+
+	memcpy(sLastTrxDate, T_transmission_date.arr, T_transmission_date.len);
+        sprintf(sLine, "transmission_date(%.24s)", sLastTrxDate);
+	trace_event(sLine, PROCESSING);
+
+	memcpy(sLastTrxTerminal, T_terminal_id.arr, T_terminal_id.len);
+        sprintf(sLine, "terminal_id(%.24s)", sLastTrxTerminal);
+	trace_event(sLine, PROCESSING);
+
+	sprintf(sLine, "End   get_last_trx(OK)");
+	trace_event(sLine, PROCESSING);
+	return(OK); 
+}
+sprintf(sLine, "End   get_last_trx(NOK)");
+trace_event(sLine, PROCESSING);
+return(NOK);
+
+account_card :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, TRACE);
+	trace_event("End  get_last_trx(MALFUNCTION)", PROCESSING);
+	return(MALFUNCTION);
+}

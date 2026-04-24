@@ -1,0 +1,207 @@
+  /***********************************************************************
+  **  nom	: hps_atm_status_mng.pc					                    **
+  **  desc	: gestion des status ATM ( watch_warning )		            **
+  **  auteur	: Younes OUADI (99/08/22)			      	            **
+  **		(C) 1997-2001 : Hightech Payment Systems		            **
+  ***********************************************************************/
+#include <stdio.h>
+#include <string.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <define.h>
+#include <param_ctx.h>
+
+  /***********************************************************************
+  **  nom	: UpdateConnexionStatus()				                    **
+  **  desc	: maj du flag connexion ATM				                    **
+  **  entree	: pTermNbr	-> numero du terminal			            **
+  **		  pStatus	-> valeur pour le status		                **
+  **  sortie	: aucune						                        **
+  **  retour	: OK	-> si c'ect OK					                **
+  **		  NOK	-> pas de terminal				                    **
+  **		  ERROR	-> erreur fatale				                    **
+  **  auteur	: Younes OUADI (99/08/22)				                **
+  ***********************************************************************/
+
+
+int	UpdateConnexionStatus( nIndexCtx,pTermNbr,pAcqBank/*ICH270715*/, char pResourceID,,pStatus,pReasonCode)
+int nIndexCtx;
+char *pTermNbr;
+char *pAcqBank;/*ICH270715*/
+char *pResourceID;
+char *pStatus;
+char *pReasonCode;
+{
+   EXEC SQL BEGIN DECLARE SECTION;
+    char sLine[MAX_LINE_TRC];
+    struct sqlca   sqlca;
+    varchar	hTermNbr	[15+1];
+	varchar hAcqBank	[6+1];/*ICH270715*/
+    char	hStatus		[ 1+1];
+    char	hReasonCode	[ 4+1];
+    int		hRet;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf(sLine, "Start UpdateConexionStatus(%.15s,%.6s,%.6s,%.1s,%.4s)",
+                   pTermNbr,pAcqBank,pResourceID, pStatus, pReasonCode);
+   trace_event(sLine, PROCESSING);
+
+    /* = Raz des variables ============================================== */
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr)	);
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr)	);/*ICH270715*/
+    memset(hResourceID.arr,	0, sizeof(hResourceID.arr)	);
+ 
+    memset(hStatus,			0, sizeof(hStatus)	);
+    memset(hReasonCode,		0, sizeof(hReasonCode)	);
+    hTermNbr.len = 2;
+
+    /* = Initialisation des variables =================================== */
+   memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr)	);
+   memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank)	);/*ICH270715*/
+   memcpy(hResourceID.arr,	pResourceID, strlen(pResourceID)	);
+   memcpy(hStatus,		pStatus, sizeof(pStatus)	);
+   hTermNbr.len = strlen(pTermNbr);
+   hAcqBank.len = strlen(pAcqBank);/*ICH270715*/
+	hResourceID.len = strlen(pResourceID);
+
+   if ( strlen(pReasonCode) == 0 )
+   {
+      memcpy(hReasonCode,	"####",  4);
+   }
+   else
+   {
+      memcpy(hReasonCode,	pReasonCode,  4);
+   }
+   /* = Capture des exceptions ========================================= */
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO UpdateConnexionStatusErr;
+
+   /* = Traitement PL/SQL ============================================== */
+   EXEC SQL EXECUTE
+   DECLARE
+      v_reason_code		TERMINAL_ATM_WATCH_WARNING.off_line_reason_code%TYPE;
+   BEGIN
+      v_reason_code := :hReasonCode;
+      IF v_reason_code = '####'
+      THEN
+         v_reason_code := NULL;
+      END IF;
+
+      :hRet := PCRD_ATM_STATUS_MNG.UPDATE_CONNEXION_STATUS(
+                                    :hTermNbr,
+                                    :hAcqBank,/*ICH270715*/
+                                    :hResourceID,
+                                    :hStatus,
+                                    v_reason_code);
+   END;
+   END-EXEC;
+
+   if ( hRet != OK)
+   {
+      sprintf(sLine, "End   UpdateConnexionStatus(%d)", hRet);
+      trace_event("End   UpdateConnexionStatus(NOK)", PROCESSING);
+      return (hRet);
+   }
+
+   sprintf(sLine, "End   UpdateConnexionStatus(%d)", hRet);
+   trace_event(sLine, PROCESSING);
+   return (OK);
+
+UpdateConnexionStatusErr :
+   sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine, ERROR);
+   trace_event("End   UpdateConnexionStatus(ERROR)", ERROR);
+   return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: UpdateServiceStatus()					                    **
+  **  desc	: maj du flag connexion ATM				                    **
+  **  entree	: pTermNbr	-> numero du terminal			            **
+  **		  pStatus	-> valeur pour le status		                **
+  **  sortie	: aucune						                        **
+  **  retour	: OK	-> si c'ect OK					                **
+  **		  NOK	-> pas de terminal				                    **
+  **		  ERROR	-> erreur fatale				                    **
+  **  auteur	: Younes OUADI (99/08/22)				                **
+  ************************************************************************/
+int	UpdateServiceStatus(int nIndexCtx, char *pTermNbr, 
+                        char *pStatus, char *pReasonCode)
+{
+   EXEC SQL BEGIN DECLARE SECTION;
+    char sLine[MAX_LINE_TRC];
+    varchar	hTermNbr	[15+1];
+    char	hStatus		[ 2+1];
+    char	hReasonCode	[ 1+1];
+    int		hRet;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf(sLine, "Start UpdateServiceStatus(%.15s,%.2s,%.1s)",
+                pTermNbr, pStatus, pReasonCode);
+   trace_event(sLine, PROCESSING);
+
+   /* = Raz des variables ============================================== */
+   memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr)	);
+   memset(hStatus,		0, sizeof(hStatus)	);
+   memset(hReasonCode,		0, sizeof(hReasonCode)	);
+   hTermNbr.len = 2;
+
+   /* = Initialisation des variables =================================== */
+   memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr)	);
+   memcpy(hStatus,		pStatus, strlen(pStatus)	);
+   hTermNbr.len = strlen(pTermNbr);
+   if ( strlen(pReasonCode) == 0)
+      memcpy(hReasonCode,	"#", 1);
+   else
+      memcpy(hReasonCode,	pReasonCode, 1);
+
+   sprintf(sLine, "Start UpdateServiceStatus(%s %d %d)", 
+								hReasonCode,(int) strlen(pTermNbr),(int) strlen(hStatus));
+   trace_event(sLine, PROCESSING);
+
+   /* = Capture des exceptions ========================================= */
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO UpdateServiceStatusErr;
+
+    /* = Traitement PL/SQL ============================================== */
+
+   EXEC SQL EXECUTE
+   DECLARE
+       v_reason_code       TERMINAL_ATM_WATCH_WARNING.off_line_reason_code%TYPE;
+   BEGIN
+       v_reason_code := :hReasonCode;
+       IF v_reason_code = '#'
+       THEN
+          v_reason_code := NULL;
+       END IF;
+
+       :hRet := PCRD_ATM_STATUS_MNG.UPDATE_SERVICE_STATUS(
+                                    					:hTermNbr,
+                                    					:hStatus,
+                                    					--v_reason_code);
+                                    					:hReasonCode);
+   END;
+   END-EXEC;
+
+
+   if ( hRet != OK)
+   {
+      sprintf(sLine, "End   UpdateServiceStatus(%d)", hRet);
+      trace_event("End   UpdateServiceStatus(NOK)", PROCESSING);
+      return (hRet);
+   }
+
+
+   sprintf(sLine, "End   UpdateServiceStatus(%d)", hRet);
+   trace_event(sLine, PROCESSING);
+   return (OK);
+
+UpdateServiceStatusErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateServiceStatus(ERROR)", ERROR);
+    return (ERROR);
+}
+

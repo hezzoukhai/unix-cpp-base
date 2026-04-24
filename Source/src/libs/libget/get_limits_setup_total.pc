@@ -1,0 +1,105 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetLimitsSetupTotal  (int nIndiceCtx, TSLimitsSetupTotal *limits_setup_total)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	char   LIMIT_INDEX [ 4 ];
+ 	char   CURRENCY_CODE [ 3 ];
+ 	double TOTAL_DAILY_AMNT;
+ 	int    TOTAL_DAILY_NBR;
+ 	double TOTAL_PER_AMNT;
+ 	int    TOTAL_PER_NBR;
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetLimitsSetupTotal() ", PROCESSING );
+ 	memset ( LIMIT_INDEX           ,  0  ,   4  );
+ 	memset ( CURRENCY_CODE         ,  0  ,   3  );
+ 	TOTAL_DAILY_AMNT      =  0.0; 
+ 	TOTAL_DAILY_NBR       =  0;
+ 	TOTAL_PER_AMNT        =  0.0;
+ 	TOTAL_PER_NBR         =  0;
+
+	memcpy ( LIMIT_INDEX,limits_setup_total->limit_index ,4);
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_limits_setup_total;
+	EXEC SQL EXECUTE
+	    DECLARE T_P7_LIMITS_SETUP_TOTAL   P7_LIMITS_SETUP_TOTAL%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_PARAM_AUTHO_ROWS.GET_P7_LIMITS_SETUP_TOTAL
+						(   :LIMIT_INDEX,
+	                                            T_P7_LIMITS_SETUP_TOTAL 
+	                                        );
+
+
+		IF :response_code = 0 THEN
+		:LIMIT_INDEX    := T_P7_LIMITS_SETUP_TOTAL.LIMIT_INDEX;
+		:CURRENCY_CODE  := T_P7_LIMITS_SETUP_TOTAL.CURRENCY_CODE;
+		:TOTAL_DAILY_AMNT:= T_P7_LIMITS_SETUP_TOTAL.TOTAL_DAILY_AMNT;
+		:TOTAL_DAILY_NBR := T_P7_LIMITS_SETUP_TOTAL.TOTAL_DAILY_NBR ;
+		:TOTAL_PER_AMNT  := T_P7_LIMITS_SETUP_TOTAL.TOTAL_PER_AMNT;
+		:TOTAL_PER_NBR   := T_P7_LIMITS_SETUP_TOTAL.TOTAL_PER_NBR ;
+		END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+ 	   memcpy ( limits_setup_total->limit_index,
+						LIMIT_INDEX  ,4 );
+ 	   memcpy ( limits_setup_total->currency_code,
+						CURRENCY_CODE ,3 );
+ 	   limits_setup_total->total_daily_amnt=TOTAL_DAILY_AMNT;
+ 	   limits_setup_total->total_daily_nbr=TOTAL_DAILY_NBR;
+ 	   limits_setup_total->total_per_amnt= TOTAL_PER_AMNT;
+ 	   limits_setup_total->total_per_nbr= TOTAL_PER_NBR;
+
+	   trace_event ( "End GetLimitsSetupTotal( OK ) ", PROCESSING );
+	   return(OK);
+	}
+
+	trace_event ( "End GetLimitsSetupTotal( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_limits_setup_total:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+ 	   memcpy ( limits_setup_total->limit_index,
+						LIMIT_INDEX  ,4 );
+ 	   memcpy ( limits_setup_total->currency_code,
+						CURRENCY_CODE ,3 );
+ 	   limits_setup_total->total_daily_amnt=TOTAL_DAILY_AMNT;
+ 	   limits_setup_total->total_daily_nbr=TOTAL_DAILY_NBR;
+ 	   limits_setup_total->total_per_amnt= TOTAL_PER_AMNT;
+ 	   limits_setup_total->total_per_nbr= TOTAL_PER_NBR;
+
+	   trace_event ( "End GetLimitsSetupTotal( OK ) ", PROCESSING );
+	   return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetLimitsSetupTotal( NOK ) ", PROCESSING );
+	return( NOK );
+}

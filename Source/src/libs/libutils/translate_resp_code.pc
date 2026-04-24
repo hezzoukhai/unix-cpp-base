@@ -1,0 +1,85 @@
+/****************************************************************************/
+/*  Routines to translate the response code (field 39) from ISO to resource */
+/*  and vice versa.                                                         */
+/****************************************************************************/
+#include <stdio.h>
+
+#include <define.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+/****************************************************************************/
+/*   TranslateRespCode()                                                    */
+/*                                                                          */
+/*   Converts an ISO response code to NW code and vice versa.               */
+/*   Input:  FromCode  (response code to convert)                           */
+/*           Resource Id                                                    */
+/*           Direction ("PR": ISO to resource,  "RP": resource to ISO)      */
+/*   Output: ToCode    (converted response code)                            */
+/****************************************************************************/
+int  TranslateRespCode (int   nIndexCtx,
+                        char *ResourceId, 
+                        char *FromCode,
+                        char *Direction, 
+                        char *ToCode)
+{
+	struct sqlca sqlca;
+	char sLine[MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_resource_code    [2+1];
+        VARCHAR    T_action_code_from [4];
+        VARCHAR    T_action_code_translat [4];
+        char       T_translat_direction [3];
+
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf(sLine,"Start TranslateRespCode(FromCode = %s, Direction=%s)",FromCode,Direction);
+   trace_event(sLine,PROCESSING);
+
+
+   memset (T_resource_code,             0, sizeof(T_resource_code));
+   memset (T_action_code_from.arr,       0, sizeof(T_action_code_from.arr));
+   memset (T_action_code_translat.arr,   0, sizeof(T_action_code_translat.arr));
+   memset (T_translat_direction,         0, sizeof(T_translat_direction));
+
+   memcpy (T_resource_code, ResourceId,  2);
+   memcpy (T_translat_direction, Direction, 2);
+   memcpy (T_action_code_from.arr, FromCode, strlen (FromCode));
+   T_action_code_from.len = strlen (FromCode) ;  
+   T_action_code_translat.len = 0;
+
+   memcpy(ToCode, "909", 3);
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+   EXEC SQL WHENEVER SQLERROR GOTO action_code_error;
+   EXEC SQL EXECUTE
+   BEGIN
+      :result := PCRD_GET_PARAM_GENERAL_ROWS.GET_RESOURCE_ACTION_CODE (
+                                          :T_resource_code,
+                                          :T_action_code_from,
+                                          :T_translat_direction,
+                                          :T_action_code_translat);
+   END;
+   END-EXEC;
+   if (result == OK)
+   {
+       memcpy (ToCode, T_action_code_translat.arr, T_action_code_translat.len);
+	   ToCode[T_action_code_translat.len]='\0';
+       sprintf(sLine,"End   TranslateRespCode(OK|%s)",ToCode);
+       trace_event(sLine,PROCESSING);
+       return (OK);
+   }
+       trace_event("End   TranslateRespCode(NOK)",PROCESSING);
+       return (NOK);
+
+   action_code_error:
+      trace_event("End   TranslateRespCode(MALFUNCTION)",PROCESSING);
+      return (NOK);
+}
+
+

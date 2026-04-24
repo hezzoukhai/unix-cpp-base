@@ -1,0 +1,89 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      update_log_arrette.pc                                                  */
+/*                                                                             */
+/* Description                                                                 */
+/*      CutOFF Update Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <define.h>
+#include <param_ctx.h>
+
+
+/******************************************************************************/
+/* Fonction update_log_arrette                                                */
+/* ------------------                                                         */
+/* Description : Fonction qui recupere l'etat de la reconciliation au niveau  */
+/*		 d'un terminal     		                              */
+/* Entree      : Le terminal                                                  */
+/* Sortie      : 800					                      */
+/*               NOK                   			                      */
+/*               MALFUNCTION                                                  */
+/* Date/Auteur : 09/11/1996 Y_KAOUTAR                                         */
+/* Revision    :                                                              */
+/******************************************************************************/
+int    update_log_arrette(nIndexCtx,V_terminal, V_AcqBank /*ICH270715*/, V_reconc_id, V_reconc_date)
+int	 nIndexCtx;
+char *V_terminal;
+char *V_AcqBank;/*ICH270715*/
+char *V_reconc_id;
+char *V_reconc_date;
+{
+struct sqlca sqlca;
+char 		detail[80];
+EXEC SQL BEGIN DECLARE SECTION;
+  int   		response;
+  VARCHAR   	T_terminal   [15];
+  VARCHAR      	T_AcqBank  	 [6+1];/*ICH270715*/ 
+  char      	T_reconc_id  [10];
+EXEC SQL END DECLARE SECTION;
+
+
+trace_event("Start update_log_arrette()", PROCESSING);
+
+memset(T_terminal.arr, 0, sizeof(T_terminal.arr));
+memcpy(T_terminal.arr, V_terminal, strlen(V_terminal));
+T_terminal.len = strlen(V_terminal);
+
+memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+T_AcqBank.len = strlen(V_AcqBank);
+
+memset(T_reconc_id,   0, sizeof(T_reconc_id));
+memcpy(T_reconc_id, V_reconc_id, 10);
+
+
+response = 909;
+EXEC SQL WHENEVER SQLERROR GOTO update_log_arrette;
+EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+EXEC SQL EXECUTE
+BEGIN
+	   :response := PCRD_ATM_ACTIVITY.TRANS_UPDATE_LOG_ARRETE(:T_terminal, 
+                    									  	  :T_AcqBank,/*ICH270715*/       
+															  :T_reconc_id);
+END;
+END-EXEC;
+if (response == 1)
+{
+	trace_event("End   update_log_arrette(OK)", PROCESSING);
+	return(OK);
+}
+trace_event("End   update_log_arretee(OK)", PROCESSING);
+return(OK);
+
+update_log_arrette :
+EXEC SQL WHENEVER SQLERROR CONTINUE;
+sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+trace_event(detail,PROCESSING);
+trace_event("End   update_log_arrette(MALFUNCTION)", PROCESSING);
+return(MALFUNCTION);
+
+}

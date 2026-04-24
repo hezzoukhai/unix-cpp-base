@@ -1,0 +1,581 @@
+/* *************************************************************************** */
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      hps_atm_additional_periph_mng.pc                                       */
+/*                                                                             */
+/* Description                                                                 */
+/*      ATM ADDITIONAL PERIPH MNG                                              */
+/* --------------------------------------------------------------------------- */
+/* --               DP01      Cash deposit wincor device                       */            
+/* --               DP02      Cheq deposit Wincor device                       */            
+/* --               DP03      Cash deposit NDC device                          */            
+/* --               DP04      Cheq deposit NDC device                          */            
+/* --------------------------------------------------------------------------- */
+/* *************************************************************************** */
+#include <stdio.h>
+#include <string.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <define.h>
+#include <param_ctx.h>
+
+  /***********************************************************************
+  **  nom	: UpdateDepositedNotes()				                    **
+  **  desc	: maj des notes déposés				         		        **
+  **  entree	: pTermNbr	-> numero du terminal			            **
+  **  sortie	: aucune						                        **
+  **  retour	: OK	-> si c'ect OK					                **
+  **		  NOK	-> pas de terminal				                    **
+  **		  ERROR	-> erreur fatale				                    **
+  **  auteur	: T.Bouzouba 07122010					                **
+  ***********************************************************************/
+  
+int	UpdateDepositedNotes(  int nIndexCtx,
+							char *pTermNbr,
+							char *pAcqBank /*ICH270715*/,
+							char *pDeviceId,
+							char *pAdditionnal_data_1,
+							char *pAdditionnal_data_2,
+							char *pAdditionnal_data_3,
+							char *pAdditionnal_data_4,
+							char *pAdditionnal_data_5,
+							char *pAdditionnal_data_6)
+{
+   char sLine[MAX_LINE_TRC];
+   struct sqlca   sqlca;
+   EXEC SQL BEGIN DECLARE SECTION;
+    varchar	hTermNbr	[15+1];
+	VARCHAR	hAcqBank	[6+1];/*ICH270715*/
+    varchar	hDeviceId	[15+1];
+    varchar	hAdditionnal_data_1	[256+1];
+    varchar	hAdditionnal_data_2	[256+1];
+	varchar	hAdditionnal_data_3	[256+1];
+	varchar	hAdditionnal_data_4	[256+1];
+	varchar	hAdditionnal_data_5	[256+1];
+	varchar	hAdditionnal_data_6	[256+1];
+    int		hRet;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf(sLine, "Start UpdateDepositedNotes(%.15s,%.6s,%.15s,%.5s,%.5s,%.5s,%.5s,%.5s)",
+                   pTermNbr,pAcqBank/*ICH270715*/, pAdditionnal_data_1, pAdditionnal_data_2,
+				   pAdditionnal_data_3,pAdditionnal_data_4,
+				   pAdditionnal_data_5,pAdditionnal_data_6);
+   trace_event(sLine, PROCESSING);
+
+    /* = Raz des variables ============================================== */
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr)	);
+    hTermNbr.len = 0;
+
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/   
+    hAcqBank.len = 0; 
+        
+    memset(hDeviceId.arr,	0, sizeof(hDeviceId.arr)	);
+    hDeviceId.len = 0;
+	
+    memset(hAdditionnal_data_1.arr,	0, sizeof(hAdditionnal_data_1.arr)	);
+    hAdditionnal_data_1.len = 0;
+	
+    memset(hAdditionnal_data_2.arr,	0, sizeof(hAdditionnal_data_2.arr)	);
+    hAdditionnal_data_2.len = 0;
+	
+    memset(hAdditionnal_data_3.arr,	0, sizeof(hAdditionnal_data_3.arr)	);
+    hAdditionnal_data_3.len = 0;
+	
+    memset(hAdditionnal_data_4.arr,	0, sizeof(hAdditionnal_data_4.arr)	);
+    hAdditionnal_data_4.len = 0;	
+	
+    memset(hAdditionnal_data_5.arr,	0, sizeof(hAdditionnal_data_5.arr)	);
+    hAdditionnal_data_5.len = 0;
+	
+    memset(hAdditionnal_data_6.arr,	0, sizeof(hAdditionnal_data_6.arr)	);
+    hAdditionnal_data_6.len = 0;	
+	
+    /* = Initialisation des variables =================================== */
+   memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr)	);
+   hTermNbr.len = strlen(pTermNbr);	
+   
+   memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+   hAcqBank.len	= strlen(pAcqBank);
+
+   memcpy(hDeviceId.arr,	pDeviceId, strlen(pDeviceId)	);
+   hDeviceId.len = strlen(pDeviceId);	
+	
+   memcpy(hAdditionnal_data_1.arr,	pAdditionnal_data_1, strlen(pAdditionnal_data_1)	);
+   hAdditionnal_data_1.len = strlen(pAdditionnal_data_1);
+
+   memcpy(hAdditionnal_data_2.arr,	pAdditionnal_data_2, strlen(pAdditionnal_data_2)	);
+   hAdditionnal_data_2.len = strlen(pAdditionnal_data_2);
+   
+   memcpy(hAdditionnal_data_3.arr,	pAdditionnal_data_3, strlen(pAdditionnal_data_3)	);
+   hAdditionnal_data_3.len = strlen(pAdditionnal_data_3);
+
+   memcpy(hAdditionnal_data_4.arr,	pAdditionnal_data_4, strlen(pAdditionnal_data_4)	);
+   hAdditionnal_data_4.len = strlen(pAdditionnal_data_4);   
+
+   memcpy(hAdditionnal_data_5.arr,	pAdditionnal_data_5, strlen(pAdditionnal_data_5)	);
+   hAdditionnal_data_5.len = strlen(pAdditionnal_data_5);
+
+   memcpy(hAdditionnal_data_6.arr,	pAdditionnal_data_6, strlen(pAdditionnal_data_6)	);
+   hAdditionnal_data_6.len = strlen(pAdditionnal_data_6);  
+
+   /* = Capture des exceptions ========================================= */
+   EXEC SQL WHENEVER SQLERROR GOTO Err;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+   /* = Traitement PL/SQL ============================================== */
+   EXEC SQL EXECUTE
+   BEGIN
+
+
+	   :hRet :=PCRD_ATM_ADDITIONAL_PERIPH_MNG.CASH_DEPOSIT_MAJ_NOTES (:hTermNbr,
+                    									  	          :hAcqBank,       
+																	  :hDeviceId,
+																	  :hAdditionnal_data_1,
+																	  :hAdditionnal_data_2,
+																	  :hAdditionnal_data_3,
+																	  :hAdditionnal_data_4,
+																	  :hAdditionnal_data_5,
+																	  :hAdditionnal_data_6  );
+   END;
+   END-EXEC;
+
+   if ( hRet != OK)
+   {
+      sprintf(sLine, "End   UpdateDepositedNotes(%d)", hRet);
+      trace_event(sLine, PROCESSING);
+      return (hRet);
+   }
+
+   sprintf(sLine, "End   UpdateDepositedNotes(%d)", hRet);
+   trace_event(sLine, PROCESSING);
+   return (OK);
+
+Err :
+   sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine, ERROR);
+   trace_event("End   UpdateDepositedNotes(ERROR)", ERROR);
+   return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: AddDepositedNotes()				                    **
+  **  desc	: maj des notes déposés				         		        **
+  **  entree	: pTermNbr	-> numero du terminal			            **
+  **  sortie	: aucune						                        **
+  **  retour	: OK	-> si c'ect OK					                **
+  **		  NOK	-> pas de terminal				                    **
+  **		  ERROR	-> erreur fatale				                    **
+  **  auteur	: T.Bouzouba 07122010					                **
+  ***********************************************************************/
+  
+int	AddDepositedNotes(  int nIndexCtx,
+							char *pTermNbr,
+							char *pAcqBank ,
+							char *pDeviceId,
+							char *pAdditionnal_data_1,
+							char *pAdditionnal_data_2,
+							char *pAdditionnal_data_3,
+							char *pAdditionnal_data_4,
+							char *pAdditionnal_data_5,
+							char *pAdditionnal_data_6)
+{
+   char sLine[MAX_LINE_TRC];
+   struct sqlca   sqlca;
+   EXEC SQL BEGIN DECLARE SECTION;
+    varchar	hTermNbr	[15+1];
+    VARCHAR	hAcqBank	[6+1];/*ICH270715*/ 
+    varchar	hDeviceId	[15+1];
+    varchar	hAdditionnal_data_1	[256+1];
+    varchar	hAdditionnal_data_2	[256+1];
+	varchar	hAdditionnal_data_3	[256+1];
+	varchar	hAdditionnal_data_4	[256+1];
+	varchar	hAdditionnal_data_5	[256+1];
+	varchar	hAdditionnal_data_6	[256+1];
+    int		hRet;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf(sLine, "Start AddDepositedNotes(%.15s,%.6s,%.15s,%.5s,%.5s,%.5s,%.5s,%.5s)",
+                   pTermNbr,pAcqBank, pAdditionnal_data_1, pAdditionnal_data_2,
+				   pAdditionnal_data_3,pAdditionnal_data_4,
+				   pAdditionnal_data_5,pAdditionnal_data_6);
+   trace_event(sLine, PROCESSING);
+
+    /* = Raz des variables ============================================== */
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr)	);
+    hTermNbr.len = 0; 
+    
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));
+    hAcqBank.len = 0; 
+              
+	memset(hDeviceId.arr,	0, sizeof(hDeviceId.arr)	);
+    hDeviceId.len = 0;
+	
+    memset(hAdditionnal_data_1.arr,	0, sizeof(hAdditionnal_data_1.arr)	);
+    hAdditionnal_data_1.len = 0;
+	
+    memset(hAdditionnal_data_2.arr,	0, sizeof(hAdditionnal_data_2.arr)	);
+    hAdditionnal_data_2.len = 0;
+	
+    memset(hAdditionnal_data_3.arr,	0, sizeof(hAdditionnal_data_3.arr)	);
+    hAdditionnal_data_3.len = 0;
+
+    memset(hAdditionnal_data_4.arr,	0, sizeof(hAdditionnal_data_4.arr)	);
+    hAdditionnal_data_4.len = 0;	
+	
+    memset(hAdditionnal_data_5.arr,	0, sizeof(hAdditionnal_data_5.arr)	);
+    hAdditionnal_data_5.len = 0;
+	
+    memset(hAdditionnal_data_6.arr,	0, sizeof(hAdditionnal_data_6.arr)	);
+    hAdditionnal_data_6.len = 0;		
+	
+    /* = Initialisation des variables =================================== */
+   memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr)	);
+   hTermNbr.len = strlen(pTermNbr);	
+ 
+   memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));
+   hAcqBank.len	= strlen(pAcqBank);
+	  
+   memcpy(hDeviceId.arr,	pDeviceId, strlen(pDeviceId)	);
+   hDeviceId.len = strlen(pDeviceId);	
+	
+   memcpy(hAdditionnal_data_1.arr,	pAdditionnal_data_1, strlen(pAdditionnal_data_1)	);
+   hAdditionnal_data_1.len = strlen(pAdditionnal_data_1);
+
+   memcpy(hAdditionnal_data_2.arr,	pAdditionnal_data_2, strlen(pAdditionnal_data_2)	);
+   hAdditionnal_data_2.len = strlen(pAdditionnal_data_2);
+   
+   memcpy(hAdditionnal_data_3.arr,	pAdditionnal_data_3, strlen(pAdditionnal_data_3)	);
+   hAdditionnal_data_3.len = strlen(pAdditionnal_data_3);
+
+   memcpy(hAdditionnal_data_4.arr,	pAdditionnal_data_4, strlen(pAdditionnal_data_4)	);
+   hAdditionnal_data_4.len = strlen(pAdditionnal_data_4);   
+
+   memcpy(hAdditionnal_data_5.arr,	pAdditionnal_data_5, strlen(pAdditionnal_data_5)	);
+   hAdditionnal_data_5.len = strlen(pAdditionnal_data_5);
+
+   memcpy(hAdditionnal_data_6.arr,	pAdditionnal_data_6, strlen(pAdditionnal_data_6)	);
+   hAdditionnal_data_6.len = strlen(pAdditionnal_data_6);  
+
+      
+   /* = Capture des exceptions ========================================= */
+   EXEC SQL WHENEVER SQLERROR GOTO Err;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+   /* = Traitement PL/SQL ============================================== */
+   EXEC SQL EXECUTE
+   BEGIN
+
+
+	   :hRet :=PCRD_ATM_ADDITIONAL_PERIPH_MNG.CASH_DEPOSIT_ADD_NOTES (:hTermNbr,
+                    									  	          :hAcqBank,       
+																	  :hDeviceId,
+																	  :hAdditionnal_data_1,
+																	  :hAdditionnal_data_2,
+																	  :hAdditionnal_data_3,
+																	  :hAdditionnal_data_4,
+																	  :hAdditionnal_data_5,
+																	  :hAdditionnal_data_6  );
+   END;
+   END-EXEC;
+
+   if ( hRet != OK)
+   {
+      sprintf(sLine, "End   AddDepositedNotes(%d)", hRet);
+      trace_event(sLine, PROCESSING);
+      return (hRet);
+   }
+
+   sprintf(sLine, "End   AddDepositedNotes(%d)", hRet);
+   trace_event(sLine, PROCESSING);
+   return (OK);
+
+Err :
+   sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine, ERROR);
+   trace_event("End   AddDepositedNotes(ERROR)", ERROR);
+   return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: RefundDepositedNotes()				                    **
+  **  desc	: maj des notes déposés				         		        **
+  **  entree	: pTermNbr	-> numero du terminal			            **
+  **  sortie	: aucune						                        **
+  **  retour	: OK	-> si c'ect OK					                **
+  **		  NOK	-> pas de terminal				                    **
+  **		  ERROR	-> erreur fatale				                    **
+  **  auteur	: T.Bouzouba 07122010					                **
+  ***********************************************************************/
+  
+int	RefundDepositedNotes(  int nIndexCtx,
+							char *pTermNbr,
+							char *pAcqBank, /*ICH270715*/
+							char *pDeviceId,
+							char *pAdditionnal_data_1,
+							char *pAdditionnal_data_2,
+							char *pAdditionnal_data_3,
+							char *pAdditionnal_data_4,
+							char *pAdditionnal_data_5,
+							char *pAdditionnal_data_6)
+{
+   char sLine[MAX_LINE_TRC];
+   struct sqlca   sqlca;
+   EXEC SQL BEGIN DECLARE SECTION;
+    varchar	hTermNbr	[15+1];
+    VARCHAR	hAcqBank	[6+1];/*ICH270715*/ 
+	varchar	hDeviceId	[15+1];	
+    varchar	hAdditionnal_data_1	[256+1];
+    varchar	hAdditionnal_data_2	[256+1];
+	varchar	hAdditionnal_data_3	[256+1];
+	varchar	hAdditionnal_data_4	[256+1];
+	varchar	hAdditionnal_data_5	[256+1];
+	varchar	hAdditionnal_data_6	[256+1];
+    int		hRet;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf(sLine, "Start RefundDepositedNotes(%.15s,%.6s,%.15s,%.5s,%.5s,%.5s,%.5s,%.5s)",
+                   pTermNbr,pAcqBank/*ICH270715*/, pAdditionnal_data_1, pAdditionnal_data_2,
+				   pAdditionnal_data_3,pAdditionnal_data_4,
+				   pAdditionnal_data_5,pAdditionnal_data_6);
+   trace_event(sLine, PROCESSING);
+
+    /* = Raz des variables ============================================== */
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr)	);
+    hAcqBank.len = 0;
+    
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr)	);
+    hTermNbr.len = 0;	
+    
+    memset(hAdditionnal_data_1.arr,	0, sizeof(hAdditionnal_data_1.arr)	);
+    hAdditionnal_data_1.len = 0;
+	
+    memset(hAdditionnal_data_2.arr,	0, sizeof(hAdditionnal_data_2.arr)	);
+    hAdditionnal_data_2.len = 0;
+	
+    memset(hAdditionnal_data_3.arr,	0, sizeof(hAdditionnal_data_3.arr)	);
+    hAdditionnal_data_3.len = 0;
+	
+    memset(hAdditionnal_data_4.arr,	0, sizeof(hAdditionnal_data_4.arr)	);
+    hAdditionnal_data_4.len = 0;	
+	
+    memset(hAdditionnal_data_5.arr,	0, sizeof(hAdditionnal_data_5.arr)	);
+    hAdditionnal_data_5.len = 0;
+	
+    memset(hAdditionnal_data_6.arr,	0, sizeof(hAdditionnal_data_6.arr)	);
+    hAdditionnal_data_6.len = 0;	
+	
+    memset(hDeviceId.arr,	0, sizeof(hDeviceId.arr)	);
+    hDeviceId.len = 0;
+	
+    /* = Initialisation des variables =================================== */
+   memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr)	);
+   hTermNbr.len = strlen(pTermNbr);	
+
+   memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+   hAcqBank.len	= strlen(pAcqBank);
+		
+   memcpy(hDeviceId.arr,	pDeviceId, strlen(pDeviceId)	);
+   hDeviceId.len = strlen(pDeviceId);
+   
+   memcpy(hAdditionnal_data_1.arr,	pAdditionnal_data_1, strlen(pAdditionnal_data_1)	);
+   hAdditionnal_data_1.len = strlen(pAdditionnal_data_1);
+
+   memcpy(hAdditionnal_data_2.arr,	pAdditionnal_data_2, strlen(pAdditionnal_data_2)	);
+   hAdditionnal_data_2.len = strlen(pAdditionnal_data_2);
+   
+   memcpy(hAdditionnal_data_3.arr,	pAdditionnal_data_3, strlen(pAdditionnal_data_3)	);
+   hAdditionnal_data_3.len = strlen(pAdditionnal_data_3);
+
+   memcpy(hAdditionnal_data_4.arr,	pAdditionnal_data_4, strlen(pAdditionnal_data_4)	);
+   hAdditionnal_data_4.len = strlen(pAdditionnal_data_4);   
+
+   memcpy(hAdditionnal_data_5.arr,	pAdditionnal_data_5, strlen(pAdditionnal_data_5)	);
+   hAdditionnal_data_5.len = strlen(pAdditionnal_data_5);
+
+   memcpy(hAdditionnal_data_6.arr,	pAdditionnal_data_6, strlen(pAdditionnal_data_6)	);
+   hAdditionnal_data_6.len = strlen(pAdditionnal_data_6);  
+
+   /* = Capture des exceptions ========================================= */
+   EXEC SQL WHENEVER SQLERROR GOTO Err;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+   /* = Traitement PL/SQL ============================================== */
+   EXEC SQL EXECUTE
+   BEGIN
+
+
+	   :hRet :=PCRD_ATM_ADDITIONAL_PERIPH_MNG.CASH_DEPOSIT_REFUND_NOTES ( :hTermNbr,
+                    									  	     	  :hAcqBank,/*ICH270715*/       
+																	  :hDeviceId,
+																	  :hAdditionnal_data_1,
+																	  :hAdditionnal_data_2,
+																	  :hAdditionnal_data_3,
+																	  :hAdditionnal_data_4,
+																	  :hAdditionnal_data_5,
+																	  :hAdditionnal_data_6  );
+   END;
+   END-EXEC;
+
+   if ( hRet != OK)
+   {
+      sprintf(sLine, "End   RefundDepositedNotes(%d)", hRet);
+      trace_event(sLine, PROCESSING);
+      return (hRet);
+   }
+
+   sprintf(sLine, "End   RefundDepositedNotes(%d)", hRet);
+   trace_event(sLine, PROCESSING);
+   return (OK);
+
+Err :
+   sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine, ERROR);
+   trace_event("End   RefundDepositedNotes(ERROR)", ERROR);
+   return (ERROR);
+}
+
+   /***********************************************************************
+  **  nom	: UpdateAdditionnalData()				                    **
+  **  desc	: maj des notes déposés				         		        **
+  **  entree	: pTermNbr	-> numero du terminal			            **
+  **		  	  pDeviceId		              **
+  **		  	  pAdditionnal_data_1		    			            **
+  **		  	  pAdditionnal_data_2		    			            **
+  **		  	  pAdditionnal_data_3		    			            **
+  **		  	  pAdditionnal_data_4		    			            **
+  **		  	  pAdditionnal_data_5		    			            **
+  **		  	  pAdditionnal_data_6		    			            **  
+  **  sortie	: aucune						                        **
+  **  retour	: OK	-> si c'ect OK					                **
+  **		  NOK	-> pas de terminal				                    **
+  **		  ERROR	-> erreur fatale				                    **
+  **  auteur	: T.Bouzouba 07122010					                **
+  ***********************************************************************/ 
+int	UpdateAdditionnalData(  int nIndexCtx,
+							char *pTermNbr,
+							char *pAcqBank /*ICH270715*/,
+							char *pDeviceId,
+							char *pAdditionnal_data_1,
+							char *pAdditionnal_data_2,
+							char *pAdditionnal_data_3,
+							char *pAdditionnal_data_4,
+							char *pAdditionnal_data_5,
+							char *pAdditionnal_data_6)
+{
+   char sLine[MAX_LINE_TRC];
+   struct sqlca   sqlca;
+   EXEC SQL BEGIN DECLARE SECTION;
+    varchar	hTermNbr	[15+1];
+    VARCHAR	hAcqBank	[6+1];/*ICH270715*/ 
+    varchar	hDeviceId	[15+1];	
+    varchar	hAdditionnal_data_1	[256+1];
+    varchar	hAdditionnal_data_2	[256+1];
+	varchar	hAdditionnal_data_3	[256+1];
+	varchar	hAdditionnal_data_4	[256+1];
+	varchar	hAdditionnal_data_5	[256+1];
+	varchar	hAdditionnal_data_6	[256+1];	
+    int		hRet;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf(sLine, "Start UpdateAdditionnalData(%.15s,%.6s,%.15s,%.5s,%.5s,%.5s,%.5s,%.5s,%.5s)",
+                   pTermNbr,pAcqBank/*ICH270715*/, pDeviceId,pAdditionnal_data_1, pAdditionnal_data_2,
+				   pAdditionnal_data_3,pAdditionnal_data_4,
+				   pAdditionnal_data_5,pAdditionnal_data_6);
+   trace_event(sLine, PROCESSING);
+
+    /* = Raz des variables ============================================== */
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr)	);
+    hTermNbr.len = 0;
+    
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/
+    hAcqBank.len = 0;
+    
+    memset(hDeviceId.arr,	0, sizeof(hDeviceId.arr)	);
+    hDeviceId.len = 0;
+	
+    memset(hAdditionnal_data_1.arr,	0, sizeof(hAdditionnal_data_1.arr)	);
+    hAdditionnal_data_1.len = 0;
+	
+    memset(hAdditionnal_data_2.arr,	0, sizeof(hAdditionnal_data_2.arr)	);
+    hAdditionnal_data_2.len = 0;
+	
+    memset(hAdditionnal_data_3.arr,	0, sizeof(hAdditionnal_data_3.arr)	);
+    hAdditionnal_data_3.len = 0;
+	
+    memset(hAdditionnal_data_4.arr,	0, sizeof(hAdditionnal_data_4.arr)	);
+    hAdditionnal_data_4.len = 0;	
+	
+    memset(hAdditionnal_data_5.arr,	0, sizeof(hAdditionnal_data_5.arr)	);
+    hAdditionnal_data_5.len = 0;
+	
+    memset(hAdditionnal_data_6.arr,	0, sizeof(hAdditionnal_data_6.arr)	);
+    hAdditionnal_data_6.len = 0;	
+	
+    /* = Initialisation des variables =================================== */
+   memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr)	);
+   hTermNbr.len = strlen(pTermNbr);	
+
+   memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+   hAcqBank.len	= strlen(pAcqBank);
+	
+   memcpy(hDeviceId.arr,	pDeviceId, strlen(pDeviceId)	);
+   hDeviceId.len = strlen(pDeviceId);
+   
+   memcpy(hAdditionnal_data_1.arr,	pAdditionnal_data_1, strlen(pAdditionnal_data_1)	);
+   hAdditionnal_data_1.len = strlen(pAdditionnal_data_1);
+
+   memcpy(hAdditionnal_data_2.arr,	pAdditionnal_data_2, strlen(pAdditionnal_data_2)	);
+   hAdditionnal_data_2.len = strlen(pAdditionnal_data_2);
+   
+   memcpy(hAdditionnal_data_3.arr,	pAdditionnal_data_3, strlen(pAdditionnal_data_3)	);
+   hAdditionnal_data_3.len = strlen(pAdditionnal_data_3);
+
+   memcpy(hAdditionnal_data_4.arr,	pAdditionnal_data_4, strlen(pAdditionnal_data_4)	);
+   hAdditionnal_data_4.len = strlen(pAdditionnal_data_4);   
+
+   memcpy(hAdditionnal_data_5.arr,	pAdditionnal_data_5, strlen(pAdditionnal_data_5)	);
+   hAdditionnal_data_5.len = strlen(pAdditionnal_data_5);
+
+   memcpy(hAdditionnal_data_6.arr,	pAdditionnal_data_6, strlen(pAdditionnal_data_6)	);
+   hAdditionnal_data_6.len = strlen(pAdditionnal_data_6);  
+
+   /* = Capture des exceptions ========================================= */
+   EXEC SQL WHENEVER SQLERROR GOTO AdditionnalDataUpdateErr;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+   /* = Traitement PL/SQL ============================================== */
+   EXEC SQL EXECUTE
+   BEGIN
+
+
+	   :hRet :=PCRD_ATM_ADDITIONAL_PERIPH_MNG.ADDITIONNAL_DATA_UPDATE (:hTermNbr,
+                    									  	          :hAcqBank,/*ICH270715*/       
+																	  :hDeviceId,
+																	  :hAdditionnal_data_1,
+																	  :hAdditionnal_data_2,
+																	  :hAdditionnal_data_3,
+																	  :hAdditionnal_data_4,
+																	  :hAdditionnal_data_5,
+																	  :hAdditionnal_data_6  );
+   END;
+   END-EXEC;
+
+   if ( hRet != OK)
+   {
+      sprintf(sLine, "End   UpdateAdditionnalData(%d)", hRet);
+      trace_event(sLine, PROCESSING);
+      return (hRet);
+   }
+
+   sprintf(sLine, "End   UpdateAdditionnalData(%d)", hRet);
+   trace_event(sLine, PROCESSING);
+   return (OK);
+
+AdditionnalDataUpdateErr :
+   sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine, ERROR);
+   trace_event("End   UpdateAdditionnalData(ERROR)", ERROR);
+   return (ERROR);
+}

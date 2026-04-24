@@ -1,0 +1,152 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <tlv_fields.h>
+#include <tlv_privfields.h>
+#include <tlv_autho.h>
+#include <tlv_private.h>
+
+
+/***********************************************************************
+**  NAME  : UpdateScriptStatus
+**  DESC  : Update the emv script data table 
+**  INPUT : the TLV buffer, sending order, script_status, tag 71/72
+**  OUTPUT: OK, NOK
+**  AUTHOR: ELyajizi Mehdi 13/10/2006
+***********************************************************************/
+
+int UpdateScriptStatus (
+          int  nIndexCtx, 
+          char *script_code,
+          int  SendingOrder,
+          char *ScriptStatus,
+          char *Tags,
+          char *sTlvBuffer
+         )
+{
+	
+	struct sqlca sqlca;
+	char   sLine [ MAX_LINE_TRC];
+	char   sPan[22 + 1];
+	char   RefNbr[12 + 1];
+	char   Transactiondate[10 + 1];
+	int tmpFieldLen =0;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    	/*MKB060309 PCI Norme Integration */
+    if (debug_option == 1)
+		sprintf(sLine,"Start UpdateScriptStatus(SOrder,ScriptStatus,Tags)=(%d, %s, %s)", SendingOrder, ScriptStatus, Tags); 
+	else
+		sprintf(sLine,"Start UpdateScriptStatus()");
+	trace_event(sLine, PROCESSING);
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	 	varchar     v_tag[128 + 1];
+	 	varchar     v_script_code[6 + 1];
+	 	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+	
+	
+	memset ( T_tlv_auth.arr, 0, sizeof(T_tlv_auth.arr ));
+	T_tlv_auth.len = 0;
+	
+	memset ( v_script_code.arr, 0, sizeof(v_script_code.arr )  );
+	v_script_code.len = 0;
+	
+	memset ( v_tag.arr, 0, sizeof(v_tag.arr )  );
+	v_tag.len = 0;
+	
+	
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( v_script_code.arr, script_code, strlen(script_code));
+	v_script_code.len = strlen(script_code );
+	
+	memcpy ( T_tlv_auth.arr, sTlvBuffer, strlen(sTlvBuffer));
+	T_tlv_auth.len = strlen(sTlvBuffer );
+	
+	memcpy ( v_tag.arr, Tags, strlen(Tags));
+	v_tag.len = strlen(Tags );
+	
+	
+	memset(sPan  ,	0, sizeof(sPan));
+	memset(RefNbr, 	0, sizeof(RefNbr));
+	memset(Transactiondate, 0, sizeof(Transactiondate));
+	
+   	if ( GetTlvBuffer ( AUTO_PAN, sTlvBuffer, sPan ,  &tmpFieldLen) != SUCCESS)
+        {
+         	sprintf (sLine, "ERRROR retreiving AUTO PAN.");
+         	trace_event(sLine, PROCESSING);
+         	return (NOK);
+        }
+   
+   	if ( GetTlvBuffer ( AUTO_RRN, sTlvBuffer, RefNbr ,  &tmpFieldLen) != SUCCESS)
+        {
+         	sprintf (sLine, "ERRROR retreiving RefNbr.");
+         	trace_event(sLine, PROCESSING);
+         	return (NOK);
+        }
+	
+	if ( GetTlvBuffer ( AUTO_TRANS_DATE_TIME, sTlvBuffer, Transactiondate ,  &tmpFieldLen) != SUCCESS)
+        {
+         	sprintf (sLine, "ERRROR retreiving DATE_TIME.");
+         	trace_event(sLine, PROCESSING);
+         	return (NOK);
+        }
+	/*MKB060309 PCI Norme Integration */
+	if (debug_option == 1)
+	{
+		sprintf(sLine, "sPan[%s], RefNbr[%s], Transactiondate[%s])", sPan, RefNbr, Transactiondate); 
+		trace_event(sLine, PROCESSING);
+	}
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO UpdateScriptStatus_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+		 :response_code := PCRD_EMV_CARD_DATA.UPD_SCRIPT_STATUS( :v_script_code,
+                                 								:ScriptStatus,
+                                 								:SendingOrder,
+                                 								:sPan,
+                                 								:RefNbr,
+                                 								:Transactiondate
+                                 								);
+
+	END;
+	END-EXEC;
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	memset ( T_tlv_auth.arr, 0, sizeof(T_tlv_auth.arr ));   /*PCI*/
+	memset(sPan  ,	0, sizeof(sPan));                       /*PCI*/
+    if (response_code != OK)
+    {
+        sprintf(sLine, "End   UpdateScriptStatus (%d)", response_code);
+        trace_event(sLine, PROCESSING);
+        return(NOK);
+    }
+	
+	trace_event("End UpdateScriptStatus(OK)", PROCESSING);
+	return (OK);
+	
+UpdateScriptStatus_exception :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	memset ( T_tlv_auth.arr, 0, sizeof(T_tlv_auth.arr ));
+	memset(sPan  ,	0, sizeof(sPan));
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "Oracle Error :%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End  UpdateScriptStatus(SQLERROR)", PROCESSING);
+	return(NOK);
+
+}                                                                                                                                                                                                                                                                                                          

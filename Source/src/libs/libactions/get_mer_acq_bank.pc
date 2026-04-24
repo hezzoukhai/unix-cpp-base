@@ -1,0 +1,140 @@
+#include <stdio.h>
+#include <define.h>
+#include <param_ctx.h>
+/*#include <base24.h>		*/
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+int  get_mer_acq_bank  (int  nIndexCtx,  char *szBank_Code, char *szNetwork_Code,
+						char *szAcquirer_Id, char *szCard_Acceptor_id, char *szTerminal_Id, 
+						char *szPrivate_Data, char *szAcq_Bank_Code)
+{
+      char     sLine[MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+		VARCHAR		T_Bank_Code			  [6 + 1];
+		VARCHAR		T_Network_Code        [2 + 1];
+		VARCHAR		T_Acquirer_Id		  [11 + 1];
+		VARCHAR		T_Card_Acceptor_id	  [15 + 1];
+		VARCHAR		T_Terminal_Id		  [15 + 1];
+		VARCHAR		T_Private_Data		  [24 + 1];
+		VARCHAR		T_Acq_Bank_Code		  [6 + 1];
+        int         result;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GET_MER_ACQ_BANK()",PROCESSING);
+
+   memset (T_Bank_Code.arr,     0, sizeof(T_Bank_Code.arr));T_Bank_Code.len=0;
+   memset (T_Network_Code.arr, 0, sizeof(T_Network_Code.arr)); T_Network_Code.len = 0;
+   memset (T_Acquirer_Id.arr,     0, sizeof(T_Acquirer_Id.arr));T_Acquirer_Id.len=0;
+   memset (T_Card_Acceptor_id.arr,     0, sizeof(T_Card_Acceptor_id.arr));T_Card_Acceptor_id.len=0;
+   memset (T_Terminal_Id.arr,     0, sizeof(T_Terminal_Id.arr));T_Terminal_Id.len=0;
+   memset (T_Private_Data.arr,     0, sizeof(T_Private_Data.arr));T_Private_Data.len=0;
+   memset (T_Acq_Bank_Code.arr,     0, sizeof(T_Acq_Bank_Code.arr));T_Acq_Bank_Code.len=0;
+   result = 909;
+
+   if(strlen(szBank_Code)>0) 
+   { 
+		memcpy(T_Bank_Code.arr,szBank_Code,6); T_Bank_Code.len=6;
+	}
+	else 
+	{ 
+		memcpy(T_Bank_Code.arr,"X",1); T_Bank_Code.len=1;
+	}
+   
+   if(strlen(szNetwork_Code)>0) 
+   {
+   memcpy(T_Network_Code.arr,szNetwork_Code,2); 
+   T_Network_Code.len=2;
+   }
+	else
+	{ 
+	memcpy(T_Network_Code.arr,"X",1);
+	T_Network_Code.len=1;
+	}
+			
+   if(strlen(szAcquirer_Id)>0) 
+   {
+   memcpy(T_Acquirer_Id.arr,szAcquirer_Id,strlen(szAcquirer_Id)); 
+   T_Acquirer_Id.len=strlen(szAcquirer_Id);
+   }
+	else 
+	{ 
+	memcpy(T_Acquirer_Id.arr,"X",1);
+	T_Acquirer_Id.len=1;
+	}
+			
+   if(strlen(szCard_Acceptor_id)>0) 
+   {
+   memcpy(T_Card_Acceptor_id.arr,szCard_Acceptor_id,15);
+   T_Card_Acceptor_id.len=15;
+   }
+	else 
+	{ 
+	memcpy(T_Card_Acceptor_id.arr,"X",1); 
+	T_Card_Acceptor_id.len=1;
+	}
+			
+   if(strlen(szTerminal_Id)>0) 
+   {
+   memcpy(T_Terminal_Id.arr,szTerminal_Id,strlen(szTerminal_Id)); 
+   T_Terminal_Id.len=strlen(szTerminal_Id);
+   }
+   else 
+   { 
+   memcpy(T_Terminal_Id.arr,"X",1);
+   T_Terminal_Id.len=1;
+   }
+			
+   if(strlen(szPrivate_Data)>0) 
+   {
+   strncpy(T_Private_Data.arr,szPrivate_Data,sizeof(T_Private_Data.arr) - 1);
+   T_Private_Data.len=strlen(T_Private_Data.arr);
+   }
+   else 
+   { 
+   memcpy(T_Private_Data.arr,"X",1); 
+   T_Private_Data.len=1;
+   }
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_mer_acq_bank_err;
+   EXEC SQL EXECUTE
+   DECLARE
+	enr_acq_bank_network		ACQ_BANK_NETWORK%ROWTYPE;
+   BEGIN
+    IF(:T_Bank_Code <> 'X') THEN 		enr_acq_bank_network.BANK_CODE  	  :=	:T_Bank_Code; ELSE 	enr_acq_bank_network.BANK_CODE := NULL; END IF;
+	IF(:T_Network_Code <> 'X') THEN		enr_acq_bank_network.NETWORK_CODE  	  :=	:T_Network_Code; ELSE 	enr_acq_bank_network.NETWORK_CODE := NULL; END IF;	      
+	IF(:T_Acquirer_Id <> 'X') THEN		enr_acq_bank_network.ACQUIRER_ID  	  :=	:T_Acquirer_Id; ELSE 	enr_acq_bank_network.ACQUIRER_ID := NULL; END IF;
+	IF(:T_Card_Acceptor_id <> 'X') THEN enr_acq_bank_network.CARD_ACCEPTOR_ID :=	:T_Card_Acceptor_id; ELSE 	enr_acq_bank_network.CARD_ACCEPTOR_ID := NULL; END IF;
+	IF(:T_Terminal_Id <> 'X') THEN 		enr_acq_bank_network.TERMINAL_ID   	  :=	:T_Terminal_Id; ELSE 	enr_acq_bank_network.TERMINAL_ID := NULL; END IF;
+	IF(:T_Private_Data <> 'X') THEN		enr_acq_bank_network.PRIVATE_DATA     :=	:T_Private_Data; ELSE 	enr_acq_bank_network.PRIVATE_DATA := NULL; END IF;
+	
+	enr_acq_bank_network.ACQ_BANK_CODE   :=	'X';	
+	
+	
+	:result := PCRD_AUTHO_PARAM_DATA.GET_MER_ACQ_BANK(enr_acq_bank_network);
+	
+	:T_Acq_Bank_Code := NVL(enr_acq_bank_network.ACQ_BANK_CODE,'X') ;
+													  
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+	/*EBE151007: Change 6 by T_Acq_Bank_Code.len */
+      memcpy (szAcq_Bank_Code, T_Acq_Bank_Code.arr ,  T_Acq_Bank_Code.len);
+      sprintf (sLine, "End GET_MER_ACQ_BANK(OK [%s])",szAcq_Bank_Code);
+      trace_event(sLine,PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      trace_event ("End GET_MER_ACQ_BANK(NOK)",PROCESSING);
+      return (NOK);
+   }
+
+get_mer_acq_bank_err:
+	sprintf (sLine, "End GET_MER_ACQ_BANK(MALFUNCTION)|%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine,PROCESSING);
+	return (NOK);
+}

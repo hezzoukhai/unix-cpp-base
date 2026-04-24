@@ -1,0 +1,90 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int CompleteTokenization    (       int nIndexCtx,
+                                    char* sTlvBuffer
+                            )
+{
+	
+	struct sqlca sqlca;
+	char 			sLine 		 [ MAX_LINE_TRC];
+	int				nResult;
+
+	
+	EXEC SQL BEGIN DECLARE SECTION;
+		int		    response_code;
+		VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    trace_event("Start  CompleteTokenization()", PROCESSING);
+    
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/    
+
+	
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+	
+	
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+  	
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+    response_code = SYSTEM_MALFUNCTION;
+  	EXEC SQL WHENEVER SQLERROR GOTO err_CompleteTokenization;
+	EXEC SQL EXECUTE
+	BEGIN
+
+        :response_code := PCRD_MDES_DIGITIZATION.COMPLETE_TOKENIZATION( 	:T_tlv_auth);
+	
+	END;
+	END-EXEC;
+
+	memcpy(sTlvBuffer,T_tlv_auth.arr, T_tlv_auth.len);
+	sTlvBuffer[T_tlv_auth.len]='\0';
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  ); 
+	
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+	
+
+	
+	if (response_code != OK) 
+	{
+	 
+	    PrintTlvBuffer ( sTlvBuffer);
+	    trace_event("End    CompleteTokenization(NOK)", PROCESSING);
+	    return NOK;
+
+	}
+
+	trace_event("End    CompleteTokenization(OK)", PROCESSING);
+	return OK;
+
+err_CompleteTokenization:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+	trace_event("End CompleteTokenization (SYSTEM_MALFUNCTION)", ERROR);
+	return( SYSTEM_MALFUNCTION );
+}

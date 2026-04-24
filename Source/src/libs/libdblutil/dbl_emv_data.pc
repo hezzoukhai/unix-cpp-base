@@ -1,0 +1,597 @@
+#ifdef SOLARIS
+    #include <thread.h>
+#endif
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <define.h>
+#include <pwrmacros.h>
+#include <dump.h>
+#include <ascii.h>
+#include <param_ctx.h>
+#include <dbl_paramdef.h>
+
+
+/*************************************************************************************/
+/*************************************************************************************/
+/*************************************************************************************/
+int GetEmvData(
+    int        nIndexCtx,
+    char      *szEmvTableType,
+    char      *szTermNbr,
+    char      *szAcqBank,/*ICH270715*/
+    dbl_param *sData)
+{
+   struct sqlca sqlca;
+   char  sLine[MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+      char        cEmvTableType[1+1];
+      varchar     vcTermNbr[15];
+	  varchar		  vcAcqBank	[6+1];/*ICH270715*/ 	
+      varchar     vcData[LG_MAX];
+      varchar     vcErrMsg[LG_MAX];
+      varchar     vcCFuncName[61];
+      varchar     vcPlSqlFuncName[61];
+      int         nStatus;
+   EXEC SQL END   DECLARE SECTION;
+
+   vcCFuncName.len     = sprintf(vcCFuncName.arr,     "GetEmvData"                 );
+   vcPlSqlFuncName.len = sprintf(vcPlSqlFuncName.arr, "PCRD_PCRD_DBL_EMV_HD.GET_EMV_TABLE");
+
+   START_TRACE(vcCFuncName.arr);
+
+   memset(cEmvTableType,     0, sizeof(cEmvTableType)   );
+   memset(vcAcqBank.arr,	 0, sizeof(vcAcqBank.arr));/*ICH270715*/
+   memset(vcTermNbr.arr,     0, sizeof(vcTermNbr.arr)   );
+   memset(vcData.arr,   0, sizeof(vcData.arr) );
+   memset(vcErrMsg.arr,      0, sizeof(vcErrMsg.arr)    );
+   vcTermNbr.len             =  sizeof(vcTermNbr.arr    );
+   vcData.len           =  sizeof(vcData.arr  );
+   vcErrMsg.len              =  sizeof(vcErrMsg.arr     );
+
+   vcTermNbr.len = sprintf(vcTermNbr.arr, "%.15s", szTermNbr);
+   vcAcqBank.len = sprintf(vcAcqBank.arr, "%.15s", szAcqBank);/*ICH270715*/
+   memcpy(cEmvTableType, szEmvTableType, sizeof(cEmvTableType) - 1);
+   
+   
+	
+   START_PLSQL_CALL(vcCFuncName.arr, vcPlSqlFuncName.arr);
+   TRACE_IN_PAR    ("cEmvTableType",  "%.1s", cEmvTableType);
+   TRACE_IN_PAR    ("vcTermNbr.arr", "%.15s", vcTermNbr.arr);
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO Err_GetEmvData;
+   EXEC SQL EXECUTE
+   DECLARE
+       v_config VARCHAR2(2048);
+   BEGIN
+      :nStatus := PCRD_DBL_EMV_HD.GET_EMV_TABLE(:cEmvTableType, :vcTermNbr, :vcAcqBank/*ICH270715*/, v_config);
+      IF v_config IS NOT NULL THEN
+          :vcData := v_config;
+      END IF;
+      IF PCRD_NDC_EMV_PARAM_1.g_err_msg IS NOT NULL THEN
+          :vcErrMsg := PCRD_NDC_EMV_PARAM_1.g_err_msg;
+      END IF;
+   EXCEPTION
+   WHEN OTHERS THEN
+      :vcErrMsg := :vcCFuncName||'-'||:vcPlSqlFuncName||' failed|Others|'
+                || SUBSTR(SQLERRM, 1, 256);
+      :nStatus  := -2;
+   END;
+   END-EXEC;
+
+   if (nStatus != OK)
+   {
+      TRACE_ERR_MSG ("vcErrMsg", vcErrMsg.arr, vcErrMsg.len);
+      TRACE_OUT_PAR ("nStatus", "%d", nStatus);
+      END_PLSQL_CALL(vcCFuncName.arr, vcPlSqlFuncName.arr);
+      return_CALL_FAILURE_INT(vcCFuncName.arr, vcPlSqlFuncName.arr, nStatus, -2);
+   }
+
+   if (strlen(vcData.arr) == 0)
+   {
+      TRACE_OUT_PAR ("nStatus", "%d", nStatus);
+      TRACE_OUT_PAR ("Message", "%.40s", "No data found for the required type");
+      END_PLSQL_CALL(vcCFuncName.arr, vcPlSqlFuncName.arr);
+      return_CALL_FAILURE_INT(vcCFuncName.arr, vcPlSqlFuncName.arr, nStatus, NOK);
+   }
+
+   TRACE_OUT_PAR ("vcData",   "%.40s", vcData.arr);
+   TRACE_OUT_PAR ("nStatus",          "%d", nStatus    );
+   END_PLSQL_CALL(vcCFuncName.arr, vcPlSqlFuncName.arr);
+
+   memcpy(sData->data, vcData.arr, vcData.len);
+   sData->len = vcData.len;
+
+   return_INT_PAR2(vcCFuncName.arr, OK, "%d, %.40s", sData->len, sData->data);
+
+Err_GetEmvData:
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   return_CALL_FAILURE_STR(vcCFuncName.arr, vcPlSqlFuncName.arr, sqlca.sqlerrm.sqlerrmc, -2);
+}
+
+
+
+/*************************************************************************************/
+/*************************************************************************************/
+/*************************************************************************************/
+int GetEmvStates(
+    int        nIndexCtx,
+    char      *szTermNbr,
+    char      *szAcqBank/*ICH270715*/,
+    dbl_param *sStates)
+{
+   struct sqlca sqlca;
+   char  sLine[MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+      varchar     vcTermNbr[15];
+      varchar     vcAcqBank[6+1];/*ICH270715*/
+      varchar     vcStates[LG_MAX];
+      varchar     vcErrMsg[LG_MAX];
+      varchar     vcCFuncName[61];
+      varchar     vcPlSqlFuncName[61];
+      int         nStatus;
+   EXEC SQL END   DECLARE SECTION;
+
+   vcCFuncName.len     = sprintf(vcCFuncName.arr,     "GetEmvStates"                 );
+   vcPlSqlFuncName.len = sprintf(vcPlSqlFuncName.arr, "PCRD_DBL_EMV_HD.GET_EMV_STATES");
+
+   START_TRACE(vcCFuncName.arr);
+
+   memset(vcTermNbr.arr,     0, sizeof(vcTermNbr.arr)   );
+   memset(vcAcqBank.arr,	 0, sizeof(vcAcqBank.arr));/*ICH270715*/     
+   memset(vcStates.arr,      0, sizeof(vcStates.arr) );
+   memset(vcErrMsg.arr,      0, sizeof(vcErrMsg.arr)    );
+   vcTermNbr.len             =  sizeof(vcTermNbr.arr    );
+   vcAcqBank.len             =  sizeof(vcAcqBank.arr    );/*ICH270715*/
+   vcStates.len              =  sizeof(vcStates.arr  );
+	vcErrMsg.len              =  sizeof(vcErrMsg.arr     );
+
+   vcTermNbr.len = sprintf(vcTermNbr.arr, "%.15s", szTermNbr);
+   vcAcqBank.len = sprintf(vcAcqBank.arr, "%.6s", szAcqBank);
+
+   START_PLSQL_CALL(vcCFuncName.arr, vcPlSqlFuncName.arr);
+   TRACE_IN_PAR    ("vcTermNbr.arr", "%.15s", vcTermNbr.arr);
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO Err_GetEmvStates;
+   EXEC SQL EXECUTE
+   DECLARE
+       v_states VARCHAR2(2048);
+   BEGIN
+      :nStatus := PCRD_NDC_EMV_PARAM_2.GET_EMV_STATES(:vcTermNbr,:vcAcqBank, v_states);
+      IF v_states IS NOT NULL THEN
+          :vcStates := v_states;
+      END IF;
+      IF PCRD_NDC_EMV_PARAM_2.g_err_msg IS NOT NULL THEN
+          :vcErrMsg := PCRD_NDC_EMV_PARAM_2.g_err_msg;
+      END IF;
+   EXCEPTION
+   WHEN OTHERS THEN
+      :vcErrMsg := :vcCFuncName||'-'||:vcPlSqlFuncName||' failed|Others|'
+                || SUBSTR(SQLERRM, 1, 256);
+      :nStatus  := -2;
+   END;
+   END-EXEC;
+
+   if (nStatus != OK)
+   {
+      TRACE_ERR_MSG ("vcErrMsg", vcErrMsg.arr, vcErrMsg.len);
+      TRACE_OUT_PAR ("nStatus", "%d", nStatus);
+      END_PLSQL_CALL(vcCFuncName.arr, vcPlSqlFuncName.arr);
+      return_CALL_FAILURE_INT(vcCFuncName.arr, vcPlSqlFuncName.arr, nStatus, -2);
+   }
+
+   if (strlen(vcStates.arr) == 0)
+   {
+      TRACE_OUT_PAR ("nStatus", "%d", nStatus);
+      TRACE_OUT_PAR ("Message", "%.40s", "No defined states");
+      END_PLSQL_CALL(vcCFuncName.arr, vcPlSqlFuncName.arr);
+      return_CALL_FAILURE_INT(vcCFuncName.arr, vcPlSqlFuncName.arr, nStatus, NOK);
+   }
+
+   TRACE_OUT_PAR ("vcStates",   "%.40s", vcStates.arr);
+   TRACE_OUT_PAR ("nStatus",          "%d", nStatus    );
+   END_PLSQL_CALL(vcCFuncName.arr, vcPlSqlFuncName.arr);
+
+   memcpy(sStates->data, vcStates.arr, vcStates.len);
+   sStates->len = vcStates.len;
+
+   return_INT_PAR2(vcCFuncName.arr, OK, "%d, %.40s", sStates->len, sStates->data);
+
+Err_GetEmvStates:
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   return_CALL_FAILURE_STR(vcCFuncName.arr, vcPlSqlFuncName.arr, sqlca.sqlerrm.sqlerrmc, -2);
+}
+
+
+
+/*************************************************************************************/
+/*************************************************************************************/
+/*************************************************************************************/
+int GetEmvEnhConfig(
+    int        nIndexCtx,
+    char      *szTermNbr,
+    char      *pAcqBank,
+    dbl_param *sEnhConfig)
+{
+   struct sqlca sqlca;
+   char  sLine[MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+      varchar     vcTermNbr[15];
+	  varchar     vAcqBank[6+1];/*ICH270715*/
+      varchar     vcEnhConfig[LG_MAX];
+      varchar     vcErrMsg[LG_MAX];
+      varchar     vcCFuncName[61];
+      varchar     vcPlSqlFuncName[61];
+      int         nStatus;
+   EXEC SQL END   DECLARE SECTION;
+
+   vcCFuncName.len     = sprintf(vcCFuncName.arr,     "GetEmvEnhConfig"                 );
+   vcPlSqlFuncName.len = sprintf(vcPlSqlFuncName.arr, "PCRD_NDC_EMV_PARAM_2.GET_EMV_ENH_CONFIG");
+
+   START_TRACE(vcCFuncName.arr);
+
+   memset(vcTermNbr.arr,     0, sizeof(vcTermNbr.arr)   );
+   memset(vAcqBank.arr,     0, sizeof(vAcqBank.arr)   );
+   memset(vcEnhConfig.arr,   0, sizeof(vcEnhConfig.arr) );
+   memset(vcErrMsg.arr,      0, sizeof(vcErrMsg.arr)    );
+   vcTermNbr.len             =  sizeof(vcTermNbr.arr    );
+   vAcqBank.len              =  sizeof(vAcqBank.arr    );  
+   vcEnhConfig.len           =  sizeof(vcEnhConfig.arr  );
+   vcErrMsg.len              =  sizeof(vcErrMsg.arr     );
+
+   vcTermNbr.len = sprintf(vcTermNbr.arr, "%.15s", szTermNbr);
+
+   START_PLSQL_CALL(vcCFuncName.arr, vcPlSqlFuncName.arr);
+   TRACE_IN_PAR    ("vcTermNbr.arr", "%.15s", vcTermNbr.arr);
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO Err_GetEmvEnhConfig;
+   EXEC SQL EXECUTE
+   DECLARE
+      v_enh_config VARCHAR2(2048);
+   BEGIN
+      :nStatus := PCRD_NDC_EMV_PARAM_2.GET_EMV_ENH_CONFIG(:vcTermNbr,:vAcqBank, v_enh_config);
+      IF v_enh_config IS NOT NULL THEN
+          :vcEnhConfig := v_enh_config;
+      END IF;
+      IF PCRD_NDC_EMV_PARAM_2.g_err_msg IS NOT NULL THEN
+          :vcErrMsg := PCRD_NDC_EMV_PARAM_2.g_err_msg;
+      END IF;
+   EXCEPTION
+   WHEN OTHERS THEN
+      :vcErrMsg := :vcCFuncName||'-'||:vcPlSqlFuncName||' failed|Others|'
+                || SUBSTR(SQLERRM, 1, 256);
+      :nStatus  := -2;
+   END;
+   END-EXEC;
+
+   if (nStatus != OK)
+   {
+      TRACE_ERR_MSG ("vcErrMsg", vcErrMsg.arr, vcErrMsg.len);
+      TRACE_OUT_PAR ("nStatus", "%d", nStatus);
+      END_PLSQL_CALL(vcCFuncName.arr, vcPlSqlFuncName.arr);
+      return_CALL_FAILURE_INT(vcCFuncName.arr, vcPlSqlFuncName.arr, nStatus, -2);
+   }
+
+   if (strlen(vcEnhConfig.arr) == 0)
+   {
+      TRACE_OUT_PAR ("nStatus", "%d", nStatus);
+      TRACE_OUT_PAR ("MEssage", "%.40s", "No Enhanced Config is defined");
+      END_PLSQL_CALL(vcCFuncName.arr, vcPlSqlFuncName.arr);
+      return_CALL_FAILURE_INT(vcCFuncName.arr, vcPlSqlFuncName.arr, nStatus, NOK);
+   }
+
+   TRACE_OUT_PAR ("vcEnhConfig",   "%.40s", vcEnhConfig.arr);
+   TRACE_OUT_PAR ("nStatus",          "%d", nStatus    );
+   END_PLSQL_CALL(vcCFuncName.arr, vcPlSqlFuncName.arr);
+
+   memcpy(sEnhConfig->data, vcEnhConfig.arr, vcEnhConfig.len);
+   sEnhConfig->len = vcEnhConfig.len;
+
+   return_INT_PAR2(vcCFuncName.arr, OK, "%d, %.40s", sEnhConfig->len, sEnhConfig->data);
+
+Err_GetEmvEnhConfig:
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   return_CALL_FAILURE_STR(vcCFuncName.arr, vcPlSqlFuncName.arr, sqlca.sqlerrm.sqlerrmc, -2);
+}
+
+
+
+/*****************************************************************/
+/*****************************************************************/
+/*****************************************************************/
+Send_Terminal_Emv_Data(
+    int   nIndexCtx,
+    char *Terminal_Number,
+    char *V_AcqBank/*ICH270715*/)
+{
+   struct sqlca sqlca;
+   dbl_param    sEmvData;
+   char         sBuff[LG_MAX];
+   char         szFuncName[] = "Send_Terminal_Emv_Data", sLine[MAX_LINE_TRC];
+   char      	ack   	 [    10];
+   char         szEmvTableType[10];
+   int      	nFdConnect;
+   int      	nOff, nHdrLen, nLen, nCntr, nStatus;
+
+   START_TRACE_PAR1(szFuncName, "%.15s", Terminal_Number);
+
+
+   /* INITIALISATION DES BUFFERS  */
+   memset(&sEmvData,   0, sizeof(sEmvData));
+
+   nFdConnect = GetFdByOraCtx(nIndexCtx);
+
+   for (nCntr = 1; nCntr < 6; nCntr ++)
+   {
+      memset(sEmvData.data, 0, sizeof(sEmvData.data));
+      sEmvData.len = 0;
+
+      sprintf(szEmvTableType, "%d", nCntr);
+
+      if ( (nStatus = GetEmvData(nIndexCtx, szEmvTableType, Terminal_Number,V_AcqBank/*ICH270715*/, &sEmvData)) != OK
+         && nStatus != NOK
+         )
+         return_CALL_FAILURE_INT(szFuncName, "GetEmvData", nStatus, NOK);
+
+      if (nStatus == NOK)
+      {
+         nStatus = OK;
+         continue;
+      }
+
+      nLen = nOff = 0;
+      while (nOff < sEmvData.len)
+      {
+         memset(sBuff, 0, sizeof(sBuff));
+
+          nLen = sEmvData.len - nOff;
+
+         nHdrLen = sprintf(sBuff, "3 %c000%c000%c", FS, FS, FS);
+         memcpy (sBuff + nHdrLen, sEmvData.data + nOff, nLen);
+         nLen += nHdrLen;
+
+         nOff += nLen;
+
+         dump_buffer((unsigned char *)sBuff, nLen, 'A', 'L', 'O');
+         if ((nStatus = WriteLineMsg( nFdConnect, sBuff, nLen)) != OK)
+            return_CALL_FAILURE_INT(szFuncName, "WriteLineMsg", nStatus, NOK);
+
+         memset(sBuff, 0, sizeof(sBuff));
+         nStatus = ReadLineMsg(nFdConnect, sBuff, &nLen);
+         dump_buffer((unsigned char *)sBuff, nLen, 'A', 'L', 'I');
+         if (nStatus != OK)
+            return_CALL_FAILURE_INT(szFuncName, "ReadLineMsg", nStatus, NOK);
+         if(nStatus == OK)
+         {
+            memset(ack, 0, sizeof(ack));
+            Download_Field(sBuff, 3, ack, nLen);
+            if(ack[0] == '9' || ack[0] == 'B')
+               nStatus = OK;
+            else if(ack[0] == '8' || ack[0] == 'A' || ack[0] == 'C')
+               nStatus = NOK;
+            else
+               nStatus = ERROR;
+            if (nStatus != OK)
+               return_FAILURE_INT_VAR(szFuncName, "Data Rejected by ATM", nStatus, NOK);
+         }
+      }
+   }
+
+   return_INT(szFuncName, nStatus);
+}
+
+
+/*****************************************************************/
+/*****************************************************************/
+/*****************************************************************/
+Send_Terminal_Emv_States(
+    int   nIndexCtx,
+    char *Terminal_Number,
+    char *V_AcqBank/*ICH270715*/)
+{
+   struct sqlca sqlca;
+   dbl_param    sEmvData;
+   char         sBuff[LG_MAX];
+   char         szFuncName[] = "Send_Terminal_Emv_States", sLine[MAX_LINE_TRC];
+   char      	ack   	 [    10];
+   char         szEmvTableType[10];
+   int      	nFdConnect;
+   int      	nOff, nHdrLen, nLen, nCntr, nStatus;
+
+   START_TRACE_PAR1(szFuncName, "%.15s", Terminal_Number);
+
+
+   /* INITIALISATION DES BUFFERS  */
+   memset(&sEmvData,   0, sizeof(sEmvData));
+
+   nFdConnect = GetFdByOraCtx(nIndexCtx);
+
+   if ((nStatus = GetEmvStates(nIndexCtx, Terminal_Number,V_AcqBank/*ICH270715*/, &sEmvData)) != OK
+     && nStatus != NOK
+      )
+      return_CALL_FAILURE_INT(szFuncName, "GetEmvStates", nStatus, NOK);
+
+   if (nStatus == NOK)
+      return_INT_PAR1(szFuncName, OK, "%.40s", "NO DEFINED STATE");
+
+   nLen = nOff = 0;
+   while (nOff < sEmvData.len)
+   {
+      memset(sBuff, 0, sizeof(sBuff));
+
+      if (sEmvData.len - nOff > MSG_MAX_LEN)
+         nLen = MSG_MAX_LEN;
+      else
+         nLen = sEmvData.len - nOff;
+
+      while (sEmvData.data[nOff + nLen] != FS) nLen --;
+
+      nHdrLen = sprintf(sBuff, "3 %c000%c%c12%c", FS, FS, FS, FS);
+      memcpy (sBuff + nHdrLen, sEmvData.data + nOff, nLen);
+      nLen += nHdrLen;
+      nLen += sprintf(sBuff + nLen, "%c", FS);
+
+      nOff += (nLen + 1);
+
+      dump_buffer((unsigned char *)sBuff, nLen, 'A', 'L', 'O');
+      if ((nStatus = WriteLineMsg( nFdConnect, sBuff, nLen)) != OK)
+         return_CALL_FAILURE_INT(szFuncName, "WriteLineMsg", nStatus, NOK);
+
+      memset(sBuff, 0, sizeof(sBuff));
+      nStatus = ReadLineMsg(nFdConnect, sBuff, &nLen);
+      dump_buffer((unsigned char *)sBuff, nLen, 'A', 'L', 'I');
+      if (nStatus != OK)
+         return_CALL_FAILURE_INT(szFuncName, "ReadLineMsg", nStatus, NOK);
+      if(nStatus == OK)
+      {
+         memset(ack, 0, sizeof(ack));
+         Download_Field(sBuff, 3, ack, nLen);
+         if(ack[0] == '9' || ack[0] == 'B')
+            nStatus = OK;
+         else if(ack[0] == '8' || ack[0] == 'A' || ack[0] == 'C')
+            nStatus = NOK;
+         else
+            nStatus = ERROR;
+         if (nStatus != OK)
+            return_FAILURE_INT_VAR(szFuncName, "Data Rejected by ATM", nStatus, NOK);
+      }
+   }
+
+   return_INT(szFuncName, nStatus);
+}
+
+
+/*****************************************************************/
+/*****************************************************************/
+/*****************************************************************/
+Send_Terminal_Emv_EnhConfig(
+    int   nIndexCtx,
+    char *Terminal_Number,
+    char *V_AcqBank/*ICH270715*/)
+{
+   struct sqlca sqlca;
+   dbl_param    sEmvData;
+   char         sBuff[LG_MAX];
+   char         szFuncName[] = "Send_Terminal_Emv_EnhConfig", sLine[MAX_LINE_TRC];
+   char      	ack   	 [    10];
+   char         szEmvTableType[10];
+   int      	nFdConnect;
+   int      	nHdrLen, nLen, nCntr, nStatus;
+
+   START_TRACE_PAR1(szFuncName, "%.15s", Terminal_Number);
+
+
+   /* INITIALISATION DES BUFFERS  */
+   memset(&sEmvData,   0, sizeof(sEmvData));
+   memset(sBuff,       0, sizeof(sBuff)   );
+
+   nFdConnect = GetFdByOraCtx(nIndexCtx);
+
+   if ((nStatus = GetEmvEnhConfig(nIndexCtx, Terminal_Number,V_AcqBank, &sEmvData)) != OK
+     && nStatus != NOK
+      )
+      return_CALL_FAILURE_INT(szFuncName, "GetEmvEnhConfig", nStatus, NOK);
+
+   if (nStatus == NOK)
+      return_INT_PAR1(szFuncName, OK, "%.40s", "NO DEFINED ENH CONFIG");
+
+   nLen = sEmvData.len;
+
+   nHdrLen = sprintf(sBuff, "3 %c000%c%c1A%c%c", FS, FS, FS, FS, FS);
+   memcpy (sBuff + nHdrLen, sEmvData.data, nLen);
+   nLen += nHdrLen;
+   nLen += sprintf(sBuff + nLen, "%c", FS);
+
+   dump_buffer((unsigned char *)sBuff, nLen, 'A', 'L', 'O');
+   if ((nStatus = WriteLineMsg( nFdConnect, sBuff, nLen)) != OK)
+      return_CALL_FAILURE_INT(szFuncName, "WriteLineMsg", nStatus, NOK);
+
+   memset(sBuff, 0, sizeof(sBuff));
+   nStatus = ReadLineMsg(nFdConnect, sBuff, &nLen);
+   dump_buffer((unsigned char *)sBuff, nLen, 'A', 'L', 'I');
+   if (nStatus != OK)
+      return_CALL_FAILURE_INT(szFuncName, "ReadLineMsg", nStatus, NOK);
+   if(nStatus == OK)
+   {
+      memset(ack, 0, sizeof(ack));
+      Download_Field(sBuff, 3, ack, nLen);
+      if(ack[0] == '9' || ack[0] == 'B')
+         nStatus = OK;
+      else if(ack[0] == '8' || ack[0] == 'A' || ack[0] == 'C')
+         nStatus = NOK;
+      else
+         nStatus = ERROR;
+      if (nStatus != OK)
+         return_FAILURE_INT_VAR(szFuncName, "Data Rejected by ATM", nStatus, NOK);
+   }
+	Send_CurrK7Mapp( nIndexCtx,Terminal_Number);
+
+   return_INT(szFuncName, nStatus);
+}
+int Send_CurrK7Mapp(
+    int   nIndexCtx,
+    char *Terminal_Number)
+{
+   struct sqlca sqlca;
+   dbl_param    sEmvData;
+   char         sBuff[LG_MAX];
+   char         szFuncName[] = "Send_CurrK7Mapp", sLine[MAX_LINE_TRC];
+   char      	ack   	 [    10];
+   char         szEmvTableType[10];
+   int      	nFdConnect;
+   int      	nHdrLen, nLen, nCntr, nStatus;
+
+   START_TRACE_PAR1(szFuncName, "%.15s", Terminal_Number);
+
+
+   /* INITIALISATION DES BUFFERS  */
+   memset(&sEmvData,   0, sizeof(sEmvData));
+   memset(sBuff,       0, sizeof(sBuff)   );
+
+   nFdConnect = GetFdByOraCtx(nIndexCtx);
+
+
+   memcpy(sEmvData.data,"0401100500012001000230010002400050",34);
+   nLen = 34;
+
+   nHdrLen = sprintf(sBuff, "3 %c000%c%c1E%c", FS, FS, FS,  FS);
+   memcpy (sBuff + nHdrLen, sEmvData.data, nLen);
+   nLen += nHdrLen;
+   nLen += sprintf(sBuff + nLen, "%c", FS);
+
+   dump_buffer((unsigned char *)sBuff, nLen, 'A', 'L', 'O');
+   if ((nStatus = WriteLineMsg( nFdConnect, sBuff, nLen)) != OK)
+      return_CALL_FAILURE_INT(szFuncName, "WriteLineMsg", nStatus, NOK);
+
+   memset(sBuff, 0, sizeof(sBuff));
+   nStatus = ReadLineMsg(nFdConnect, sBuff, &nLen);
+   dump_buffer((unsigned char *)sBuff, nLen, 'A', 'L', 'I');
+   if (nStatus != OK)
+      return_CALL_FAILURE_INT(szFuncName, "ReadLineMsg", nStatus, NOK);
+   if(nStatus == OK)
+   {
+      memset(ack, 0, sizeof(ack));
+      Download_Field(sBuff, 3, ack, nLen);
+      if(ack[0] == '9' || ack[0] == 'B')
+         nStatus = OK;
+      else if(ack[0] == '8' || ack[0] == 'A' || ack[0] == 'C')
+         nStatus = NOK;
+      else
+         nStatus = ERROR;
+      if (nStatus != OK)
+         return_FAILURE_INT_VAR(szFuncName, "Data Rejected by ATM", nStatus, NOK);
+   }
+
+   return_INT(szFuncName, nStatus);
+}

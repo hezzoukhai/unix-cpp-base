@@ -1,0 +1,12 @@
+include $(HOME)/src/libs/env_precomp.mk
+LIBS= -lpthread -L$(HPS_LIBPATH) -lpthr -lqueue -lcomora -ltools -lutils -lcomora -lpiso -lsaf -lget -lprivtlv -lprocessing -lhsmtdes -lauthotlv -L$(ORACLE_HOME)/lib $(ORACLE_LINK) -lphost -lnethost
+all :   GenPassWord
+
+OBJECTS = generate_password.o
+
+.c.o :
+	$(CC) $<
+
+GenPassWord : $(OBJECTS)
+	$(GCC) $(OBJECTS) $(LIBS) -o GenPassWord
+	mv GenPassWord $(BIN)/GenPassWord

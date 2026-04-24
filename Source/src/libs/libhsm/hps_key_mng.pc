@@ -1,0 +1,102 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      hps_key_mng.pc                                                         */
+/*                                                                             */
+/* Description                                                                 */
+/*      Save Key Tools Management                                              */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#include <string.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <hsm_inc.h>
+#include <param_ctx.h>
+
+
+
+
+  /***********************************************************************
+  **  nom	: SaveTPKKey()						**
+  **  desc	: sauvegarde d'une TPK cryptee sous la TMK		**
+  **  entree	: pTermNbr	-> numero de terminal			**
+  **  sortie	: pTPKKey	-> la TPK/TMK				**
+  **  retour	: OK	-> normal					**
+  **  auteur	: Younes OUADI (07 Avr 1999)				**
+  ***********************************************************************/
+int	SaveTPKKey(nIndiceCtx,pTermNbr, pAcqBank /*ICH270715*/, pTpkLmk, pTpkTmk)
+int		nIndiceCtx;
+char	*pTermNbr;
+char	*pAcqBank;/*ICH270715*/
+char	*pTpkLmk;
+char	*pTpkTmk;
+{
+struct sqlca sqlca;
+char 	detail[LG_MAX];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar		hTermNbr	[15+1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTpkLmk		[256+1];
+    char		hTpkTmk		[256+1];
+    int			hRet;
+EXEC SQL END DECLARE SECTION;
+
+/*sprintf(detail, "Start SaveTPKKey(%s,%s,%s,%s)", pTermNbr,pAcqBank/*ICH270715*/, pTpkLmk, pTpkTmk);
+trace_event(detail, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+trace_event("Start SaveTPKKey()", PROCESSING);
+
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr)	);
+    hTermNbr.len		= 2;
+    
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+
+    memset(hTpkLmk,		0, sizeof(hTpkLmk)	);
+    memset(hTpkTmk,		0, sizeof(hTpkTmk)	);
+    memcpy(hTermNbr.arr,	pTermNbr, 	strlen(pTermNbr));
+    hTermNbr.len		= strlen(pTermNbr); 
+
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hAcqBank.arr,	pATMCommand.fAcqBank, strlen(pATMCommand.fAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pATMCommand.fAcqBank);
+	
+    memcpy(hTpkLmk,		pTpkLmk, 	strlen(pTpkLmk));
+    memcpy(hTpkTmk,		pTpkTmk, 	strlen(pTpkTmk));
+
+    EXEC SQL WHENEVER SQLERROR GOTO saveTPKKeyErr;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+
+    EXEC SQL EXECUTE
+    BEGIN
+        :hRet := PCRD_ATM_KEY_MNG.SAVE_TPK_KEY(:hTermNbr,:hAcqBank/*ICH270715*/,:hTpkLmk, :hTpkTmk);
+    END;
+    END-EXEC;
+
+
+    if(hRet != OK)
+    {
+        sprintf(detail, "End   SaveTPKKey(NOK)");
+        trace_event(detail, PROCESSING);
+        return (hRet);
+    }
+
+sprintf(detail, "End   SaveTPKKey(OK)");
+trace_event(detail, PROCESSING);
+return (OK);
+
+saveTPKKeyErr :
+    sprintf(detail, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(detail, ERROR);
+    trace_event("End   SaveTPKKey(ERROR)", ERROR);
+    return (ERROR);
+}
+
+

@@ -1,0 +1,326 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <stdlib.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int AuthAmountMng ( int   nIndiceCtx, char *sTlvBuffer)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int			response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start AuthAmountMng() ", PROCESSING );
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+	
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+	
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_AmountMng;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_AUTH_AMOUNT_MNG.AMOUNT_AUTH_MNG( :T_tlv_auth ); 
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		
+		trace_event("End AuthAmountMng(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	sprintf(sLine,"End AuthAmountMng(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_AmountMng :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.70s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End AuthAmountMng(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+
+/*Start SKA20221026 PLUTONL-5184*/
+int ReversalAuthAmountMng ( int   nIndiceCtx, char *sTlvBuffer)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int			response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start ReversalAuthAmountMng() ", PROCESSING );
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+	
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+	
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_ReversalAmountMng;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_AUTH_AMOUNT_MNG.REVERSAL_AMOUNT_AUTH_MNG( :T_tlv_auth ); 
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		
+		trace_event("End ReversalAuthAmountMng(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	sprintf(sLine,"End ReversalAuthAmountMng(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_ReversalAmountMng :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.70s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End ReversalAuthAmountMng(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+/*End SKA20221026 PLUTONL-5184*/
+
+
+/*AMER20170308 Start: PROD00039737*/
+int ReplaceBillingAmnt ( int   nIndiceCtx, double nAlternAmnt, char *sTlvBuffer)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int			response_code;
+	double T_amnt;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine,"Start ReplaceBillingAmnt(%f)",nAlternAmnt);
+	trace_event ( sLine, PROCESSING );
+	/*PrintTlvBuffer ( sTlvBuffer );*/
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+	
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+	
+	T_amnt = nAlternAmnt;
+	
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_ReplaceBillingAmnt;
+	EXEC SQL EXECUTE
+	DECLARE
+		n_amnt AUTHO_ACTIVITY_ADM.BILLING_AMOUNT%TYPE;
+	BEGIN
+		n_amnt := :T_amnt;
+
+         :response_code := PCRD_P7_AUTH_AMOUNT_MNG.REPLACE_BILLING_AMOUNT( n_amnt, :T_tlv_auth );  
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		
+		trace_event("End ReplaceBillingAmnt(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	sprintf(sLine,"End ReplaceBillingAmnt(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_ReplaceBillingAmnt :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.70s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End ReplaceBillingAmnt(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+int ReplaceTransactionAmnt ( int   nIndiceCtx, double nAlternAmnt, char *sTlvBuffer)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int			response_code;
+	double T_amnt;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine,"Start ReplaceTransactionAmnt(%f)",nAlternAmnt);
+	trace_event ( sLine, PROCESSING );
+	/*PrintTlvBuffer ( sTlvBuffer );*/
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+	
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+	
+	T_amnt = nAlternAmnt;
+	
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_ReplaceTransactionAmnt;
+	EXEC SQL EXECUTE
+	DECLARE
+		n_amnt AUTHO_ACTIVITY_ADM.TRANSACTION_AMOUNT%TYPE;
+	BEGIN
+		n_amnt := :T_amnt;
+
+         :response_code := PCRD_P7_AUTH_AMOUNT_MNG.REPLACE_TRANSACTION_AMOUNT( n_amnt, :T_tlv_auth );  
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		
+		trace_event("End ReplaceTransactionAmnt(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	sprintf(sLine,"End ReplaceTransactionAmnt(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_ReplaceTransactionAmnt :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.70s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End ReplaceTransactionAmnt(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+/*AMER20170308 End: PROD00039737*/

@@ -1,0 +1,152 @@
+#include <stdio.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <resources.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetHSMVCodes  (int nIndiceCtx, char *node_id , char *interface_mode , char *Hsm_v01_code, char *Hsm_v02_code)
+{
+        struct sqlca sqlca;
+       
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        char      T_node_id[4 +1];
+        char      T_interface_mode[1 +1];
+        VARCHAR   T_Hsm_v01_code[6 + 1];
+        VARCHAR   T_Hsm_v02_code[6 + 1];
+        int     response_code;
+        short     null_Hsm_v01_code_ind;    /*IZL 15042022: PLUTONL-4596*/ 
+	short     null_Hsm_v02_code_ind;    /*IZL 15042022: PLUTONL-4596*/ 
+        EXEC SQL END DECLARE SECTION;
+
+  EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+  
+   char detail [ MAX_LINE_TRC];
+   memset ( detail     ,  0  ,   sizeof(detail));
+
+		sprintf ( detail," Start GetHSMVCodes(%s,%s) ", node_id,interface_mode );
+		trace_event(detail,TRACE);
+
+        memset ( T_node_id     ,  0  ,   sizeof(T_node_id));
+        memset ( T_interface_mode     ,  0  ,   sizeof(T_interface_mode));
+        memset ( T_Hsm_v01_code.arr ,  0  ,   sizeof(T_Hsm_v01_code.arr));
+        memset ( T_Hsm_v02_code.arr ,  0  ,   sizeof(T_Hsm_v02_code.arr));
+		T_Hsm_v01_code.len = 0;
+		T_Hsm_v02_code.len = 0;
+		
+        memcpy ( T_node_id ,        node_id ,        strlen(node_id));
+        memcpy ( T_interface_mode , interface_mode , 1);
+		
+		
+        response_code = 909;
+        EXEC SQL WHENEVER SQLERROR GOTO err_exec_sql;
+        EXEC SQL EXECUTE
+        
+        BEGIN
+
+        :response_code := PCRD_GET_PARAM_HSM_ROWS_1.GET_HSM_V_CODES_BY_NODES(   :T_node_id,
+						        			:T_interface_mode,
+										:T_Hsm_v01_code:null_Hsm_v01_code_ind,
+										:T_Hsm_v02_code:null_Hsm_v02_code_ind);  /*IZL 15042022: PLUTONL-4596*/ 
+
+
+        END;
+        END-EXEC;
+
+        if ( response_code == 0 )
+        {
+			memcpy(Hsm_v01_code, T_Hsm_v01_code.arr, T_Hsm_v01_code.len); Hsm_v01_code[6] = '\0';
+			memcpy(Hsm_v02_code, T_Hsm_v02_code.arr, T_Hsm_v02_code.len); Hsm_v02_code[6] = '\0';
+			sprintf(detail, "End GetHSMVCodes( OK [%s],[%s])", Hsm_v01_code, Hsm_v02_code);
+			trace_event(detail, PROCESSING);
+			return(OK);
+        }
+        trace_event ( "End GetHSMVCodes( NOK ) ", PROCESSING );
+        return(NOK);
+
+err_exec_sql :
+        EXEC SQL WHENEVER SQLERROR CONTINUE;
+        sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+        
+        trace_event (  detail , ERROR );
+        trace_event ( "End GetHSMVCodes( NOK ) ", PROCESSING );
+        return( NOK );
+}
+
+
+
+
+int GetHSMPCodes  (int nIndiceCtx, char *node_id , char *interface_mode , char *Hsm_p01_code, char *Hsm_p02_code)
+{
+        struct sqlca sqlca;
+       
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        char      T_node_id[4 +1];
+        char      T_interface_mode[1 +1];
+        VARCHAR   T_Hsm_p01_code[6 + 1];
+        VARCHAR   T_Hsm_p02_code[6 + 1];
+        int     response_code;
+        short     null_Hsm_p01_code_ind;    /*IZL 15042022: PLUTONL-4596*/ 	
+	short     null_Hsm_p02_code_ind;    /*IZL 15042022: PLUTONL-4596*/ 	
+        EXEC SQL END DECLARE SECTION;
+
+  EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+  
+   char detail [ MAX_LINE_TRC];
+   memset ( detail     ,  0  ,   sizeof(detail));
+
+		sprintf ( detail," Start GetHSMPCodes(%s,%s) ", node_id,interface_mode );
+		trace_event(detail,TRACE);
+
+
+        memset ( T_node_id     ,  0  ,   sizeof(T_node_id));
+        memset ( T_interface_mode     ,  0  ,   sizeof(T_interface_mode));
+        memset ( T_Hsm_p01_code.arr ,  0  ,   sizeof(T_Hsm_p01_code.arr));
+        memset ( T_Hsm_p02_code.arr ,  0  ,   sizeof(T_Hsm_p02_code.arr));
+		T_Hsm_p01_code.len = 0;
+		T_Hsm_p02_code.len = 0;
+		
+        memcpy ( T_node_id ,        node_id ,        strlen(node_id));
+        memcpy ( T_interface_mode , interface_mode , 1);
+		
+		
+        response_code = 909;
+        EXEC SQL WHENEVER SQLERROR GOTO err_exec_sql;
+        EXEC SQL EXECUTE
+        
+        BEGIN
+
+        :response_code := PCRD_GET_PARAM_HSM_ROWS_1.GET_HSM_P_CODES_BY_NODES(   :T_node_id,
+					        				:T_interface_mode,
+										:T_Hsm_p01_code:null_Hsm_p01_code_ind,
+										:T_Hsm_p02_code:null_Hsm_p02_code_ind);    /*IZL 15042022: PLUTONL-4596*/ 
+
+
+        END;
+        END-EXEC;
+
+        if ( response_code == 0 )
+        {
+			memcpy(Hsm_p01_code, T_Hsm_p01_code.arr, T_Hsm_p01_code.len); Hsm_p01_code[6] = '\0';
+			memcpy(Hsm_p02_code, T_Hsm_p02_code.arr, T_Hsm_p02_code.len); Hsm_p02_code[6] = '\0';
+			sprintf(detail, "End GetHSMPCodes( OK [%s],[%s])", Hsm_p01_code, Hsm_p02_code);
+			trace_event(detail, PROCESSING);
+			return(OK);
+        }
+        trace_event ( "End GetHSMPCodes( NOK ) ", PROCESSING );
+        return(NOK);
+
+err_exec_sql :
+        EXEC SQL WHENEVER SQLERROR CONTINUE;
+        sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+        
+        trace_event (  detail , ERROR );
+        trace_event ( "End GetHSMPCodes( NOK ) ", PROCESSING );
+        return( NOK );
+}

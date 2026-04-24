@@ -1,0 +1,319 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <define.h>
+#include <tlv_autho.h>
+#include <list_thr.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/*ICH20191018 CIS/BASE1 Excp file mngt*/
+
+/*****************************************************************************/
+int GetBase1SafData (int  nIndiceCtx, 
+					char *sDestResource, 
+					char cManageType, 
+					char DeclineAdviceFlag, 
+					char *sMti, 
+					char *sStan, 
+					char *sSrcResource, 
+					int *nSendCounter, 
+					char *sResponseCode,
+					char *sCardNumber , 
+					char *sTlvBuffer,
+					char *s)
+{
+   struct sqlca sqlca;
+   TSTlvAutho      sTlvInfo;
+   char detail 	   [ MAX_LINE_TRC];
+   int  i,nLength;
+
+   EXEC SQL BEGIN DECLARE SECTION;
+       char      T_DEST_RESOURCE [ 6 + 1];
+       char      T_SRC_RESOURCE  [ 6 + 1];
+       char      T_MTI	         [ 4 + 1 ];
+       char      T_STAN	         [ 6 + 1 ];
+       int       T_SEND_COUNTER;
+       char      T_DECLINE_ADVICE_FLAG;
+       char      T_MANAGE_TYPE;
+       VARCHAR   T_TLV_BUFFER    [ LG_MAX ]; 
+       VARCHAR   T_RESPONSE_CODE [ 3 + 1 ]; 
+       VARCHAR   T_CARD_NUMBER   [22 + 1 ]; 
+	   int       response_code;
+   EXEC SQL END DECLARE SECTION;
+   
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+   /*----------------------------------------------------------------------*/
+
+   /*trace_event("GetBase1SafData",TRACE); */
+
+   memset ( sTlvBuffer   ,  0 , sizeof ( sTlvBuffer ));
+   memset ( T_DEST_RESOURCE     , 0 , sizeof ( T_DEST_RESOURCE ));
+   memset ( T_MTI               , 0 , sizeof ( T_MTI ));
+   memset ( T_STAN              , 0 , sizeof ( T_STAN ));
+   memset ( T_SRC_RESOURCE      , 0 , sizeof ( T_SRC_RESOURCE ));
+   memset ( T_TLV_BUFFER.arr    , 0 , sizeof ( T_TLV_BUFFER.arr ));
+   memset ( T_RESPONSE_CODE.arr , 0 , sizeof ( T_RESPONSE_CODE.arr ));
+   memset ( T_CARD_NUMBER.arr   , 0 , sizeof ( T_CARD_NUMBER.arr ));
+   T_DECLINE_ADVICE_FLAG = 0;
+   T_SEND_COUNTER = 0;
+   T_MANAGE_TYPE = 0;
+   T_TLV_BUFFER.len = 0;
+   T_RESPONSE_CODE.len = 0;
+   T_CARD_NUMBER.len = 0;
+
+   /*----------------------------------------------------------------------*/
+
+   memcpy ( T_DEST_RESOURCE , sDestResource , strlen ( sDestResource ));
+   T_MANAGE_TYPE = cManageType;
+    
+   response_code = 909;
+
+   EXEC SQL WHENEVER SQLERROR GOTO err_GetBase1SafData;
+   EXEC SQL EXECUTE
+   BEGIN
+
+      :response_code := PCRD_BASE1_SAF_MANAGE.GET_BASE1_SAF_DATA( :T_DEST_RESOURCE, 
+																  :T_MANAGE_TYPE,
+																  :T_DECLINE_ADVICE_FLAG,
+																  :T_MTI, 
+																  :T_STAN, 
+																  :T_SRC_RESOURCE, 
+																  :T_SEND_COUNTER, 
+																  :T_RESPONSE_CODE, 
+																  :T_TLV_BUFFER,
+																  :T_CARD_NUMBER);
+
+   END;
+   END-EXEC;
+   
+
+   if ( response_code == OK )
+   {
+	*nSendCounter = T_SEND_COUNTER;
+	memcpy ( sMti         , T_MTI            , 4 );
+	memcpy ( sStan        , T_STAN           , 6 );
+	memcpy ( sSrcResource , T_SRC_RESOURCE , 6 );
+	memcpy ( sResponseCode, T_RESPONSE_CODE.arr , T_RESPONSE_CODE.len );
+	memcpy ( sCardNumber  , T_CARD_NUMBER.arr   , T_CARD_NUMBER.len );
+	memcpy ( sTlvBuffer   , T_TLV_BUFFER.arr    , T_TLV_BUFFER.len );
+	memset ( T_TLV_BUFFER.arr    , 0 , sizeof ( T_TLV_BUFFER.arr ));
+	memset ( T_CARD_NUMBER.arr   , 0 , sizeof ( T_CARD_NUMBER.arr ));
+    trace_event ( "End GetBase1SafData( OK ) ", PROCESSING );
+	return(OK);
+   }
+    
+	memset ( T_TLV_BUFFER.arr    , 0 , sizeof ( T_TLV_BUFFER.arr ));
+	memset ( T_CARD_NUMBER.arr   , 0 , sizeof ( T_CARD_NUMBER.arr ));
+
+   sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+   trace_event (  detail , ERROR );
+   trace_event ( "End GetBase1SafData( NOK ) ", PROCESSING );
+   return(NOK);
+
+   err_GetBase1SafData :
+        EXEC SQL WHENEVER SQLERROR CONTINUE;
+        sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+		memset ( T_TLV_BUFFER.arr    , 0 , sizeof ( T_TLV_BUFFER.arr ));
+		memset ( T_CARD_NUMBER.arr   , 0 , sizeof ( T_CARD_NUMBER.arr ));
+        if (memcmp(detail,"ORA-01405",9) != 0)
+        {
+            trace_event (  detail , ERROR );
+            trace_event ( "End GetBase1SafData( MALFUNCTION ) ", PROCESSING );
+        }
+        return( NOK );
+
+}
+
+/*****************************************************************************/
+int UpdateBase1SafData  ( int     nIndiceCtx, 
+                        char    *sMti, 
+                        char    cManageType, 
+                        char    *sStan,
+                        char    *sSrcResource, 
+                        char    *sDestResource,
+                        char    *sRefNbr,
+                        char    *sPan)
+{
+   struct sqlca sqlca;
+   char detail[ MAX_LINE_TRC];
+   int  nLength;
+
+   EXEC SQL BEGIN DECLARE SECTION;
+      char  T_MTI          [ 4 + 1];
+      char  T_STAN         [ 6 + 1];
+      char  T_DEST_RESOURCE[ 6 + 1];
+      char  T_SRC_RESOURCE [ 6 + 1];
+      char  T_REF_NBR      [ 12 + 1];
+      char  T_PAN          [ 19 + 1];
+      char  T_MANAGE_TYPE;
+
+      int   response_code;
+   EXEC SQL END DECLARE SECTION;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+   /*----------------------------------------------------------------------*/
+   trace_event ( "Start UpdateBase1SafData() ", PROCESSING );
+   memset ( T_MTI,  0 , 4 + 1  );
+   memset ( T_STAN, 0 , 6 + 1  );
+   memset ( T_DEST_RESOURCE , 0 , 6 + 1 );
+   memset ( T_SRC_RESOURCE  , 0 , 6 + 1 );
+   memset ( T_REF_NBR       , 0 , 12 + 1 );
+   memset ( T_PAN           , 0 , 19 + 1 );
+
+   T_MANAGE_TYPE  = 0;
+   /*----------------------------------------------------------------------*/
+
+   memcpy ( T_MTI, sMti	, 4   );
+   memcpy ( T_STAN, sStan , 6   );
+   memcpy ( T_DEST_RESOURCE, sDestResource , 6   );
+   memcpy ( T_SRC_RESOURCE , sSrcResource	, 6   );
+   memcpy (T_PAN , sPan  , strlen(sPan) );
+   memcpy (T_REF_NBR , sRefNbr  , strlen(sRefNbr) );
+
+   T_MANAGE_TYPE  = cManageType;
+   
+   response_code = 909;
+   EXEC SQL WHENEVER SQLERROR GOTO err_UpdateBase1SafData;
+   EXEC SQL EXECUTE
+   BEGIN
+      :response_code := PCRD_BASE1_SAF_MANAGE.UPDATE_BASE1_SAF_DATA(:T_MTI,
+                                                                    :T_MANAGE_TYPE,  
+                                                                    :T_STAN,  
+                                                                    :T_SRC_RESOURCE, 
+                                                                    :T_DEST_RESOURCE,
+                                                                    :T_REF_NBR,
+                                                                    :T_PAN);
+
+   END;
+   END-EXEC;
+
+   if ( response_code == OK )
+   {
+      trace_event ( "End UpdateBase1SafData( OK ) ", PROCESSING );
+      return(OK);
+   }
+
+   trace_event ( "End UpdateBase1SafData( NOK ) ", PROCESSING );
+   return(NOK);
+
+   err_UpdateBase1SafData :
+      EXEC SQL WHENEVER SQLERROR CONTINUE;
+      sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+      trace_event (  detail , ERROR );
+      trace_event ( "End UpdateBase1SafData( MALFUNCTION ) ", PROCESSING );
+      return( NOK );
+}
+
+/*****************************************************************************/
+int DeleteBase1SafData ( int     nIndiceCtx, 
+                        char    *sPan,  
+                        char    *sMti, 
+                        char    cManageType , 
+                        char    *sStan,
+                        char    *sSrcResource, 
+                        char    *sDestResource,
+                        char    *sSlfMti, 
+                        char    *sSlfResponseCode,
+                        char    *sRefNbr)
+{
+   struct sqlca sqlca;
+   char detail 	[ MAX_LINE_TRC];
+   int  nLength;
+
+   EXEC SQL BEGIN DECLARE SECTION;
+      char   T_MTI[ 4 + 1];
+      char   T_PAN[ 19 + 1];
+      char   T_STAN[ 6 + 1];
+      char   T_DEST_RESOURCE[ 6 + 1];
+      char   T_SRC_RESOURCE[ 6 + 1];
+      char   T_MANAGE_TYPE;
+      char   T_SLF_MTI[ 4 + 1];
+      VARCHAR   T_SLF_RESPONSE_CODE [ 3 + 1];
+      char  T_REF_NBR      [ 12 + 1];
+
+      int	response_code;
+   EXEC SQL END DECLARE SECTION;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+   /*----------------------------------------------------------------------*/
+   trace_event ( "Start DeleteBase1SafData() ", PROCESSING );
+   memset ( T_MTI,  0 , sizeof(T_MTI) );
+   memset ( T_PAN,  0 , sizeof(T_PAN) );
+   memset ( T_STAN, 0 , sizeof(T_STAN) );
+   memset ( T_DEST_RESOURCE , 0 ,sizeof(T_DEST_RESOURCE) );
+   memset ( T_SRC_RESOURCE  , 0 , sizeof(T_SRC_RESOURCE) );
+   memset ( T_SLF_MTI       , 0,  sizeof(T_SLF_MTI) );
+   memset ( T_SLF_RESPONSE_CODE.arr , 0, sizeof( T_SLF_RESPONSE_CODE.arr ));
+    memset ( T_REF_NBR  , 0 , sizeof(T_REF_NBR) );
+
+   T_SLF_RESPONSE_CODE.len = 0;
+   T_MANAGE_TYPE  = 0;
+    /*----------------------------------------------------------------------*/
+
+   memcpy (T_MTI , sMti  , 4 );
+   memcpy (T_PAN , sPan  , strlen(sPan) );
+   memcpy (T_STAN, sStan , 6 );
+   memcpy (T_DEST_RESOURCE , sDestResource , 6   );
+   memcpy (T_SRC_RESOURCE  , sSrcResource   , 6   );
+   memcpy (T_SLF_MTI       , sSlfMti,  4 + 1 );
+   memcpy (T_REF_NBR , sRefNbr  , strlen(sRefNbr) );
+
+   if( debug_option == 1 )
+   {
+	sprintf(detail, "PAN................=[%s]",T_PAN); trace_event (  detail , TRACE );
+   }
+	sprintf(detail, "MTI................=[%s]",T_MTI); trace_event (  detail , TRACE );
+	sprintf(detail, "STAN...............=[%s]",T_STAN); trace_event (  detail , TRACE );
+	sprintf(detail, "DEST_RESOURCE......=[%s]",T_DEST_RESOURCE); trace_event (  detail , TRACE );
+	sprintf(detail, "SRC_RESOURCE.......=[%s]",T_SRC_RESOURCE); trace_event (  detail , TRACE );
+	sprintf(detail, "SLF_MTI............=[%s]",T_SLF_MTI); trace_event (  detail , TRACE );
+
+   memcpy (T_SLF_RESPONSE_CODE.arr, sSlfResponseCode,strlen(sSlfResponseCode));
+   T_SLF_RESPONSE_CODE.len = strlen(sSlfResponseCode);
+
+   
+   T_MANAGE_TYPE  = cManageType;
+   
+   
+   response_code = 909;
+   EXEC SQL WHENEVER SQLERROR GOTO err_DeleteBase1SafData;
+   EXEC SQL EXECUTE
+   BEGIN
+       :response_code := PCRD_BASE1_SAF_MANAGE.DELETE_BASE1_SAF_DATA(:T_MTI,
+                                                                    :T_PAN,
+                                                                    :T_MANAGE_TYPE,  
+                                                                    :T_STAN,  
+                                                                    :T_SRC_RESOURCE, 
+                                                                    :T_DEST_RESOURCE, 
+                                                                    :T_SLF_MTI, 
+                                                                    :T_SLF_RESPONSE_CODE ,
+                                                                    :T_REF_NBR);
+
+   END;
+   END-EXEC;
+
+   memset ( T_PAN,  0 , sizeof(T_PAN));
+   if ( response_code == OK )
+   {
+      trace_event ( "End DeleteBase1SafData( OK ) ", PROCESSING );
+      return(OK);
+   }
+
+   trace_event ( "End DeleteBase1SafData( NOK ) ", PROCESSING );
+   return(NOK);
+
+   err_DeleteBase1SafData :
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   memset ( T_PAN,  0 , sizeof(T_PAN));
+   sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+   trace_event (  detail , ERROR );
+   trace_event ( "End DeleteBase1SafData( MALFUNCTION ) ", PROCESSING );
+   return( NOK );
+}

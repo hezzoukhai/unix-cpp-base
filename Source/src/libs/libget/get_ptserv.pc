@@ -1,0 +1,155 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetOutlet  (int nIndiceCtx, TSPtserv *outlet )
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   OUTLET_NUMBER [ 15 ];
+ 	VARCHAR   MERCHANT_NUMBER [ 15 ];
+ 	VARCHAR   OUTLET_NAME [ 30 ];
+ 	char   BANK_CODE [ 6 ];
+ 	char   BRANCH_CODE [ 6 ];
+ 	char   CITY_CODE [ 5 ];
+ 	char   REGION_CODE [ 2 ];
+ 	char   COUNTRY_CODE [ 3 ];
+ 	char   STATUS_CODE [ 1 ];
+ 	char   OPENING_DATE [ 8 ];
+ 	char   CLOSING_DATE [ 8 ];
+ 	int    CAPTURE_MODE;
+ 	char   MCC [ 4 ];
+ 	long   FLOOR_LIMIT;
+ 	char   CURRENCY_CODE [ 3 ];
+ 	char   SENSITIVE_OPERATION_RECORD [ 1 ];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetPtserv() ", PROCESSING );
+ 	memset (   OUTLET_NUMBER.arr ,0, sizeof ( OUTLET_NUMBER.arr ));
+ 	memset (   MERCHANT_NUMBER.arr ,0, sizeof ( MERCHANT_NUMBER.arr ));
+ 	memset (   OUTLET_NAME.arr ,0, sizeof ( OUTLET_NAME.arr ));
+ 	memset (   BANK_CODE ,0, 6  );
+ 	memset (   BRANCH_CODE ,0, 6  );
+ 	memset (   CITY_CODE ,0, 5);
+ 	memset (   REGION_CODE ,0, 2  );
+ 	memset (   COUNTRY_CODE ,0, 3  );
+ 	memset (   STATUS_CODE , 0,  1  );
+ 	memset (   OPENING_DATE , 0 , 8) ;
+ 	memset (   CLOSING_DATE  , 0 , 8);
+ 	CAPTURE_MODE = 0;
+ 	memset (   MCC , 0,  4  );
+ 	FLOOR_LIMIT = 0;
+ 	memset (   CURRENCY_CODE ,0, 3 );
+ 	memset (   SENSITIVE_OPERATION_RECORD ,0, 1 );
+
+	memcpy ( OUTLET_NUMBER.arr , outlet->outlet_number,
+			strlen (  outlet->outlet_number ));
+
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_;
+	EXEC SQL EXECUTE
+	    DECLARE T_PTSERV   PTSERV%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_DATA_MERCHANT_ROWS.GET_PTSERV
+						(   :OUTLET_NUMBER, 
+	                                            T_PTSERV 
+	                                        );
+
+
+		IF :response_code = 0 THEN
+ 	           :OUTLET_NUMBER 	:= T_PTSERV.OUTLET_NUMBER; 
+ 	           :MERCHANT_NUMBER 	:= T_PTSERV.MERCHANT_NUMBER;
+ 	           :OUTLET_NAME 	:= T_PTSERV.OUTLET_NAME; 
+ 	           :BANK_CODE 		:= T_PTSERV.BANK_CODE;
+ 	           :BRANCH_CODE 	:= T_PTSERV.BRANCH_CODE;
+ 	           :CITY_CODE 		:= T_PTSERV.CITY_CODE;
+ 	           :REGION_CODE 	:= T_PTSERV.REGION_CODE;
+ 	           :COUNTRY_CODE 	:= T_PTSERV.COUNTRY_CODE;
+ 	           :STATUS_CODE 	:= T_PTSERV.STATUS_CODE;
+ 	           :OPENING_DATE	:= T_PTSERV.OPENING_DATE;
+ 	           :CLOSING_DATE	:= T_PTSERV.CLOSING_DATE;
+ 	           :CAPTURE_MODE	:= T_PTSERV.CAPTURE_MODE;
+ 	           :MCC 		:= T_PTSERV.MCC;
+ 	           :FLOOR_LIMIT		:= T_PTSERV.FLOOR_LIMIT;
+ 	           :CURRENCY_CODE 	:= T_PTSERV.CURRENCY_CODE;
+ 	           :SENSITIVE_OPERATION_RECORD := T_PTSERV.SENSITIVE_OPERATION_RECORD;
+		END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+ 	memcpy ( outlet->merchant_number , MERCHANT_NUMBER.arr ,0, sizeof ( MERCHANT_NUMBER.arr ));
+ 	memcpy ( outlet->outlet_name , OUTLET_NAME.arr 
+						, sizeof ( OUTLET_NAME.arr ));
+ 	outlet->outlet_name[OUTLET_NAME.len] = 0;
+ 	memcpy ( outlet->bank_code , BANK_CODE ,6);
+ 	memcpy ( outlet->branch_code,  BRANCH_CODE,6);
+ 	memcpy ( outlet->city_code ,  CITY_CODE , 5);
+ 	memcpy ( outlet->region_code ,REGION_CODE , 2);
+ 	memcpy ( outlet->country_code,COUNTRY_CODE , 3);
+ 	memcpy ( outlet->status_code,STATUS_CODE , 1);
+ 	memcpy ( outlet->opening_date,OPENING_DATE,8) ;
+ 	memcpy ( outlet->closing_date,CLOSING_DATE,8);
+ 	outlet->capture_mode =  CAPTURE_MODE;
+ 	memcpy ( outlet->mcc ,  MCC , 4);
+ 	outlet->floor_limit =  FLOOR_LIMIT;
+ 	memcpy ( outlet->currency_code,CURRENCY_CODE,3);
+        memcpy ( outlet->sensitive_operation_record , SENSITIVE_OPERATION_RECORD , 1 );
+
+	    trace_event ( "End GetPtserv( OK ) ", PROCESSING );
+	    return(OK);
+	}
+	trace_event ( "End GetPtserv( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_ :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+      if (memcmp(detail,"ORA-01405",9) == 0)
+      {
+ 	memcpy ( outlet->merchant_number , MERCHANT_NUMBER.arr ,0, sizeof ( MERCHANT_NUMBER.arr ));
+ 	memcpy ( outlet->outlet_name , OUTLET_NAME.arr 
+						, sizeof ( OUTLET_NAME.arr ));
+ 	outlet->outlet_name[OUTLET_NAME.len] = 0;
+ 	memcpy ( outlet->bank_code , BANK_CODE ,6);
+ 	memcpy ( outlet->branch_code,  BRANCH_CODE,6);
+ 	memcpy ( outlet->city_code ,  CITY_CODE , 5);
+ 	memcpy ( outlet->region_code ,REGION_CODE , 2);
+ 	memcpy ( outlet->country_code,COUNTRY_CODE , 3);
+ 	memcpy ( outlet->status_code,STATUS_CODE , 1);
+ 	memcpy ( outlet->opening_date,OPENING_DATE,8) ;
+ 	memcpy ( outlet->closing_date,CLOSING_DATE,8);
+ 	outlet->capture_mode =  CAPTURE_MODE;
+ 	memcpy ( outlet->mcc ,  MCC , 4);
+ 	outlet->floor_limit =  FLOOR_LIMIT;
+ 	memcpy ( outlet->currency_code,CURRENCY_CODE,3);
+ 	memcpy ( outlet->sensitive_operation_record , 
+					   SENSITIVE_OPERATION_RECORD , 1 );
+
+	        trace_event ( "End GetPtserv( OK ) ", PROCESSING );
+		return(OK);
+     }
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetPtserv( NOK ) ", PROCESSING );
+	return( NOK );
+}

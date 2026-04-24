@@ -1,0 +1,640 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <define.h>
+#include <iso_hps.h>
+#include <tlv_autho.h>
+#include <tlv_fields.h>
+#include <list_thr.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+/*****************************************************************************/
+/* GetSafData :                                                              */
+/* Entree : char *sDestResource, char DeclineAdviceFlag,                     */
+/* Sortie : char *sMti, char *sStan, int  *nSendCounter,                     */
+/*          TSIsoInfo *sMsgIso                                               */
+/*****************************************************************************/
+int GetSafData (int  nIndiceCtx, 
+                char *sDestResource, char cManageType, char DeclineAdviceFlag, 
+                char *sMti, char *sStan, 
+                char *sSrcResource, int *nSendCounter, char *sResponseCode,
+                char *sCardNumber , char *sTlvBuffer
+	       )
+{
+   struct sqlca sqlca;
+   TSTlvAutho      sTlvInfo;
+   char detail 	   [ MAX_LINE_TRC];
+   int  i,nLength;
+
+   EXEC SQL BEGIN DECLARE SECTION;
+       char      T_DEST_RESOURCE [ 6 + 1];
+       char      T_SRC_RESOURCE  [ 6 + 1];
+       char      T_MTI	         [ 4 + 1 ];
+       char      T_STAN	         [ 6 + 1 ];
+       int       T_SEND_COUNTER;
+       char      T_DECLINE_ADVICE_FLAG;
+       char      T_MANAGE_TYPE;
+       VARCHAR   T_TLV_BUFFER    [ TLV_MAX_LENGTH ]; 
+       VARCHAR   T_RESPONSE_CODE [ 3 + 1 ]; 
+       VARCHAR   T_CARD_NUMBER   [22 + 1 ]; 
+       int       response_code;
+   EXEC SQL END DECLARE SECTION;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+   InitTlvAutho (&sTlvInfo);
+   /*----------------------------------------------------------------------*/
+
+   memset ( sTlvBuffer          , 0 , sizeof ( sTlvBuffer ));
+   memset ( T_DEST_RESOURCE     , 0 , sizeof ( T_DEST_RESOURCE ));
+   memset ( T_MTI               , 0 , sizeof ( T_MTI ));
+   memset ( T_STAN              , 0 , sizeof ( T_STAN ));
+   memset ( T_SRC_RESOURCE      , 0 , sizeof ( T_SRC_RESOURCE ));
+   memset ( T_TLV_BUFFER.arr    , 0 , sizeof ( T_TLV_BUFFER.arr ));
+   memset ( T_RESPONSE_CODE.arr , 0 , sizeof ( T_RESPONSE_CODE.arr ));
+   memset ( T_CARD_NUMBER.arr   , 0 , sizeof ( T_CARD_NUMBER.arr ));
+   
+   T_DECLINE_ADVICE_FLAG = 0;
+   T_SEND_COUNTER = 0;
+   T_MANAGE_TYPE = 0;
+   T_TLV_BUFFER.len = 0;
+   T_RESPONSE_CODE.len = 0;
+   T_CARD_NUMBER.len = 0;
+
+   /*----------------------------------------------------------------------*/
+
+   memcpy ( T_DEST_RESOURCE , sDestResource , strlen ( sDestResource ));
+   T_MANAGE_TYPE = cManageType;
+    
+   response_code = 909;
+
+   EXEC SQL WHENEVER SQLERROR GOTO err_get_saf_data;
+   EXEC SQL EXECUTE
+   BEGIN
+
+      :response_code := PCRD_SAF_MANAGE.GET_SAF_DATA( :T_DEST_RESOURCE, 
+                                                      :T_MANAGE_TYPE,
+                                                      :T_DECLINE_ADVICE_FLAG,
+                                                      :T_MTI, 
+                                                      :T_STAN, 
+                                                      :T_SRC_RESOURCE, 
+                                                      :T_SEND_COUNTER, 
+                                                      :T_RESPONSE_CODE, 
+                                                      :T_TLV_BUFFER,
+                                                      :T_CARD_NUMBER
+                                                    );
+
+   END;
+   END-EXEC;
+
+   if ( response_code == OK )
+   {
+	*nSendCounter = T_SEND_COUNTER;
+	memcpy ( sMti         , T_MTI            , 4 );
+	memcpy ( sStan        , T_STAN           , 6 );
+	memcpy ( sSrcResource , T_SRC_RESOURCE , 6 );
+	memcpy ( sResponseCode, T_RESPONSE_CODE.arr , T_RESPONSE_CODE.len );
+	memcpy ( sCardNumber  , T_CARD_NUMBER.arr   , T_CARD_NUMBER.len );
+	memcpy ( sTlvBuffer   , T_TLV_BUFFER.arr    , T_TLV_BUFFER.len );
+	memset ( T_TLV_BUFFER.arr    , 0 , sizeof ( T_TLV_BUFFER.arr ));
+	memset ( T_CARD_NUMBER.arr   , 0 , sizeof ( T_CARD_NUMBER.arr ));
+    trace_event ( "End GetSafData( OK ) ", PROCESSING );
+	return(OK);
+   }
+    
+	memset ( T_TLV_BUFFER.arr    , 0 , sizeof ( T_TLV_BUFFER.arr ));
+	memset ( T_CARD_NUMBER.arr   , 0 , sizeof ( T_CARD_NUMBER.arr ));
+
+   sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+   if (memcmp(detail,"ORA-01405",9) == 0)
+       return(OK);
+
+   trace_event (  detail , ERROR );
+   trace_event ( "End GetSafData( NOK ) ", PROCESSING );
+   return(NOK);
+
+   err_get_saf_data :
+        EXEC SQL WHENEVER SQLERROR CONTINUE;
+        sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+		memset ( T_TLV_BUFFER.arr    , 0 , sizeof ( T_TLV_BUFFER.arr ));
+		memset ( T_CARD_NUMBER.arr   , 0 , sizeof ( T_CARD_NUMBER.arr ));
+        if (memcmp(detail,"ORA-01405",9) != 0)
+        {
+            trace_event (  detail , ERROR );
+            trace_event ( "End GetSafData( MALFUNCTION ) ", PROCESSING );
+        }
+        return( NOK );
+}
+
+/*****************************************************************************/
+/* CardInSaf  :                                                              */
+/* Entree : char *sCard                                                      */
+/* Sortie : int   response                                                   */
+/*****************************************************************************/
+int CardInSaf (
+					int  nIndiceCtx, 
+                	char *sCard
+	            )
+{
+   struct sqlca sqlca;
+   char detail 	   [ MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+       VARCHAR   T_CARD_NUMBER   [22 + 1 ]; 
+	   int       response_code;
+   EXEC SQL END DECLARE SECTION;
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+   trace_event ( "Card In Saf Checking Start()", PROCESSING );
+   /*----------------------------------------------------------------------*/
+   memset ( T_CARD_NUMBER.arr   , 0 , sizeof ( T_CARD_NUMBER.arr ));
+   T_CARD_NUMBER.len = 0;
+
+   memcpy ( T_CARD_NUMBER.arr   , sCard , strlen ( sCard ));
+   T_CARD_NUMBER.len =  strlen ( sCard ) ;
+   /*----------------------------------------------------------------------*/
+
+   response_code = 909;
+
+   EXEC SQL WHENEVER SQLERROR GOTO err_card_in_saf;
+   EXEC SQL EXECUTE
+   BEGIN
+
+      :response_code := PCRD_SAF_MANAGE.CARD_IN_SAF ( 
+                                                      :T_CARD_NUMBER
+                                                    );
+
+   END;
+   END-EXEC;
+
+   memset ( T_CARD_NUMBER.arr   , 0 , sizeof ( T_CARD_NUMBER.arr ));
+   if ( response_code == OK )
+   {
+        trace_event ( "End CardInSaf( OK ) ", PROCESSING );
+	    return(OK);
+   }
+    
+
+   sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+   if (memcmp(detail,"ORA-01405",9) == 0)
+       return(NOK);
+
+   trace_event (  detail , ERROR );
+   trace_event ( "End CardInSaf ( NOK ) ", PROCESSING );
+   return(NOK);
+
+   err_card_in_saf :
+        EXEC SQL WHENEVER SQLERROR CONTINUE;
+        memset ( T_CARD_NUMBER.arr   , 0 , sizeof ( T_CARD_NUMBER.arr ));
+        sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+        if (memcmp(detail,"ORA-01405",9) != 0)
+        {
+            trace_event (  detail , ERROR );
+            trace_event ( "End CardInSaf ( MALFUNCTION ) ", PROCESSING );
+        }
+        return( NOK );
+}
+/*****************************************************************************/
+/* InsertSafData :                                                           */
+/* Entree :     char *sMti, char *sStan                                      */
+/*              char *sSourceResource, char *sDestResource,                  */ 
+/*              TSIsoInfo *sMsgIso,                                          */
+/*              int  nSendCounter, char *response_code                       */
+/* Sortie : Status D'ecriture                                                */
+/*****************************************************************************/
+int InsertSafData  ( int  nIndiceCtx, 
+                     char *sMti, char cManageType, char *sStan,
+                     char *sSourceResource, char *sDestResource, 
+                     int  nSendCounter, char *sResponseCode,
+                     char  *sTlvBuffer, char *sCardNumber
+                   )
+{
+   struct sqlca sqlca;
+   char detail 	[ MAX_LINE_TRC];
+   int  nLength;
+
+   EXEC SQL BEGIN DECLARE SECTION;
+       char      T_MTI	[ 4 + 1];
+       char      T_STAN	[ 6 + 1];
+       char      T_DEST_RESOURCE [ 6 + 1];
+       char      T_SRC_RESOURCE  [ 6 + 1];
+       char      T_MANAGE_TYPE;
+       int       T_SEND_COUNTER;
+       VARCHAR   T_RESPONSE_CODE  [ 3 + 1 ];
+       VARCHAR   T_TLV_BUFFER     [TLV_MAX_LENGTH];
+       VARCHAR   T_CARD_NUMBER    [22 + 1];
+
+       int       response_code;
+   EXEC SQL END DECLARE SECTION;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+   /*----------------------------------------------------------------------*/
+   trace_event ( "Start InsertSafData() ", PROCESSING );
+   memset ( T_MTI , 0 , 4 + 1  );
+   memset ( T_STAN, 0 , 6 + 1  );
+   memset ( T_DEST_RESOURCE , 0 , 6 + 1 );
+   memset ( T_SRC_RESOURCE  , 0 , 6 + 1 );
+   memset ( T_RESPONSE_CODE.arr, 0 , sizeof ( T_RESPONSE_CODE.arr ));
+   memset ( T_TLV_BUFFER.arr   , 0 , sizeof ( T_TLV_BUFFER.arr ));
+   memset ( T_CARD_NUMBER.arr  , 0 , sizeof ( T_CARD_NUMBER.arr ));
+   T_SEND_COUNTER = 0;
+   T_MANAGE_TYPE  = 0;
+   T_RESPONSE_CODE.len = 0;
+   T_CARD_NUMBER.len = 0;
+   T_TLV_BUFFER.len = TLV_MAX_LENGTH;
+   /*----------------------------------------------------------------------*/
+
+   memcpy ( T_MTI, sMti	  , 4);
+   memcpy ( T_STAN, sStan , 6);
+   memcpy ( T_DEST_RESOURCE , sDestResource ,   6 );
+   memcpy ( T_SRC_RESOURCE  , sSourceResource , 6 );
+   memcpy ( T_RESPONSE_CODE.arr, sResponseCode , strlen ( sResponseCode ));
+   memcpy ( T_CARD_NUMBER.arr   , sCardNumber , strlen ( sCardNumber ));
+   memcpy ( T_TLV_BUFFER.arr   , sTlvBuffer , strlen ( sTlvBuffer ));
+
+   T_SEND_COUNTER = nSendCounter;
+   T_MANAGE_TYPE  = cManageType;
+   T_RESPONSE_CODE.len = strlen ( sResponseCode );
+   T_TLV_BUFFER.len    = strlen ( sTlvBuffer );
+   T_CARD_NUMBER.len   = strlen ( sCardNumber );
+    
+   response_code = 909;
+   EXEC SQL WHENEVER SQLERROR GOTO err_insert_saf_data;
+   EXEC SQL EXECUTE
+   BEGIN
+        :response_code := PCRD_SAF_MANAGE.INSERT_SAF_DATA( :T_MTI,
+                                                           :T_MANAGE_TYPE,
+                                                           :T_STAN, 
+                                                           :T_SRC_RESOURCE, 
+                                                           :T_DEST_RESOURCE, 
+                                                           :T_SEND_COUNTER, 
+                                                           :T_RESPONSE_CODE, 
+                                                           :T_TLV_BUFFER,
+                                                           :T_CARD_NUMBER
+                                                         );
+   END;
+   END-EXEC;
+
+   memset ( T_TLV_BUFFER.arr   , 0 , sizeof ( T_TLV_BUFFER.arr ));
+   memset ( T_CARD_NUMBER.arr  , 0 , sizeof ( T_CARD_NUMBER.arr ));
+   
+   if ( response_code == OK )
+   {
+      trace_event ( "End InsertSafData( OK ) ", PROCESSING );
+      return(OK);
+   }
+
+   trace_event ( "End InsertSafData( NOK ) ", PROCESSING );
+   return(NOK);
+
+   err_insert_saf_data :
+      EXEC SQL WHENEVER SQLERROR CONTINUE;
+	   memset ( T_TLV_BUFFER.arr   , 0 , sizeof ( T_TLV_BUFFER.arr ));
+	   memset ( T_CARD_NUMBER.arr  , 0 , sizeof ( T_CARD_NUMBER.arr ));
+      sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+      trace_event (  detail , ERROR );
+      trace_event ( "End InsertSafData( MALFUNCTION ) ", PROCESSING );
+      return( NOK );
+}
+
+/*****************************************************************************/
+/* UpdateSafData :                                                           */
+/* Entree :   char *sMti, char *sStan,                                       */
+/*            char *sSourceResource, char *sDestResource                     */ 
+/*            int  nSendCounter, char *response_code                         */
+/* Sortie : Status D'update                                                  */
+/*****************************************************************************/
+int UpdateSafData  ( int   nIndiceCtx, 
+                     char *sMti, char cManageType, char *sStan,
+                     char *sSrcResource, char *sDestResource
+                   )
+{
+   struct sqlca sqlca;
+   char detail[ MAX_LINE_TRC];
+   int  nLength;
+
+   EXEC SQL BEGIN DECLARE SECTION;
+      char  T_MTI          [ 4 + 1];
+      char  T_STAN         [ 6 + 1];
+      char  T_DEST_RESOURCE[ 6 + 1];
+      char  T_SRC_RESOURCE [ 6 + 1];
+      char  T_MANAGE_TYPE;
+
+      int   response_code;
+   EXEC SQL END DECLARE SECTION;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+   /*----------------------------------------------------------------------*/
+   trace_event ( "Start UpdateSafData() ", PROCESSING );
+   memset ( T_MTI,  0 , 4 + 1  );
+   memset ( T_STAN, 0 , 6 + 1  );
+   memset ( T_DEST_RESOURCE , 0 , 6 + 1 );
+   memset ( T_SRC_RESOURCE  , 0 , 6 + 1 );
+   T_MANAGE_TYPE  = 0;
+   /*----------------------------------------------------------------------*/
+
+   memcpy ( T_MTI, sMti	, 4   );
+   memcpy ( T_STAN, sStan , 6   );
+   memcpy ( T_DEST_RESOURCE, sDestResource , 6   );
+   memcpy ( T_SRC_RESOURCE , sSrcResource	, 6   );
+   T_MANAGE_TYPE  = cManageType;
+   
+   response_code = 909;
+   EXEC SQL WHENEVER SQLERROR GOTO err_update_saf_data;
+   EXEC SQL EXECUTE
+   BEGIN
+      :response_code := PCRD_SAF_MANAGE.UPDATE_SAF_DATA( :T_MTI,
+                                                         :T_MANAGE_TYPE,  
+                                                         :T_STAN,  
+                                                         :T_SRC_RESOURCE, 
+                                                         :T_DEST_RESOURCE
+                                                        );
+
+   END;
+   END-EXEC;
+
+   if ( response_code == OK )
+   {
+      trace_event ( "End UpdateSafData( OK ) ", PROCESSING );
+      return(OK);
+   }
+
+   trace_event ( "End UpdateSafData( NOK ) ", PROCESSING );
+   return(NOK);
+
+   err_update_saf_data :
+      EXEC SQL WHENEVER SQLERROR CONTINUE;
+      sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+      trace_event (  detail , ERROR );
+      trace_event ( "End UpdateSafData( MALFUNCTION ) ", PROCESSING );
+      return( NOK );
+}
+
+
+/*****************************************************************************/
+/* DeleteSafData :                                                           */
+/* Entree :    char *sMti, char *sStan,                                      */
+/*             char *sSourceResource, char *sDestResource,                   */
+/* Sortie : Status De delete                                                 */
+/*****************************************************************************/
+int DeleteSafData  ( int  nIndiceCtx, char *sPan,/**MKB111009 LINUX**/
+                     char *sMti, char cManageType , char *sStan,
+                     char *sSrcResource, char *sDestResource,
+                     char *sSlfMti, char *sSlfResponseCode
+                   )
+{
+   struct sqlca sqlca;
+   char detail 	[ MAX_LINE_TRC];
+   int  nLength;
+
+   EXEC SQL BEGIN DECLARE SECTION;
+      char   T_MTI[ 4 + 1];
+      char   T_PAN[ 19 + 1];/**MKB111009 LINUX**/
+      char   T_STAN[ 6 + 1];
+      char   T_DEST_RESOURCE[ 6 + 1];
+      char   T_SRC_RESOURCE[ 6 + 1];
+      char   T_MANAGE_TYPE;
+      char   T_SLF_MTI[ 4 + 1];
+      VARCHAR   T_SLF_RESPONSE_CODE [ 3 + 1];
+
+      int	response_code;
+   EXEC SQL END DECLARE SECTION;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+   /*----------------------------------------------------------------------*/
+   trace_event ( "Start DeleteSafData() ", PROCESSING );
+   memset ( T_MTI,  0 , 4 + 1 );
+   memset ( T_PAN,  0 , 19 + 1 );/**MKB111009 LINUX**/
+   memset ( T_STAN, 0 , 6 + 1 );
+   memset ( T_DEST_RESOURCE , 0 , 6 + 1 );
+   memset ( T_SRC_RESOURCE  , 0 , 6 + 1 );
+   memset ( T_SLF_MTI       , 0,  4 + 1 );
+   memset ( T_SLF_RESPONSE_CODE.arr , 0, sizeof( T_SLF_RESPONSE_CODE.arr ));
+   T_SLF_RESPONSE_CODE.len = 0;
+   T_MANAGE_TYPE  = 0;
+    /*----------------------------------------------------------------------*/
+
+   memcpy (T_MTI , sMti  , 4 );
+   memcpy (T_PAN , sPan  , strlen(sPan) ); /**MKB111009 LINUX**/
+   memcpy (T_STAN, sStan , 6 );
+   memcpy (T_DEST_RESOURCE , sDestResource , 6   );
+   memcpy (T_SRC_RESOURCE  , sSrcResource   , 6   );
+   memcpy (T_SLF_MTI       , sSlfMti,  4 + 1 );
+   memcpy (T_SLF_RESPONSE_CODE.arr, sSlfResponseCode,strlen(sSlfResponseCode));
+   T_SLF_RESPONSE_CODE.len = strlen(sSlfResponseCode);
+   T_MANAGE_TYPE  = cManageType;
+   
+      
+   response_code = 909;
+   EXEC SQL WHENEVER SQLERROR GOTO err_delete_saf_data;
+   EXEC SQL EXECUTE
+   BEGIN
+       :response_code := PCRD_SAF_MANAGE.DELETE_SAF_DATA( :T_MTI,
+							  :T_PAN, /**MKB111009 LINUX**/
+                                                          :T_MANAGE_TYPE,  
+                                                          :T_STAN,  
+                                                          :T_SRC_RESOURCE, 
+                                                          :T_DEST_RESOURCE, 
+                                                          :T_SLF_MTI, 
+                                                          :T_SLF_RESPONSE_CODE 
+                                                         );
+
+   END;
+   END-EXEC;
+
+   memset ( T_PAN,  0 , sizeof(T_PAN));
+   if ( response_code == OK )
+   {
+      trace_event ( "End DeleteSafData( OK ) ", PROCESSING );
+      return(OK);
+   }
+
+   trace_event ( "End DeleteSafData( NOK ) ", PROCESSING );
+   return(NOK);
+
+   err_delete_saf_data :
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+   trace_event (  detail , ERROR );
+   trace_event ( "End DeleteSafData( MALFUNCTION ) ", PROCESSING );
+   return( NOK );
+}
+
+/*****************************************************************************/
+/* InsertionSaf  :                                                           */
+/* Entree :   char *sMsgIso                                                  */
+/*            char *sSourceResource, char *sDestResource                     */
+/* Sortie : Status De l'insertion                                            */
+/*****************************************************************************/
+int InsertionSaf (  int nIndiceCtx,  char  *sTlvInBuffer , 
+                    char *sSourceResource , char *sDestResource )
+{
+
+    char sLine [ MAX_LINE_TRC ];
+    char sMti [ 4 + 1];
+    char sCardNumber [ 22 + 1];
+   
+/*YK05032007*/
+   /* 
+    char sStan [ 4 + 1];
+    char sSrcResource [ 4 + 1];
+    char sResponseCode [ 4 + 1];
+   */
+   char sStan [ 6 + 1];
+   char sSrcResource [ 6 + 1];
+   char sResponseCode [ 3 + 1];
+
+/*YK05032007*/
+    char sTlvBuffer [ LG_MAX ];
+    char cManageType;
+    int  nSendCounter,nMsgType, nLength, result;
+    int  nMti;
+
+    trace_event ( "Insertion In SToreAndForward Table (Start)", PROCESSING );
+    memset ( sTlvBuffer , 0 , sizeof ( sTlvBuffer ));
+    memset ( sCardNumber, 0, sizeof(sCardNumber));
+    memset ( sMti ,       0, sizeof ( sMti ));
+    /*YK05032007*/
+    memset ( sLine ,       0, sizeof ( sLine ));
+    memset ( sStan ,       0, sizeof ( sStan ));
+    memset ( sSrcResource ,       0, sizeof ( sSrcResource ));
+    memset ( sResponseCode ,       0, sizeof ( sResponseCode ));
+    /*YK05032007*/
+    memcpy (  sTlvBuffer , sTlvInBuffer , strlen ( sTlvInBuffer ));
+
+    if ( GetTlvBuffer (AUTO_MSG_TYPE , sTlvBuffer, sMti, &nLength) != SUCCES )
+    {
+       trace_event ( "Message does not contain Mtype", PROCESSING );
+       return ( NOK );
+    }
+    nMti = atoi( sMti );
+    
+    switch ( nMti )
+    {
+      case  1100 : 
+      case  1101 : 
+      case  1110 :    memcpy ( sMti , "1120" , 4 );
+                      if ( nMti == 1101 )     nSendCounter = 1;
+                      else                    nSendCounter = 0;
+                      cManageType = 'A';      /* A for Advice */
+                      break;
+
+      case  1200 : 
+      case  1201 : 
+      case  1210 :    memcpy ( sMti , "1220" , 4 );
+                      if ( nMti == 1201 )     nSendCounter = 1;
+                      else                    nSendCounter = 0;
+                      cManageType = 'A';
+                      break;
+
+      case  1324 :    
+      case  1325 :   
+      case  1334 :    memcpy ( sMti , "1324" , 4 );
+                      if ( nMti == 1325 )     nSendCounter = 1;
+                      else                    nSendCounter = 0;
+                      cManageType = 'A';
+                      break;
+
+      case  1400 : 
+      case  1401 : 
+      case  1410 :    memcpy ( sMti , "1400" , 4 );
+                      if ( nMti == 1401 )     nSendCounter = 1;
+                      else                    nSendCounter = 0;
+                      cManageType = 'A';
+                      break;
+
+      case  1420 : 
+      case  1421 : 
+      case  1430 :    memcpy ( sMti , "1420" , 4 );
+                      if ( nMti == 1421 )     nSendCounter = 1;
+                      else                    nSendCounter = 0;
+                      cManageType = 'A';
+                      break;
+
+      case  1520 : 
+      case  1521 : 
+      case  1530 :    memcpy ( sMti , "1520" , 4 );
+                      if ( nMti == 1521 )     nSendCounter = 1;
+                      else                    nSendCounter = 0;
+                      cManageType = 'R';      /* R for Reconciliation */
+                      break;
+
+      case  1522 : 
+      case  1523 : 
+      case  1532 :    memcpy ( sMti , "1522" , 4 );
+                      if ( nMti == 1523 )     nSendCounter = 1;
+                      else                    nSendCounter = 0;
+                      cManageType = 'R';
+                      break;
+
+      case  1820 : 
+      case  1821 : 
+      case  1830 :    memcpy ( sMti , "1820" , 4 );
+                      if ( nMti == 1821 )     nSendCounter = 1;
+                      else                    nSendCounter = 0;
+                      cManageType = 'R';
+                      break;
+
+       default  :
+                      cManageType = 'A';
+                      nSendCounter = 0;
+     }
+
+    trace_event(" .... 0", FATAL);
+    PutTlvBuffer ( AUTO_MSG_TYPE 		, sTlvBuffer, sMti,  4);
+    trace_event(" .... 1", FATAL);
+    GetTlvBuffer ( AUTO_INTERNAL_STAN	, sTlvBuffer, sStan, &nLength);
+    trace_event(" .... 2", FATAL);
+    sprintf(sLine, " Stan = %s ", sStan);
+    trace_event ( sLine , PROCESSING );
+    GetTlvBuffer ( AUTO_PAN         	, sTlvBuffer, sCardNumber, &nLength);
+
+    memset ( sResponseCode , 0 , sizeof ( sResponseCode ));
+    if ( GetTlvBuffer(AUTO_RESPONSE_CODE ,sTlvBuffer,sResponseCode ,&nLength) != SUCCES )
+         memcpy ( sResponseCode , "XXX" , 3 );
+
+    /************************************************************************/
+    trace_event ( "Insertion Saf Params", PROCESSING );
+    trace_event ( "========= === ======", PROCESSING );
+/*START TED PADSS
+    sprintf ( sLine ,"sCardNumber ... = [%s] ", sCardNumber );
+    trace_event ( sLine , PROCESSING );
+END TED PADSS*/
+    sprintf ( sLine ,"sMti ... .......= [%s] ", sMti );
+    trace_event ( sLine , PROCESSING );
+    sprintf ( sLine ,"cManageType ... = [%c] ", cManageType );
+    trace_event ( sLine , PROCESSING );
+    sprintf ( sLine ,"sStan ......... = [%s] ", sStan );
+    trace_event ( sLine , PROCESSING );
+    sprintf ( sLine ,"sSourceResource.= [%s] ", sSourceResource );
+    trace_event ( sLine , PROCESSING );
+    sprintf ( sLine ,"sDestResource ..= [%s] ", sDestResource );
+    trace_event ( sLine , PROCESSING );
+    sprintf ( sLine ,"nSendCounter  ..= [%d] ", nSendCounter  );
+    trace_event ( sLine , PROCESSING );
+    sprintf ( sLine ,"sResponseCode ..= [%s] ", sResponseCode  );
+    trace_event ( sLine , PROCESSING );
+    /************************************************************************/
+
+    result = InsertSafData  ( nIndiceCtx, sMti, cManageType, sStan,
+                              sSourceResource, sDestResource, 
+                              nSendCounter, sResponseCode,
+                              sTlvBuffer, sCardNumber
+                            );
+
+    memset ( sTlvBuffer , 0 , sizeof ( sTlvBuffer ));
+    memset ( sCardNumber, 0, sizeof(sCardNumber));
+   trace_event ( "Insertion In SToreAndForward Table (End)", PROCESSING );
+   return ( result );
+}
+

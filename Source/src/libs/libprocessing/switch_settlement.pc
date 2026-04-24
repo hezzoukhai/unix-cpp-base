@@ -1,0 +1,494 @@
+/******************************************************************************/
+/*   (c) Hightech Payment Systems 1995-1999                                   */
+/*   ISO 8583 1993 Management tools Settlement processing.                    */
+/******************************************************************************/
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <iso_fields.h>
+#include <event_auth.h>
+#include <dump.h>
+
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/**************************************************************************/
+/* Fonction insert_settlement_record   		  		   	                  */
+/*---------------------------------                                       */
+/* Description : Cette fonction apour but d'inserer un enregistrement de  */
+/*    		 reglement dansa la table on_line_network_settlement.         */
+/* Entree      : Enregistrement de reglement recu du reseau               */
+/*		 Identification du reseau                                         */
+/*               Type de reglement.                                       */ 
+/* Sortie     :  OK si l'insertion ds la table evenement est sans pb      */
+/*               ERROR  si probleme                                       */
+/* Revision    :                                                          */
+/**************************************************************************/
+int 	InsertSettlementRecord( int nIndiceCtx , 
+								TSIsoInfo *sIsoInfo 
+                                ) 
+{
+    char sLine[ MAX_LINE_TRC ];
+    int  nLength;
+
+	EXEC SQL BEGIN DECLARE SECTION;
+		char		T_acq_resource     	  [ 6 + 1];
+		char		T_iss_resource     	  [ 6 + 1];
+		char		T_iss_bank	     	  [ 6 + 1];
+		char		T_iss_resource     	  [ 6 + 1];
+
+
+		VARCHAR 	T_institution_code 	  [11];
+		char		T_settlement_type  	  [ 4];
+		char		T_settlement_date  	  [ 4];
+		VARCHAR     T_settlement_id    	  [12];
+
+		int 		T_credit_number;
+		int 		T_credit_reversal_number;
+		int 		T_debit_number;
+		int 		T_debit_reversal_number;
+		int 		T_transfer_number;
+		int 		T_transfer_reversal_number;
+		int 		T_inquiry_number;
+		int 		T_authorization_number;
+
+		double		T_credit_processing_fee;
+		double		T_credit_transaction_fee;
+		double		T_debit_processing_fee;
+		double		T_debit_transaction_fee;
+		double		T_credit_amount;
+		double		T_credit_reversal_amount;
+		double		T_debit_amount;
+		double		T_debit_reversal_amount;
+		double		T_net_settlement;
+		char   		T_settlement_currency    [ 3];
+
+		int		retour;
+		int		exponent;
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+
+	char 	L_credit_number			[11];
+	char 	L_credit_reversal_number	[11];
+	char 	L_debit_number			[11];
+	char 	L_debit_reversal_number		[11];
+	char 	L_transfer_number		[11];
+	char 	L_transfer_reversal_number	[11];
+	char 	L_inquiry_number		[11];
+	char 	L_authorization_number		[11];
+
+	char	L_credit_processing_fee		[17];
+	char	L_credit_transaction_fee	[17];
+	char	L_debit_processing_fee		[17];
+	char	L_debit_transaction_fee		[17];
+	char	L_credit_amount			[17];
+	char	L_credit_reversal_amount	[17];
+	char	L_debit_amount			[17];
+	char	L_debit_reversal_amount		[17];
+	char	L_net_settlement		[17];
+	char	L_settlement_currency		[4];
+
+	sprintf(sLine, "Start insert_settlement_record(%.2s, %.4s)",
+									sNetworkCode, sSettlementType);
+	trace_event(sLine, PROCESSING);
+
+
+	T_credit_processing_fee 	= 0.0;
+	T_credit_transaction_fee 	= 0.0;
+	T_debit_processing_fee 		= 0.0;
+	T_debit_transaction_fee 	= 0.0;
+	T_credit_amount 		= 0.0;
+	T_credit_reversal_amount 	= 0.0;
+	T_debit_amount 			= 0.0;
+	T_debit_reversal_amount 	= 0.0;
+	T_net_settlement 		= 0.0;
+
+	memset(T_network_code     	 , 0, sizeof(T_network_code));
+	memset(T_institution_code.arr 	 , 0, sizeof(T_institution_code).arr);
+	memset(T_settlement_type  	 , 0, sizeof(T_settlement_type));
+	memset(T_settlement_date  	 , 0, sizeof(T_settlement_date));
+	memset(T_settlement_id.arr   	 , 0, sizeof(T_settlement_id.arr));
+
+
+	T_credit_number		   = 0; 
+	T_credit_reversal_number   = 0; 
+	T_debit_number		   = 0; 
+	T_debit_reversal_number    = 0; 
+	T_transfer_number	   = 0; 
+	T_transfer_reversal_number = 0;
+	T_inquiry_number	   = 0;  	
+	T_authorization_number	   = 0; 
+
+	memset(L_credit_number		 	 , 0, sizeof(L_credit_number));
+	memset(L_credit_reversal_number	 , 0, sizeof(L_credit_reversal_number));
+	memset(L_debit_number		 	 , 0, sizeof(L_debit_number));
+	memset(L_debit_reversal_number	 , 0, sizeof(L_debit_reversal_number));
+	memset(L_transfer_number	 	 , 0, sizeof(L_transfer_number));
+	memset(L_transfer_reversal_number, 0, sizeof(L_transfer_number));
+	memset(L_inquiry_number		 	 , 0, sizeof(L_inquiry_number));
+	memset(L_authorization_number	 , 0, sizeof(L_authorization_number));
+	memset(L_credit_processing_fee	 , 0, sizeof(L_credit_processing_fee));
+	memset(L_credit_transaction_fee	 , 0, sizeof(L_credit_transaction_fee));
+	memset(L_debit_processing_fee	 , 0, sizeof(L_debit_processing_fee));
+	memset(L_debit_transaction_fee	 , 0, sizeof(L_debit_transaction_fee));
+	memset(L_credit_amount		 	 , 0, sizeof(L_credit_amount));
+	memset(L_credit_reversal_amount	 , 0, sizeof(L_credit_reversal_amount));
+	memset(L_debit_amount	 	 	 , 0, sizeof(L_debit_amount));
+	memset(L_debit_reversal_amount	 , 0, sizeof(L_debit_reversal_amount));
+	memset(L_net_settlement		 	 , 0, sizeof(L_net_settlement));
+	memset(L_settlement_currency	 , 0, sizeof ( L_settlement_currency ));
+
+
+	memcpy(T_network_code		, sNetworkCode 		, 2); 
+	memcpy(T_settlement_type	, sSettlementType 	, 4);
+
+    GetIsoField(ISO_STLMNT_INSTITN,sIsoInfo,T_institution_code.arr,&nLength);
+    T_institution_code.len = nLength;
+
+    GetIsoField(ISO_STLMNT_DATE, sIsoInfo,T_settlement_date ,&nLength);
+
+    if ( GetIsoField(ISO_NETWORK_DATA , sIsoInfo,T_settlement_id.arr,&nLength)
+														== SUCCES )
+		T_settlement_id.len =  nLength;
+	else 
+	{
+		memcpy(T_settlement_id.arr, "VOID", 4);
+		T_settlement_id.len = 4; 
+	}
+
+    GetIsoField(ISO_CR_NBR , sIsoInfo,L_credit_number ,&nLength);
+    T_credit_number = atoi(L_credit_number);
+
+    GetIsoField(ISO_CR_REV_NBR , sIsoInfo,L_credit_reversal_number ,&nLength);
+	T_credit_reversal_number = atoi(L_credit_reversal_number);
+
+    GetIsoField(ISO_DB_NBR , sIsoInfo,L_debit_number ,&nLength);
+    T_debit_number = atoi(L_debit_number);
+
+    GetIsoField(ISO_DB_REV_NBR, sIsoInfo,L_debit_reversal_number,&nLength);
+    T_debit_reversal_number = atoi(L_debit_reversal_number);
+
+    GetIsoField(ISO_TRANSFER_NBR, sIsoInfo,L_transfer_number,&nLength);
+    T_transfer_number = atoi(L_transfer_number);
+
+
+    GetIsoField(ISO_TRANSFER_REV_NBR,sIsoInfo,L_transfer_reversal_number,
+                                                                 &nLength);
+    T_transfer_reversal_number = atoi(L_transfer_reversal_number);
+
+    GetIsoField(ISO_INFORMATION_NBR , sIsoInfo,L_inquiry_number,&nLength);
+    T_inquiry_number = atoi(L_inquiry_number);
+
+    GetIsoField(ISO_AUTHOR_NBR , sIsoInfo,L_authorization_number ,&nLength);
+    T_authorization_number = atoi(L_authorization_number);
+  
+    GetIsoField( ISO_STLMNT_CRNCY , sIsoInfo,T_settlement_currency ,&nLength);
+
+
+exponent= -3;
+EXEC SQL WHENEVER SQLERROR GOTO read_exponent_error;
+EXEC SQL EXECUTE
+BEGIN
+  :exponent := HPS_READ_FIELD.READ_CURRENCY_EXPONENT(:T_settlement_currency);
+END;
+END-EXEC;
+
+if (exponent < 0) 
+{
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   insert_settlement_record(MALFUNCTION)",PROCESSING);
+	return(MALFUNCTION);
+}
+
+if (exponent ==  0) exponent = 1;
+else
+if (exponent ==  1) exponent = 10;
+else
+if (exponent ==  2) exponent = 100;
+else
+if (exponent ==  3) exponent = 1000;
+
+
+     if( GetIsoField( ISO_RESERV_PRIV_USAGE_1 , sIsoInfo
+              , L_credit_processing_fee ,&nLength) == SUCCES )
+       T_credit_processing_fee = atof(L_credit_processing_fee)/exponent;
+     else 
+       T_credit_processing_fee = 0.0; 
+
+     if( GetIsoField( ISO_ADR_VERIF_DATA , sIsoInfo
+              ,L_credit_transaction_fee ,&nLength) == SUCCES )
+       T_credit_transaction_fee = atof(L_credit_transaction_fee)/exponent;
+     else
+       T_credit_transaction_fee = 0.0;
+
+     if( GetIsoField( ISO_RESERV_PRIV_USAGE_3 , sIsoInfo
+              ,L_debit_processing_fee,&nLength) == SUCCES )
+       T_debit_processing_fee = atof(L_debit_processing_fee)/exponent;
+     else
+       T_debit_processing_fee = 0.0; 
+
+     if( GetIsoField( ISO_SUPPORT_INFO , sIsoInfo
+              ,L_debit_transaction_fee ,&nLength) == SUCCES )
+       T_debit_transaction_fee = atof(L_debit_transaction_fee)/exponent;
+     else
+       T_debit_transaction_fee = 0.0; 
+
+     GetIsoField(ISO_CR_AMOUNT , sIsoInfo,L_credit_amount,&nLength);
+     T_credit_amount = atof(L_credit_amount)/exponent;
+
+     GetIsoField(ISO_CR_REV_AMOUNT,sIsoInfo,L_credit_reversal_amount ,&nLength);
+     T_credit_reversal_amount = atof(L_credit_reversal_amount)/exponent;
+
+     GetIsoField(ISO_DB_AMOUNT,sIsoInfo,L_debit_amount,&nLength);
+     T_debit_amount = atof(L_debit_amount)/exponent;
+
+     GetIsoField(ISO_DB_REV_AMOUNT,sIsoInfo,L_debit_reversal_amount,&nLength);
+     T_debit_reversal_amount = atof(L_debit_reversal_amount)/exponent;
+
+     GetIsoField(ISO_NET_AMOUNT,sIsoInfo,L_net_settlement,&nLength);
+     if (memcmp(L_net_settlement, "D", 1) == 0)
+       exponent = exponent * -1;
+     T_net_settlement = atof(L_net_settlement)/exponent;
+
+
+retour = 999;
+EXEC SQL WHENEVER SQLERROR GOTO insert_settlement_error;
+EXEC SQL EXECUTE
+BEGIN
+
+:retour := HPS_ONLINE_SETTLEMENT.INSERT_SETTLEMENT(
+				    :T_network_code,
+        			:T_institution_code,
+        			:T_settlement_type,
+        			:T_settlement_date,
+        			:T_settlement_id,
+				    :T_credit_number,
+        			:T_credit_reversal_number,
+        			:T_debit_number,
+        			:T_debit_reversal_number,
+        			:T_transfer_number,
+        			:T_transfer_reversal_number,
+        			:T_inquiry_number,
+        			:T_authorization_number,
+				    :T_credit_processing_fee,
+        			:T_credit_transaction_fee,
+        			:T_debit_processing_fee,
+        			:T_debit_transaction_fee,
+        			:T_credit_amount,
+        			:T_credit_reversal_amount,
+        			:T_debit_amount,
+        			:T_debit_reversal_amount,
+				    :T_net_settlement,
+				    :T_settlement_currency);
+END;
+END-EXEC;
+
+if (retour == OK)
+{
+	trace_event("End   insert_settlement_record(OK)",PROCESSING);
+	return(OK);
+}
+
+
+sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+trace_event(sLine, PROCESSING);
+trace_event("End   insert_settlement_record(NOK)",PROCESSING);
+return(NOK);
+
+insert_settlement_error :
+EXEC SQL WHENEVER SQLERROR CONTINUE;
+sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+trace_event(sLine, PROCESSING);
+trace_event("End   insert_settlement_record(MALFUNCTION)",PROCESSING);
+return(MALFUNCTION);
+
+read_exponent_error :
+EXEC SQL WHENEVER SQLERROR CONTINUE;
+sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+trace_event(sLine, PROCESSING);
+trace_event("End   insert_settlement_record(MALFUNCTION)",PROCESSING);
+return(MALFUNCTION);
+}
+
+/******************************************************************************/
+/*Fonction get_last_settlement_date   		  		   	      				  */
+/*---------------------------------                                           */
+/* Description : Cette fonction ramene la dernere date de reconciliation      */
+/* Entree      : Le reseau.                                                   */
+/* Sortie     :  La date de dernier reglement.                                */
+/* Date/Auteur : 03/06/97 A. ALAOUI                                           */
+/* Revision    :                                                              */
+/******************************************************************************/
+int	get_last_issuer_settlement_date(int nIndiceCtx,char *V_network,char *V_date)
+{
+
+    char sLine[ MAX_LINE_TRC ];
+    int  nLength;
+EXEC SQL BEGIN DECLARE SECTION;
+	char	T_network[2];
+	char	T_date	 [6];
+	int	response;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start get_last_issuer_settlement_date(%.2s)", V_network);
+trace_event(sLine, PROCESSING);
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+memcpy(T_network, V_network, 2);
+memset(T_date,    0,         6);
+memset(V_date,    0,         6);
+
+response = NOK;
+EXEC SQL WHENEVER SQLERROR GOTO get_last_date_error;
+EXEC SQL EXECUTE
+BEGIN
+  :response := HPS_ONLINE_SETTLEMENT.GET_SETTLEMENT_DATE(:T_network, :T_date);
+END;
+END-EXEC;
+
+if (response == OK) 
+{
+trace_event("End   get_last_issuer_settlement_date(OK)", PROCESSING);
+memcpy(V_date, T_date, 6);
+return(OK);
+}
+
+
+trace_event("End   get_last_issuer_settlement_date(ERROR)", PROCESSING);
+return(ERROR);
+
+
+get_last_date_error :
+EXEC SQL WHENEVER SQLERROR CONTINUE;
+sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+trace_event(sLine, PROCESSING );
+trace_event("End   get_last_issuer_settlement_date(MALFUNCTION)", PROCESSING);
+return(MALFUNCTION);
+}
+
+
+
+/**************************************************************************/
+/* Fonction check_settlement_date      		  		   	  */
+/* ------------------------------                                         */
+/* Description : Cette fonction verifie que la date de reconciliation est */
+/*               coherante.                                               */
+/* Entree      : Le reseau.                                               */
+/*               La date de reconciliation courante                       */
+/* Sortie     :  OK en cas de coherance NOK sinon.                        */
+/* Date/Auteur : 03/06/97 A. ALAOUI                                       */
+/* Revision    :                                                          */
+/**************************************************************************/
+int	check_settlement_date(int nIndiceCtx , char *V_network, char *V_date)
+{
+int	retour;
+    int  nLength;
+char	P_date_current_settlement[ 7];
+char	P_date_last_settlement   [ 7];
+
+    char sLine[ MAX_LINE_TRC ];
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+sprintf("Start check_settlement_date(%.2s, %.6s)", V_network, V_date);
+trace_event(sLine, PROCESSING);
+
+current_date_yymmdd(P_date_current_settlement);
+memcpy(P_date_current_settlement + 2, V_date, 4);
+
+retour = get_last_issuer_settlement_date(	nIndiceCtx ,
+											V_network, 
+											P_date_last_settlement);
+
+if (retour != OK) 
+{
+trace_event("End   check_settlement_date(MALFUNCTION)", PROCESSING);
+return(MALFUNCTION);
+}
+
+if (strncmp(P_date_last_settlement, P_date_current_settlement, 6) >= 0)
+{
+sprintf(sLine,"Last Settlement : %.6s Current Settlement : %.6s",
+               P_date_last_settlement, P_date_current_settlement);
+
+trace_event(sLine, ERROR);
+
+trace_event("End   check_settlement_date(NOK)", PROCESSING);
+return(NOK);
+}
+
+trace_event("End   check_settlement_date(OK)", PROCESSING);
+return(OK);
+}
+
+/******************************************************************************/
+/* Fonction load_settlement_date                                              */
+/* -----------------------------                                              */
+/* Description : Cette fonction charge dans un buffer au format PowerSEVEN    */
+/*               le champs settlement_date                                    */
+/* Entree      : Le reseau concerne.                                          */
+/* Sortie      : Le buffer PowerSEVEN charge de la settlement date            */
+/* Date/Auteur : 01/02/97 A. ALAOUI                                           */
+/* Revision    :                                                              */
+/******************************************************************************/
+int	       load_settlement_date(int nIndiceCtx , char *V_network, TSIsoInfo *sIsoInfo )
+{
+
+    char sLine[ MAX_LINE_TRC ];
+    char data [ MAX_LINE_TRC ];
+    int  nLength;
+EXEC SQL BEGIN DECLARE SECTION;
+        char    T_network[2];
+        char    T_date   [6];
+        int     response;
+EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+sprintf(sLine, "Start load_settlement_date(%.2s)", V_network);
+trace_event(sLine, PROCESSING);
+
+if (GetIsoField(ISO_STLMNT_DATE,sIsoInfo,data,&nLength) == SUCCES)
+{
+	trace_event("End   load_settlement_date(OK)", PROCESSING);
+	return(OK);
+}
+
+memcpy(T_network, V_network, 2);
+memset(T_date,    0,         6);
+
+response = NOK;
+EXEC SQL WHENEVER SQLERROR GOTO get_business_error;
+EXEC SQL EXECUTE
+BEGIN
+  :response := HPS_ONLINE_SETTLEMENT.GET_BUSINESS_DATE(:T_network, :T_date);
+END;
+END-EXEC;
+
+if (response == OK)
+{
+  PutIsoField( ISO_STLMNT_DATE , sIsoInfo, T_date , 6 );
+  trace_event("End   load_settlement_date(OK)", PROCESSING);
+  return(OK);
+}
+
+
+trace_event("End   load_settlement_date(ERROR)", PROCESSING);
+return(ERROR);
+
+
+get_business_error :
+EXEC SQL WHENEVER SQLERROR CONTINUE;
+sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+trace_event(sLine, PROCESSING );
+trace_event("End   load_settlement_date(MALFUNCTION)", PROCESSING);
+return(MALFUNCTION);
+}
+

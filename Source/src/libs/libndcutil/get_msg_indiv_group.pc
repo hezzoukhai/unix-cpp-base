@@ -1,0 +1,191 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_msg_indiv_group.pc                                                 */
+/*                                                                             */
+/* Description                                                                 */
+/*      Indiv Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#include <paramdef.h>
+#include <langue.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/******************************************************************************/
+/* Fonction get_msg_indiv_group 					      */
+/* --------------------------                                                 */
+/* Description : Cette fonction a pour but de                                 */
+/*                                                                            */
+/* Entree      :                                                              */
+/* Sortie      :                                                              */
+/*                                                                            */
+/* Revision    :                                                              */
+/******************************************************************************/
+
+int	get_msg_indiv_group (
+	int 	nIndexCtx,
+	char	*V_card_number,
+	char	V_language_code,
+	char	*V_message_line,
+	int		*V_message_lg)
+
+{
+	struct sqlca sqlca;
+	
+
+	
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	int		response_code;
+	int		T_message_lg;
+	VARCHAR		T_card_number	[ 22];
+	char		T_language_code	[  3 + 1];
+	VARCHAR		T_message_line	[100];
+	EXEC SQL END DECLARE SECTION;
+	char	 sLine[MAX_LINE_TRC];
+
+	/*MKB060309 PCI Norme Integration */
+	if (debug_option == 1)
+		sprintf(sLine, "Start get_msg_indiv_group(%.22s,%c)",V_card_number, V_language_code);
+	else
+	{
+		sprintf(sLine, "Start get_msg_indiv_group(**********)");
+	}
+	trace_event(sLine,PROCESSING);
+
+	memset(T_card_number.arr, 0, sizeof(T_card_number.arr));
+
+	memcpy(T_card_number.arr, V_card_number, strlen(V_card_number));
+	T_card_number.len = strlen(V_card_number);
+
+
+	GetTransCode(V_language_code,T_language_code);
+
+	memset(sLine, 		  0,	sizeof(sLine));
+
+
+	memset(T_message_line.arr,   0, sizeof(T_message_line.arr));
+	T_message_line.len = 2;
+
+
+	response_code =995;
+
+	EXEC SQL WHENEVER SQLERROR GOTO Get_Message_err;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL EXECUTE
+		BEGIN
+		:response_code := PCRD_ATM_MESSAGES.GET_ATM_MESSAGE( :T_language_code, 
+		:T_card_number, 
+		:T_message_line, 
+		:T_message_lg);
+	END;
+	END-EXEC;
+
+	
+	sprintf(sLine,"le code reponse est        :%d", response_code);
+	trace_event(sLine,TRACE);
+
+	if (response_code != OK)
+	{
+		trace_event("End   get_msg_indiv_group(NOK)", PROCESSING);
+		return (NOK);
+	}
+	memcpy(V_message_line,T_message_line.arr, T_message_line.len);
+	*V_message_lg = T_message_line.len;
+	memset(T_card_number.arr, 0, sizeof(T_card_number.arr));
+
+	if (debug_option == 1)
+		sprintf(sLine, "End get_msg_indiv_group(%.30s,%d,%d)", V_message_line, *V_message_lg, response_code); 
+	else
+		sprintf(sLine, "End get_msg_indiv_group(%d,%d)", *V_message_lg, response_code); 
+	trace_event(sLine, PROCESSING); 
+	return(response_code);
+Get_Message_err :
+
+	memset(T_card_number.arr, 0, sizeof(T_card_number.arr));
+	sprintf(sLine,"End   get_msg_indiv_group(X) -> %.40s", sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine,ERROR);
+	return(ERROR);
+}
+
+/******************************************************************************/
+/* Fonction del_msg_indiv_group */
+/* --------------------------                                                 */
+/* Description : Cette fonction a pour but de                                 */
+/*                                                                            */
+/* Entree      :                                                              */
+/* Sortie      :                                                              */
+/*                                                                            */
+/* Date/Auteur : 23/08/97 M. MORTADY                                          */
+/* Revision    :                                                              */
+/******************************************************************************/
+
+int	del_msg_indiv_group (int		nIndexCtx,char	*V_card_number)
+{
+	struct sqlca sqlca;
+	
+
+	
+	EXEC SQL BEGIN DECLARE SECTION;
+	int			response_code;
+	VARCHAR		T_card_number[22];
+	EXEC SQL END DECLARE SECTION;
+	char	 sLine[MAX_LINE_TRC];
+
+
+	trace_event("Start del_msg_indiv_group()",PROCESSING); 
+
+	memset(T_card_number.arr, 0, sizeof(T_card_number.arr));
+
+	memcpy(T_card_number.arr, V_card_number, strlen(V_card_number));
+	T_card_number.len = strlen(V_card_number);
+
+	/*MKB060309 PCI Norme Integration */
+	if (debug_option == 1)
+		sprintf(sLine,"T_card_number              =%.22s",T_card_number.arr);
+	else
+	{
+		sprintf(sLine,"T_card_number              = ********");
+	}
+	trace_event(sLine,PROCESSING);
+
+	response_code =995;
+
+	EXEC SQL WHENEVER SQLERROR GOTO Del_Message_err;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL EXECUTE
+		BEGIN
+		:response_code := PCRD_ATM_MESSAGES.DEL_ATM_MESSAGE  (:T_card_number);
+	END;
+	END-EXEC;
+
+	sprintf(sLine,"le code reponse est        :%d\n", response_code);
+	trace_event(sLine,PROCESSING); 
+	memset(T_card_number.arr, 0, sizeof(T_card_number.arr));
+
+	if (response_code != OK)
+	{
+
+		trace_event("End   del_msg_indiv_group(NOK)", PROCESSING);
+		return (NOK);
+	}
+
+	trace_event("End del_msg_indiv_group()",PROCESSING); 
+	return(response_code);
+Del_Message_err :
+
+	memset(T_card_number.arr, 0, sizeof(T_card_number.arr));
+	sprintf(sLine,"End   del_msg_indiv_group(X) -> %.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine,ERROR);
+	return(ERROR);
+}
+

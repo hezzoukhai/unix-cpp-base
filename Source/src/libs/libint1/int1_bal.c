@@ -1,0 +1,91 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <pthread.h>
+#include <signal.h>
+#include <define.h>
+#include <queue.h>
+#include <param_arg.h>
+#include <thread_var.h>
+#include <errno.h>
+#include <int1_struct.h>
+#include <int1.h>
+/***********************************************************************/
+int UserInt1BalProcMsg(int nIndexCtx, TSBalExchange* pkBalExchange);
+/***********************************************************************/
+static void* int1_thread_proc_BAL(void *arg)
+{
+	TSBalExchange   sBalMsg;
+	int             nIndiceCtx;
+	char            sLine[MAX_LINE_TRC];
+	struct timeval	lastTime;
+	int				nResult;
+
+	pthread_detach(pthread_self());
+	nIndiceCtx = ((TSArgParam *) arg)->nIndice;
+	free(arg);
+	sprintf(sLine, "THREAD BAL : %d", nIndiceCtx);
+	trace_event(sLine, TRACE);
+
+	ConnectOracle(nIndiceCtx);
+
+	ThreadMaskSignals();
+
+	gettimeofday(&lastTime,NULL);
+	while (1) 
+	{
+		CBalWaitMsg();
+		CBalGetMsg(&sBalMsg);
+		CBalFreeEntry();
+		nResult = CheckAndRefreshDBCon(nIndiceCtx,lastTime);
+
+		UserInt1BalProcMsg(nIndiceCtx, &sBalMsg);
+		gettimeofday(&lastTime,NULL);
+	}
+}
+
+void* int1_thread_wait_BAL(void *arg)
+{
+	TSBalExchange   sBalMsg;
+	int             i;
+	pthread_attr_t  pattr;
+	TSArgParam     *p_arg;
+
+	pthread_detach(pthread_self());
+
+
+	ThreadMaskSignals();
+
+
+	/**** Creation des Threads de traitement ***/
+	for (i = 0; i < max_thread; i++) 
+	{
+		pthread_attr_init(&pattr);
+		if (i < nUserThread)
+			pthread_attr_setscope(&pattr, PTHREAD_SCOPE_PROCESS);
+		else
+			pthread_attr_setscope(&pattr, PTHREAD_SCOPE_SYSTEM);
+		p_arg = (TSArgParam *) malloc(sizeof(TSArgParam));
+		AllocateOracleCtx(i + RESERVED_THREAD);
+		p_arg->nIndice = i + RESERVED_THREAD;
+
+		if (pthread_create(&(tab_ThrInfo[i + RESERVED_THREAD].tid), &pattr, int1_thread_proc_BAL, p_arg) < 0) {
+			fprintf(stderr, "pthread_create Error %d\n", errno);
+			free(p_arg);
+			pthread_exit(NULL);
+		}
+	}
+
+
+	while (1) 
+	{
+		if (ReadBalMsg(nBalMsg, getpid(), !IPC_NOWAIT, &sBalMsg) < 0) 
+		{
+			fprintf(stderr, " >>> !!! Error Reading Message !!! \n");
+			pthread_exit(NULL);
+		}
+		PBalWaitEntry();
+		PBalPutMsg(&sBalMsg);
+		PBalConsoInfo();
+	}
+}

@@ -1,0 +1,86 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <tlv_autho.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int StopListReplyProcessing  ( int nIndiceCtx , char *sTlvBuffer)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+	int				nRetCode;
+
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+    trace_event ( "Start StopListReplyProcessing () ", PROCESSING );
+
+
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_StopListReplyProcessing;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response_code := PCRD_P7_GENERAL_TOOLS.STOP_LIST_REPLY_PROCESSING( :T_tlv_auth);
+	END;
+	END-EXEC;
+
+    if (response_code != OK)
+	{
+         PrintTlvBuffer ( T_tlv_auth.arr);
+	}
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	
+	sprintf(sLine,"End StopListReplyProcessing (%d)", response_code );
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_StopListReplyProcessing :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	trace_event("End StopListReplyProcessing (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

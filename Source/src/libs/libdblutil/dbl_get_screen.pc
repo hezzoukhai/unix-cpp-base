@@ -1,0 +1,211 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_screen.c                                                          */
+/*                                                                             */
+/* Description                                                                 */
+/*      ATM Screen Tools Management                                            */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+
+#include <define.h>
+
+#include <dbl_paramdef.h>
+#include <langue.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+     /*****************************************************************
+     **  GetAllScreens(pScreen)					     **
+     **  Descri : charge les screens.				     **
+     **  Entree :  Aucune					     **
+     **  Sortie : pScreen -> structure dbl_param qui recevra la     **
+     **      chaine screen(.data) et sa langueur(.len).		     **
+     **  Return : OK -> fonctionnement normal.			     **
+     **		  Error -> erreur ORACLE.			     **
+     ** Auteur : Younes OUADI (le 27/11/1997).			     **
+     *****************************************************************/
+
+int GetAllScreens(nIndexCtx,pTerminalNbr,pAcqBank/*ICH270715*/, pScreenLanguage, pScreen)
+int 		nIndexCtx;
+char		pTerminalNbr	[16];
+char		*pAcqBank/*ICH270715*/;
+char		pScreenLanguage	[ 4];
+dbl_param	*pScreen;
+{
+   struct sqlca sqlca;   
+   char		detail[MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+      char		plBankCode		[    6+1];
+      char		plProfileCode	[    3+1];
+      char		plScreenLanguage[    3+1];
+      varchar		plScreen	[20000+1];
+      int		plRetour;
+   EXEC SQL END DECLARE SECTION;
+
+sprintf(detail, "Start GetAllScreens(%.6s,%.6s,%.3s)",pTerminalNbr,pAcqBank,pScreenLanguage);
+trace_event(detail, PROCESSING);
+
+   /* initialisation des variables PL/SQL */
+   memset(plScreen.arr, 0, sizeof(plScreen.arr));
+   plScreen.len = 100;
+   memset(plBankCode, 0, sizeof(plBankCode));
+   memset(plProfileCode, 0, sizeof(plProfileCode));
+   memset(plScreenLanguage, 0, sizeof(plScreenLanguage));
+   
+	memcpy(plBankCode,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	
+   plRetour = GetTerminalProfile(nIndexCtx,
+				pTerminalNbr, plBankCode, plProfileCode);
+
+   sprintf(detail, "DEBUG (pTerminalNbr=%s,plBankCode=%s,pScreenLanguage=%s)", pTerminalNbr, plBankCode, pScreenLanguage);
+   trace_event(detail, PROCESSING);
+   if(plRetour != OK)
+   {
+      trace_event("End   GetAllStates(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+
+
+   memcpy(plScreenLanguage, pScreenLanguage, 3);
+
+   EXEC SQL WHENEVER SQLERROR GOTO GetAllScreens_err;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+   EXEC SQL EXECUTE
+      BEGIN
+         :plRetour := PCRD_GET_DBLPARAM_1.ALL_SCREENS(
+                               :plBankCode,
+                               :plProfileCode,
+                               :plScreenLanguage,
+                               :plScreen);
+      END;
+   END-EXEC;
+
+   if (plRetour == NOK)
+   {
+      trace_event("End   GetAllScreens(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+   memcpy(pScreen->data, plScreen.arr, plScreen.len);
+   pScreen->len = plScreen.len;
+
+   sprintf(detail, "End   GetAllScreens(%d)",pScreen->len);
+   trace_event(detail, PROCESSING);
+   return (OK);
+
+GetAllScreens_err :
+
+   sprintf(detail,"End   GetAllScreens(X) -> %.40s",sqlca.sqlerrm.sqlerrmc);
+   trace_event(detail,ERROR);
+   return(ERROR);
+
+}
+
+     /********************************************************************
+     **  GetScreen(pScreen)					     	**
+     **  Descri : charge les screens.				     	**
+     **  Entree : pScreenNumber	-> numero de l'ecran a charger		**
+     **		  pScreenLanguage -> langue de l'ecran a charger	**
+     **  Sortie : pScreen -> structure dbl_param qui recevra la		**
+     **      chaine screen(.data) et sa langueur(.len).		     	**
+     **  Return : OK -> fonctionnement normal.			     	**
+     **		  Error -> erreur ORACLE.			     	**
+     ** Auteur : Younes OUADI (07 Nov 1998).			     	**
+     ********************************************************************/
+int GetScreen(nIndexCtx,pTerminalNbr,pAcqBank/*ICH270715*/, pScreenNumber, pScreenLanguage, pScreen)
+int			nIndexCtx;
+char		pTerminalNbr	[16];
+char		*pAcqBank/*ICH270715*/;
+char		pScreenNumber	[ 4];
+char		pScreenLanguage	[ 4];
+dbl_param	*pScreen;
+{
+   struct sqlca sqlca;
+   char		detail[MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+      char		plBankCode			[    6+1];
+      char		plProfileCode		[    3+1];
+      char		plScreenNumber		[    3+1];
+      char		plScreenLanguage	[    3+1];
+      varchar		plScreen		[10000+1];
+      int		plRetour;
+   EXEC SQL END DECLARE SECTION;
+
+sprintf(detail, "Start GetScreen(%.15s,%.6s,%.3s,%.3s)",
+                pTerminalNbr,pAcqBank, pScreenNumber,pScreenLanguage);
+trace_event(detail,PROCESSING);
+
+   /* initialisation des variables PL/SQL */
+   memset(plScreen.arr, 0, sizeof(plScreen.arr));
+   plScreen.len = 3;
+   memset(plBankCode, 0, sizeof(plBankCode));
+   memset(plProfileCode, 0, sizeof(plProfileCode));
+   memset(plScreenNumber, 0, sizeof(plScreenNumber));
+   memset(plScreenLanguage, 0, sizeof(plScreenLanguage));
+   
+	memcpy(plBankCode,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	
+   /* affectation */
+   sprintf(plScreenNumber, "%03d", atoi(pScreenNumber));
+   memcpy(plScreenLanguage, pScreenLanguage, 3);
+
+   plRetour = GetTerminalProfile(nIndexCtx,pTerminalNbr, plBankCode, plProfileCode);
+   if(plRetour != OK)
+   {
+      trace_event("End   GetScreen(NOK)", PROCESSING);
+      return (NOK);
+   }
+   EXEC SQL WHENEVER SQLERROR GOTO GetScreen_err;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+   EXEC SQL EXECUTE
+	DECLARE
+      l_Screen		VARCHAR2(10000);
+      BEGIN
+         	:plRetour := PCRD_GET_DBLPARAM_1.SCREEN(
+                               :plBankCode,
+                               :plProfileCode,
+                               :plScreenNumber,
+                               :plScreenLanguage,
+                               l_Screen);
+			IF (l_Screen IS NULL) THEN
+    			:plScreen := '      ';
+			ELSE
+    			:plScreen := l_Screen;
+			END IF;
+      END;
+   END-EXEC;
+
+   if (plRetour == NOK)
+   {
+      trace_event("End   GetScreen(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+   memcpy(pScreen->data, plScreen.arr, plScreen.len);
+   pScreen->len = plScreen.len;
+
+   sprintf(detail, "End   GetScreen(OK SCR_NBR : %s)",plScreenNumber);
+   trace_event(detail, PROCESSING);
+   return (OK);
+
+GetScreen_err :
+
+   sprintf(detail,"End   GetScreen(%.3s,%.3s):%.40s",
+           plScreenLanguage, plScreenNumber, sqlca.sqlerrm.sqlerrmc);
+   trace_event(detail,ERROR);
+   return(ERROR);
+
+}

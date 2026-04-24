@@ -1,0 +1,81 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+int LoadSecurityKeys       (  int 	nIndiceCtx,  char 	*sTlvAuth )
+							
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 		VARCHAR   	T_tlv_auth [ LG_MAX ];
+		int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start LoadSecurityKeys() ", PROCESSING );
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	T_tlv_auth.len=0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+    memcpy ( T_tlv_auth.arr, sTlvAuth, strlen ( sTlvAuth ));
+    T_tlv_auth.len =  strlen ( sTlvAuth );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_security_flags;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response_code := PCRD_P7_LOAD_ISS_DATA.LOAD_SECURITY_KEYS( :T_tlv_auth );
+	END;
+	END-EXEC;
+
+
+	tlvcpy ( sTlvAuth , T_tlv_auth.arr , T_tlv_auth.len );
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine,"End LoadSecurityKeys( %d )", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+ err_get_security_flags :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+ 	tlvcpy ( sTlvAuth , T_tlv_auth.arr , T_tlv_auth.len );
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.80s",sqlca.sqlerrm.sqlerrmc);
+	
+	trace_event (  sLine , ERROR );
+	trace_event("End LoadSecurityKeys(SYSTEM_MALFUNCTION)", PROCESSING);
+ 	return( SYSTEM_MALFUNCTION );
+
+}

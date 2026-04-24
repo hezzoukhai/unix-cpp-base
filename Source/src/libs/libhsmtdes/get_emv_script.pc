@@ -1,0 +1,499 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <tlv_fields.h>
+#include <tlv_privfields.h>
+#include <tlv_autho.h>
+#include <tlv_private.h>
+#include <hsm_inc.h>
+/***********************************************************************
+**  NAME  : get_card_script_status
+**  DESC  : get the data from the autorization and emv script table for built and send KU command to hsm
+**  INPUT : the TLV buffer
+**  OUTPUT: OK, NOK
+**  AUTHOR: ELyajizi Mehdi & Amine Wahbi 12/06/2006
+***********************************************************************/
+
+int get_card_script_status (
+          int  nIndexCtx, 
+          char *sTlvBuffer
+         )
+{
+	
+	struct sqlca sqlca;
+	
+	char                       sLine [ MAX_LINE_TRC];
+	char                       sMAC_Key[256];
+	char                       cSchemeId; 
+	char                       szWork[128];
+	char                       sTmpField[LG_MAX];
+	char                       sFormatedPan[LG_MAX];
+	unsigned char              sSeqNumber   [8 + 1];  /* Preformated Pan/Sequence Nbr */
+	/* char                    sTPK[256]; For Pin change use*/
+	char                       vErrCode[256], vMac[256], vpin[256];
+	int                        nPid;
+	char                       vBuffRcv[LG_MAX];
+	char                       buffer[LG_MAX];
+	int                        nLenData = 0;
+	int                        nLenWork = 0;
+	int                        retour = -1;
+	int                        result = 0; 
+	char                       vCardNumber [ 22 +1 ];
+	char                       vATC  [ 8+1 ];
+	char                       vARQC [ 8 + 1 ];
+	char                       sTAG71_Data [127 + 1 ];
+	char                       sTAG72_Data [127 + 1 ];
+	int                        nTAG71_Len =0;
+	int                        nTAG72_Len =0;
+	int                        nIccLen ;
+	TSTlvPrivate               sTlvPrivateInfo;
+	char                       sIccData [ LG_MAX ];
+	char                       v_issuing_bank_code[6 + 1];
+	char                       v_issuing_bin[11 + 1];
+	char                       v_product_code[3 + 1];
+	char                       v_icc_application_index[4 + 1];
+	char 			   *detail;
+	char 			   Tag55[127 + 1];
+	char                       Update_command_Data [127 + 1 ];
+	int offset = 0;	
+	int SendOrder = 0;
+	char ScriptStatus[1 + 1]; /*= 5; */
+	
+	char MacBufferHex[LG_MAX];
+	char MacBuffer[LG_MAX];
+	int  Macoffset = 0;
+	int vLenPin =0;
+	
+	EXEC SQL BEGIN DECLARE SECTION;
+		varchar            v_card_Nbr[22 + 1];
+		varchar            SCRIPT_CODE [6 + 1];
+		varchar            SCRIPT_TYPE_str [2 + 1];
+		int                SCRIPT_TYPE; 
+		char                AUTHORIS_DECLINE_FLAG[1 + 1];
+		int                Return_Status;
+		varchar            v_Value[16 + 1];
+	EXEC SQL END DECLARE SECTION;
+	
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	
+	sprintf ( sLine, "START get_card_script_status() ");
+	trace_event(sLine, PROCESSING);
+	
+	memset(v_card_Nbr.arr		, 0, sizeof(v_card_Nbr.arr));
+	v_card_Nbr.len = 0;
+	
+	memset(SCRIPT_CODE.arr		, 0, sizeof(SCRIPT_CODE.arr));
+	SCRIPT_CODE.len = 0;
+	
+	memset(SCRIPT_TYPE_str.arr	, 0, sizeof(SCRIPT_TYPE_str.arr));
+	SCRIPT_TYPE_str.len = 0;
+	
+	memset(AUTHORIS_DECLINE_FLAG, 0, 2);
+	SCRIPT_TYPE =0;
+	Return_Status = -1;
+	
+	memset(v_Value.arr, 0, sizeof(v_Value.arr));
+	v_Value.len =0;	
+	
+	memset(sLine			, 0,sizeof(sLine)); 
+	memset(sMAC_Key			, 0, sizeof(sMAC_Key));             
+	memset(szWork			, 0,sizeof(szWork));              
+	memset(sTmpField		, 0, sizeof(sTmpField));        
+	memset(sFormatedPan		, 0, sizeof(sFormatedPan)); 
+	/*memset(sTPK			, 0, sizeof(sTPK));               Futur use  */
+	memset(vCardNumber		, 0, sizeof(vCardNumber));   
+	memset(sIccData			, 0, sizeof(sIccData));         
+	memset(v_issuing_bank_code	, 0, sizeof(v_issuing_bank_code)); 
+	memset(v_issuing_bin		, 0, sizeof(v_issuing_bin)); 
+	memset(v_product_code		, 0, sizeof(v_product_code)); 
+	memset(v_icc_application_index	, 0, sizeof(v_icc_application_index)); 
+	memset(buffer			, 0, LG_MAX);
+	memset(vBuffRcv			, 0, LG_MAX);
+	memset(vARQC			, 0, sizeof(vARQC));
+	vATC[0] = 0x30;
+	vATC[1] = 0x30;
+	memset(sTAG71_Data		, 0, 128);
+	memset(sTAG72_Data		, 0, 128);
+	memset(Update_command_Data, 0, 128);
+	memset(vErrCode			, 0, 256);
+	memset(vMac			, 0, 256);
+	memset(vpin			, 0, 256);
+	memset(Tag55    , 0, 128);
+	memset(	ScriptStatus,0, sizeof(ScriptStatus));
+	
+	memset(MacBuffer , 0,sizeof(MacBuffer));
+	memset(MacBufferHex , 0,sizeof(MacBufferHex));
+	
+	/** Getting the ICC Data from TLV **/
+		
+	if ( GetTlvBuffer ( AUTO_ICC_DATA , sTlvBuffer , sIccData ,&nIccLen) != SUCCESS )
+	{
+		trace_event("END   get_card_script_status(OK). NO AUTO_ICC_DATA",PROCESSING);
+		return(OK);
+	}
+	
+		IsoDumpIccFields (sIccData, nIccLen);
+
+	/** retrieve MAX_SEND_COMMAND from POWERCARD_GLOBALS **/
+		
+	EXEC SQL EXECUTE
+	BEGIN
+		:Return_Status :=PCRD_GENERAL_TOOLS.GET_VALUE_FORM_GLOBALS_VAR ( 'MAX_SEND_COMMAND', :v_Value );
+	EXCEPTION WHEN OTHERS THEN
+		:Return_Status := 999;
+	END;
+	END-EXEC;
+	
+	if ( Return_Status != OK )
+	{
+		sprintf(detail, "Error PROCESSING SEE PCARD_TRACES TABLE,response_code = %d ", Return_Status);
+		trace_event(detail, ERROR );
+		
+		return(NOK);
+	}
+
+	/*Begin MKB060309 PCI Norme Integration */
+	if (debug_option == 1)
+	{
+		sprintf(sLine, "MAX_SEND_COMMAND l=[%d] d=[%s]", v_Value.len, v_Value.arr);
+		trace_event(sLine, PROCESSING);	
+	}
+	/*End MKB060309 PCI Norme Integration */
+
+	/** Retrieveing the Card Number **/
+    
+	if ( GetTlvBuffer ( AUTO_PAN , sTlvBuffer , vCardNumber ,&nLenData) != SUCCESS )
+	{
+		trace_event("END   get_card_script_status(NOK). AUTO_PAN",PROCESSING);
+		return(NOK);
+	}
+	
+	memcpy( v_card_Nbr.arr, vCardNumber, strlen(vCardNumber));
+	v_card_Nbr.len = strlen(vCardNumber);
+	
+	EXEC SQL DECLARE EMV_CARD_SCRIPT_STATUS_CUR CURSOR FOR
+		SELECT  S.SCRIPT_CODE, 
+			DECODE(D.SCRIPT_TYPE,'AB',0,'AU',1,'PU',2,-1), 
+			D.SCRIPT_TYPE,
+			DECODE(S.AUTHORIS_DECLINE_FLAG,'Y', 1, 'N',0,-1)
+		FROM        EMV_CARD_SCRIPT_STATUS S, EMV_SCRIPT_DESCRIPTION D
+		WHERE     		S.card_number    =   :v_card_Nbr
+			AND		S.BANK_CODE = D.BANK_CODE 
+			AND		S.script_code = D.script_code
+			AND		S.RESEND_COUNTER < D.MAX_RESEND_TRY_LIMIT
+			AND		ROWNUM <= :v_Value 
+			AND   		S.SCRIPT_STATUS <> 4
+		ORDER BY	D.SCRIPT_PRIORITY desc;
+	
+	EXEC SQL OPEN EMV_CARD_SCRIPT_STATUS_CUR;
+	
+	
+	
+	/** Retrieveing the Card Number **/
+	if ( GetTlvBuffer ( AUTO_PAN , sTlvBuffer , vCardNumber ,&nLenData) != SUCCESS )
+	{
+		trace_event("END   get_card_script_status(NOK). AUTO_PAN",PROCESSING);
+		return(NOK);
+	}
+	
+	InitTlvPrivate (&sTlvPrivateInfo);
+	AnalyseTlvPrivate(sIccData , nIccLen,&sTlvPrivateInfo);
+	
+	/** Retrieveing the ATC **/
+	memset(szWork, 0, sizeof(szWork));
+	if (GetTlvPrivate (CHIP_ATC_TAG, &sTlvPrivateInfo, szWork, &nLenWork) == SUCCESS)
+		AsciiToHex (szWork, vATC, 4);
+	
+	/** Retrieveing the ARQC **/
+	memset(szWork, 0, sizeof(szWork));
+	if (GetTlvPrivate (CHIP_APP_CRYPTOGRAM_TAG , &sTlvPrivateInfo, szWork, &nLenWork) == SUCCESS)
+		AsciiToHex (szWork, vARQC, 16);
+	
+	/**** Retreiving tags from tlv for get the MAc key   */
+	memset(v_card_Nbr.arr		, 0, sizeof(v_card_Nbr.arr)); /* PCI */
+	if(GetTlvBuffer ( AUTO_ISSUING_BANK, sTlvBuffer, v_issuing_bank_code, &nLenData) != OK)
+	{
+		trace_event("Error retreiving the v_issuing_bank_code from tlv buffer.", ERROR);
+		return (NOK);	
+	} 
+	if(GetTlvBuffer ( ICC_APPLICATION_INDX, sTlvBuffer, v_icc_application_index, &nLenData) != OK)
+	{
+		trace_event("Error retreiving the v_icc_application_index from tlv buffer.", ERROR);
+		return (NOK);	
+	}
+	if(GetTlvBuffer  ( AUTO_PRODUCT_CODE, sTlvBuffer, v_product_code, &nLenData) != OK)
+	{
+		trace_event("Error retreiving the product_code from tlv buffer.", ERROR);
+		return (NOK);	
+	}
+	if( GetTlvBuffer ( ISSUER_BIN, sTlvBuffer, v_issuing_bin, &nLenData) != OK)
+	{
+		trace_event("Error retreiving the ISSUER_BIN from tlv buffer.", ERROR);
+		return (NOK);	
+	}
+	
+	/** sMAC_Key **/
+	retour = GET_EMV_KEYS (nIndexCtx, vCardNumber, sMAC_Key, v_issuing_bank_code, v_issuing_bin, v_product_code,v_icc_application_index, "MAC");
+
+	if(retour != OK)
+	{
+		trace_event("Error when trying to retreive the Mac Key", ERROR);
+		return (NOK);
+	}
+
+	/* cSchemeId */
+	cSchemeId = '0'; /** Visa **/
+	if (!GetTlvBuffer ( AUTO_NETWORK_CODE , sTlvBuffer , szWork ,&nLenData) && memcmp(szWork, "01", 2) )
+		cSchemeId = '1'; /** MC **/
+	
+	/** Retrieveing the Card Seq Number **/
+	memset(sSeqNumber, 0, sizeof(sSeqNumber));
+	if (GetTlvBuffer (AUTO_CARD_SEQUENCE_NUMBER , sTlvBuffer, sSeqNumber, &nLenData) != SUCCES)
+	{
+		trace_event("ERROR WhiLe GetTlvBuffer (AUTO_CARD_SEQUENCE_NUMBER) ", ERROR);
+		return(NOK);
+	}
+	
+	memset(szWork, '0', 16);
+	memcpy(sTmpField, vCardNumber, strlen(vCardNumber));
+	memcpy(sTmpField + strlen(vCardNumber), sSeqNumber+1, 2);
+	nLenWork = strlen(sTmpField);
+	/* if (strlen(nLenWork) < 16 ) EBE140523: It was meant nLenWork*/
+	if ( nLenWork < 16 )
+		memcpy(szWork + (16 - nLenWork), sTmpField , nLenWork);
+	else
+		memcpy(szWork, sTmpField + (nLenWork - 16), 16);
+	
+	AsciiToHex (szWork, sFormatedPan, 16);
+		
+	/** Fin Retrieveing the Card Seq Number **/
+
+	/****************************************************************************/
+	/*      Appel PL/SQL                                                        */
+	/****************************************************************************/
+	
+	nTAG71_Len = 0;
+	nTAG72_Len = 0;
+	
+	EXEC SQL WHENEVER NOT FOUND DO break; 
+
+	for (;;)
+	{
+		EXEC SQL    FETCH  EMV_CARD_SCRIPT_STATUS_CUR INTO :SCRIPT_CODE, :SCRIPT_TYPE, :SCRIPT_TYPE_str, :AUTHORIS_DECLINE_FLAG ;
+	
+		SendOrder += 1;
+		/* build buffer for calculating MAC.*/
+		
+		if ( CheckHsmResource ( nIndexCtx, HSM_VERIF_MODE , &nPid ) != OK )
+		{
+			trace_event("End   emv_get_script(2. HSM_UNAVAILABLE)",PROCESSING);
+			return(HSM_UNAVAILABLE);
+		}
+
+	memcpy(MacBuffer + Macoffset, "84",   2);
+	Macoffset += 2;
+	/* ---------------------------------------------------------------- */    
+	switch(SCRIPT_TYPE)	{
+			case 0 :  memcpy(MacBuffer + Macoffset, "1E",   2); /* "AB" */
+								Macoffset += 2;
+								break;
+			case 1 :  memcpy(MacBuffer + Macoffset, "18",   2);  /* "AU" */
+								Macoffset += 2;
+								break;
+			case 2 :  memcpy(MacBuffer + Macoffset, "24",   2);  /* "PU" */
+								Macoffset += 2;
+								break;
+			default : trace_event("Operation flag not allowed in current state", ERROR);
+								return NOK; 
+	}
+		sprintf(sLine, "Command type=[%d].", SCRIPT_TYPE);
+		trace_event( sLine ,PROCESSING);
+	/* ---------------------------------------------------------------- */   
+	memcpy(MacBuffer + Macoffset, "00",   2);
+	Macoffset += 2;
+	/* ---------------------------------------------------------------- */    
+	memcpy(MacBuffer + Macoffset, "00",   2);
+	Macoffset += 2;
+	/* ---------------------------------------------------------------- */
+	memcpy(MacBuffer + Macoffset, "08",   2);
+	Macoffset += 2;
+	/* ---------------------------------------------------------------- */
+	memcpy(MacBuffer + Macoffset, vATC, 2);
+	Macoffset += 2;
+	memcpy(MacBuffer + Macoffset, vARQC, 8);
+	Macoffset += 8;
+	/* Mehdi Elyajizi PCI */
+
+	/*Begin MKB060309 PCI Norme Integration */
+	if (debug_option == 1)
+	{
+		sprintf(sLine, "ATC =[%02X%02X], ARQC=[%02X%02X%02X%02X%02X%02X%02X%02X].", 
+				vATC[0], vATC[1], vARQC[0], vARQC[1], vARQC[2], vARQC[3], 
+				vARQC[4], vARQC[5], vARQC[6], vARQC[7]);
+		trace_event( sLine ,PROCESSING);
+	}
+	/*End MKB060309 PCI Norme Integration */
+	/*---------------------------------------------------------------- */   
+	/***** the Mac calculated buffer      ****/	
+	/* call KU cmd. */
+				
+	AsciiToHex (MacBuffer, MacBufferHex, strlen(MacBuffer));
+		
+	result = command_KU(buffer, '0', cSchemeId, sMAC_Key, sFormatedPan, vARQC, Macoffset, MacBufferHex,"", "", "", 0, 0, "" );
+		
+	dump_buffer(buffer, result, 'A', 'X', 'X'); 
+
+	retour = HsmQueryBin(nIndexCtx,nPid, buffer, result,  vBuffRcv);
+
+	if (retour == NOT_AVAILABLE)
+		{
+			trace_event("HSM NOT AVAILABLE", ERROR);
+			trace_event("End   emv_get_script(NOT_AVAILABLE)",PROCESSING);
+			return(HSM_UNAVAILABLE);
+		}
+		
+	if (retour == HSM_MALFUNCTION)
+		{
+			trace_event("HSM MALFUNCTION DETECTED", ERROR);
+			trace_event("END   get_card_script_status(HSM_MALFUNCTION)",PROCESSING);
+			return(HSM_UNAVAILABLE);
+		}
+		
+	retour = command_KV ( vBuffRcv , '0', vErrCode, vMac, vLenPin,vpin);
+	if ( retour != OK )
+		{
+			trace_event("HSM Abnormal  DETECTED", ERROR);
+			trace_event("End   emv_get_script(CRYPTOGRAPHIC_ERROR)",PROCESSING);
+			PutEvent( sTlvBuffer, SCRIPT_FAILED, "ERROR WHEN PROCESSING ISSUER SCRIPT"); 
+			return(OK); 
+			
+		}
+		
+	memset(szWork, 0, sizeof(szWork));
+	nLenWork = 0;
+
+	/** CLA **/
+	memcpy(szWork+nLenWork, "84", 2);
+	nLenWork += 2;
+	/** INS **/
+
+	memcpy(szWork+nLenWork, SCRIPT_TYPE_str.arr, 2);
+	nLenWork += 2;
+	/** P1 **/
+
+	memcpy(szWork+nLenWork, "00", 2);
+	nLenWork += 2;
+	/** P2 **/
+
+	memcpy(szWork+nLenWork, "00", 2);
+	nLenWork += 2;
+
+	/** Lc **/
+
+	memcpy(szWork+nLenWork, "08", 2);
+	nLenWork += 2;
+		
+	/** Data **/
+		
+	memcpy(szWork + nLenWork, vMac, 8);
+	nLenWork += 8;
+
+	if ( memcmp(AUTHORIS_DECLINE_FLAG, "1", 1) == 0 )
+		{
+			memcpy(sTAG71_Data + offset , szWork, nLenWork);
+			offset += nLenWork;
+			nTAG71_Len += nLenWork;
+
+			memcpy(ScriptStatus,"0", 1);
+			memcpy(Update_command_Data, sTAG71_Data, nTAG71_Len);
+			
+		}
+	else
+		if(memcmp(AUTHORIS_DECLINE_FLAG, "0", 1) == 0)
+		{
+			memcpy(sTAG72_Data + offset , szWork, nLenWork);
+			offset += nLenWork;
+			nTAG72_Len += nLenWork;
+
+			/*MKB060309 PCI Norme Integration */
+			if (debug_option == 1)
+			{
+				sprintf(sLine, "sTAG72 = [%s], szWork = [%s], nTAG72_Len = [%d]", sTAG72_Data, szWork, nTAG72_Len);
+				trace_event(sLine, PROCESSING);
+			}
+
+			memcpy(ScriptStatus,"0", 1);
+			memcpy(Update_command_Data, sTAG72_Data, nTAG72_Len);
+		} 
+		
+		memcpy(ScriptStatus,"0", 1);
+		retour = UpdateScriptStatus (nIndexCtx, SCRIPT_CODE.arr, SendOrder, ScriptStatus, Update_command_Data, sTlvBuffer);
+		if(retour != OK)
+		{
+			trace_event("Unable to update Script status.", ERROR);
+			trace_event("End   emv_get_script(Update_script_failed).",PROCESSING);
+			return(OK);
+		}
+			
+}
+	EXEC SQL CLOSE EMV_CARD_SCRIPT_STATUS_CUR ;
+
+	/** Add Tags 71 & 72 **/ 
+
+	if( nTAG71_Len )
+		{
+			sprintf(Tag55, "86%02X%s", nTAG71_Len/2, sTAG71_Data);
+			/*MKB060309 PCI Norme Integration */
+			if (debug_option == 1)
+			{
+				sprintf(sLine, "==> ISO.DE55.TAG72=[%40s]", Tag55);
+				trace_event(sLine, PROCESSING);	
+			}
+			PutTlvPrivate (ISO_TAG_ISS_SCRIPT1, &sTlvPrivateInfo, Tag55, nLenWork+4);
+		}
+	if( nTAG72_Len )
+		{
+		
+			sprintf(Tag55, "86%02X%s", nTAG72_Len/2, sTAG72_Data);
+
+			/*MKB060309 PCI Norme Integration */
+			if (debug_option == 1)
+			{
+				sprintf(sLine, "==> ISO.DE55.TAG72=[%40s]", Tag55);
+				trace_event(sLine, PROCESSING);
+			}
+
+			PutTlvPrivate (ISO_TAG_ISS_SCRIPT2, &sTlvPrivateInfo, Tag55, nLenWork+4);
+		
+		}
+
+	if( nTAG71_Len || nTAG72_Len )
+	{
+		nIccLen = PrivateBuildTlv (sIccData, &sTlvPrivateInfo);
+
+			sprintf(sLine, "nIccLen = [%d].", nIccLen);
+			trace_event(sLine, PROCESSING);
+
+		PutTlvBuffer ( AUTO_ICC_DATA, sTlvBuffer, sIccData, nIccLen);
+	}
+	
+	IsoDumpIccFields (sIccData, nIccLen);
+
+	trace_event("END   get_card_script_status(OK)", PROCESSING);
+	return(OK);
+	
+	
+	GET_EMV_CARD_SCRIPT_STATUS_err:
+		EXEC SQL CLOSE EMV_CARD_SCRIPT_STATUS_CUR ;	
+		sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+		trace_event(sLine, ERROR);
+		trace_event("End  get_card_script_status(NOK)", PROCESSING);
+		return (OK);
+	
+}

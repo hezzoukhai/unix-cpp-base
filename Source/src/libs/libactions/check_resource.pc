@@ -1,0 +1,78 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <define.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int CheckResource ( int 		nIndiceCtx,
+				    char 		*sResourceId,
+					pid_t    	*nPid
+				  )
+							
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	char   		T_resource_id    [ 6 + 1];
+ 	pid_t	   	T_pid;
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	sprintf(sLine,"Start CheckResource(%s) ",sResourceId);
+	trace_event ( sLine, PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_resource_id            ,  0  ,   sizeof(T_resource_id )  );
+	T_pid =  -1;
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+
+	memcpy ( T_resource_id     ,  sResourceId   , 6);
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                        */
+/****************************************************************************/
+
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_check_resource;
+	EXEC SQL EXECUTE
+	BEGIN
+
+       :response_code := PCRD_P7_FUNCTION_TOOLS.CHECK_RESOURCE( :T_resource_id, :T_pid);
+
+	END;
+	END-EXEC;
+
+    *nPid = T_pid;
+
+	
+	if( response_code == OK	&& kill ( T_pid , 0 ) != 0 )
+	{
+		response_code = NOK;
+	}
+
+	sprintf(sLine,"End CheckResource(%d), Pid = [%d]", response_code, *nPid);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_check_resource:
+
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+    *nPid = T_pid;
+	sprintf(sLine, "%.70s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End CheckResource(SYSTEM_MALFUNCTION)", ERROR);
+	return( SYSTEM_MALFUNCTION );
+}

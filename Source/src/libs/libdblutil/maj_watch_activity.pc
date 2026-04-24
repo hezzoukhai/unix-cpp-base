@@ -1,0 +1,2320 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      maj_watch_activity.pc                                                  */
+/*                                                                             */
+/* Description                                                                 */
+/*      MAJ watch activity Tools Management                                    */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <define.h>
+#include <param_ctx.h>
+extern	double   atof();
+
+  /***********************************************************************
+  **  nom	: UpdateAppTrans()					**
+  **  desc	: maj des transactions approuvees dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pAmount	-> montant approuve			**
+  **		  pCurrency	-> monnaie du montant approuve		**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucune						**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> Pb PL/SQL					**
+  **		  ERROR	-> erreur FATAL					**
+  **  auteur	: Younes OUADI (19 dec 1998)				**
+  ***********************************************************************/
+int	UpdateAppTrans(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pAmount, pCurrency, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pAmount		[13];
+char		pCurrency	[ 4];
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+char		sLine	[MAX_LINE_TRC];
+struct sqlca sqlca;
+
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/
+    char		hCurrency	[ 3 + 1];
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    double		hAmount = 0.0;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateAppTrans(%.15s,%.6s,%.12s,%.3s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pAmount,pCurrency,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/
+    memset(hCurrency,		0, sizeof(hCurrency)	);
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hCurrency,		pCurrency, strlen(pCurrency));
+
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    hAmount = atof(pAmount);
+    adjust_amount_numeric(nIndexCtx,&hAmount, hCurrency);
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO updateAppTransErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.UPDATE_APP_TRANS(:hTerminal,
+         			:hAcqBank,/*ICH270715*/    
+					:hAmount,
+					:hCurrency,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   UpdateAppTrans(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateAppTrans(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateAppTransErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateAppTrans(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: UpdateRevTrans()					**
+  **  desc	: maj des transactions annulees dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pAmount	-> montant annule			**
+  **		  pCurrency	-> monnaie du montant annule		**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  ***********************************************************************/
+int	UpdateRevTrans(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pAmount, pCurrency, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pAmount		[13];
+char		pCurrency	[ 4];
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hCurrency	[ 3 + 1];
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    double		hAmount;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateRevTrans(%.15s,%.6s,%.12s,%.3s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pAmount,pCurrency,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/
+    memset(hCurrency,		0, sizeof(hCurrency)	);
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hCurrency,		pCurrency, strlen(pCurrency));
+
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    hAmount = atof(pAmount);
+    adjust_amount_numeric(nIndexCtx,&hAmount, hCurrency);
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO updateRevTransErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.UPDATE_REV_TRANS(  :hTerminal,
+                    :hAcqBank,/*ICH270715*/  
+					:hAmount,
+					:hCurrency,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   UpdateRevTrans(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateRevTrans(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateRevTransErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateRevTrans(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: UpdateDecTrans()					**
+  **  desc	: maj des transactions refusees dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pAmount	-> montant refuse			**
+  **		  pCurrency	-> monnaie du montant refuse		**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	UpdateDecTrans(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/,pActionCode /*ICH20190522*/,pAmount, pCurrency, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pAmount		[13];
+char		pCurrency	[ 4];
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+char		pActionCode	[ 4];
+
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hCurrency	[ 3 + 1];
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    char		hActionCode	[ 3 + 1];
+    double		hAmount;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateAppTrans(%.15s,%.6s,%.3s,%.12s,%.3s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pActionCode,pAmount,pCurrency,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/
+    memset(hCurrency,		0, sizeof(hCurrency)	);
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+    memset(hActionCode,		0, sizeof(hActionCode)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hCurrency,		pCurrency, strlen(pCurrency));
+
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    memcpy(hActionCode,		pActionCode, strlen(pActionCode));
+
+    hAmount = atof(pAmount);
+    adjust_amount_numeric(nIndexCtx,&hAmount, hCurrency);
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO updateDecTransErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.UPDATE_DEC_TRANS(  :hTerminal,
+                    :hAcqBank,/*ICH270715*/  
+                    :hActionCode,/*ICH20190522*/					
+					:hAmount,
+					:hCurrency,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   UpdateDecTrans(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateDecTrans(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateDecTransErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateDecTrans(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: UpdateAppIntTransfer()				**
+  **  desc	: maj des virements approuvees dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pAmount	-> montant vire				**
+  **		  pCurrency	-> monnaie du vire approuve		**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucune						**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> Pb PL/SQL					**
+  **		  ERROR	-> erreur FATAL					**
+  **  auteur	: Younes OUADI (19 dec 1998)				**
+  ***********************************************************************/
+int	UpdateAppIntTransfer(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pAmount, pCurrency, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pAmount		[13];
+char		pCurrency	[ 4];
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hCurrency	[ 3 + 1];
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    double		hAmount;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateAppIntTransfer(%.15s,%.6s,%.12s,%.3s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pAmount,pCurrency,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/
+    memset(hCurrency,		0, sizeof(hCurrency)	);
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hCurrency,		pCurrency, strlen(pCurrency));
+
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    hAmount = atof(pAmount);
+    adjust_amount_numeric(nIndexCtx,&hAmount, hCurrency);
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO updateAppIntTransferErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.UPDATE_APP_INT_TRANSFER(:hTerminal,
+                    :hAcqBank,/*ICH270715*/  
+					:hAmount,
+					:hCurrency,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   UpdateAppIntTransfer(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateAppIntTransfer(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateAppIntTransferErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateAppIntTransfer(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: UpdateRevIntTransfer()				**
+  **  desc	: maj des virements annulees dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pAmount	-> montant annule			**
+  **		  pCurrency	-> monnaie du montant annule		**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> date de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	UpdateRevIntTransfer(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pAmount, pCurrency, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pAmount		[13];
+char		pCurrency	[ 4];
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hCurrency	[ 3 + 1];
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    double		hAmount;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateAppIntTransfer(%.15s,%.6s,%.12s,%.3s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pAmount,pCurrency,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/
+    memset(hCurrency,		0, sizeof(hCurrency)	);
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+    
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hCurrency,		pCurrency, strlen(pCurrency));
+
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    hAmount = atof(pAmount);
+    adjust_amount_numeric(nIndexCtx,&hAmount, hCurrency);
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO updateRevIntTransferErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.UPDATE_REV_INT_TRANSFER(:hTerminal,
+                    :hAcqBank,/*ICH270715*/ 
+					:hAmount,
+					:hCurrency,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   UpdateRevIntTransfer(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateRevIntTransfer(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateRevIntTransferErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateRevIntTransfer(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: UpdateDecIntTransfer()				**
+  **  desc	: maj des virements refusees dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pAmount	-> montant refuse			**
+  **		  pCurrency	-> monnaie du montant refuse		**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	UpdateDecIntTransfer(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pActionCode, pAmount, pCurrency, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pAmount		[13];
+char		pCurrency	[ 4];
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+char		pActionCode	[ 4];
+
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hCurrency	[ 3 + 1];
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    char		hActionCode	[ 3 + 1];
+
+    double		hAmount;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateAppIntTransfer(%.15s,%.6s,%.3s,%.12s,%.3s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pActionCode,pAmount,pCurrency,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/
+    memset(hCurrency,		0, sizeof(hCurrency)	);
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+    memset(hActionCode,		0, sizeof(hActionCode)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+    
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+    
+    memcpy(hCurrency,		pCurrency, strlen(pCurrency));
+
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    memcpy(hActionCode,		pActionCode, strlen(pActionCode));
+
+    hAmount = atof(pAmount);
+    adjust_amount_numeric(nIndexCtx,&hAmount, hCurrency);
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO updateDecIntTransferErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.UPDATE_DEC_INT_TRANSFER(  :hTerminal,
+                     :hAcqBank,/*ICH270715*/
+                     :hActionCode/*ICH20190522*/ 
+					:hAmount,
+					:hCurrency,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   UpdateDecIntTransfer(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateDecIntTransfer(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateDecIntTransferErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateDecIntTransfer(ERROR)", ERROR);
+    return (ERROR);
+}
+
+
+  /***********************************************************************
+  **  nom	: UpdateAppExtTransfer()				**
+  **  desc	: maj des virements approuvees dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pAmount	-> montant vire				**
+  **		  pCurrency	-> monnaie du vire approuve		**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucune						**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> Pb PL/SQL					**
+  **		  ERROR	-> erreur FATAL					**
+  **  auteur	: Younes OUADI (19 dec 1998)				**
+  ***********************************************************************/
+int	UpdateAppExtTransfer(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pAmount, pCurrency, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pAmount		[13];
+char		pCurrency	[ 4];
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+char		sLine	[80];
+struct sqlca sqlca;
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/  
+    char		hCurrency	[ 3 + 1];
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    double		hAmount;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateAppExtTransfer(%.15s,%.6s,%.12s,%.3s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pAmount,pCurrency,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));
+    memset(hCurrency,		0, sizeof(hCurrency)	);
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+    
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));
+    hAcqBank.len	= strlen(pAcqBank);
+    
+    memcpy(hCurrency,		pCurrency, strlen(pCurrency));
+
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    hAmount = atof(pAmount);
+    adjust_amount_numeric(nIndexCtx,&hAmount, hCurrency);
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO updateAppExtTransferErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.UPDATE_APP_EXT_TRANSFER(:hTerminal,
+                    :hAcqBank,/*ICH270715*/
+					:hAmount,
+					:hCurrency,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   UpdateAppExtTransfer(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateAppExtTransfer(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateAppExtTransferErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateAppExtTransfer(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: UpdateRevExtTransfer()				**
+  **  desc	: maj des virements annulees dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pAmount	-> montant annule			**
+  **		  pCurrency	-> monnaie du montant annule		**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> date de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	UpdateRevExtTransfer(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pAmount, pCurrency, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pAmount		[13];
+char		pCurrency	[ 4];
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6  + 1];/*ICH270715*/ 
+    char		hCurrency	[3  + 1];
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    double		hAmount;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateAppExtTransfer(%.15s,%.6s,%.12s,%.3s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pAmount,pCurrency,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/
+    memset(hCurrency,		0, sizeof(hCurrency)	);
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+    
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+    hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hCurrency,		pCurrency, strlen(pCurrency));
+
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    hAmount = atof(pAmount);
+    adjust_amount_numeric(nIndexCtx,&hAmount, hCurrency);
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO updateRevExtTransferErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.UPDATE_REV_EXT_TRANSFER(:hTerminal,
+                                        :hAcqBank,/*ICH270715*/ 
+					:hAmount,
+					:hCurrency,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   UpdateRevExtTransfer(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateRevExtTransfer(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateRevExtTransferErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateRevExtTransfer(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: UpdateDecExtTransfer()				**
+  **  desc	: maj des virements refusees dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pAmount	-> montant refuse			**
+  **		  pCurrency	-> monnaie du montant refuse		**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	UpdateDecExtTransfer(nIndexCtx,pTerminal,pAcqBank /*ICH270715*/, pActionCode, pAmount, pCurrency, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pAmount		[13];
+char		pCurrency	[ 4];
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+char		pActionCode	[ 4];
+
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/
+    char		hCurrency	[ 3 + 1];
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    char		hActionCode	[ 3 + 1];
+
+    double		hAmount;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateDecExtTransfer(%.15s,%.6s,,%.3s,%.12s,%.3s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pActionCode,pAmount,pCurrency,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/
+    memset(hCurrency,		0, sizeof(hCurrency)	);
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+    memset(hActionCode,		0, sizeof(hActionCode)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hCurrency,		pCurrency, strlen(pCurrency));
+
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    memcpy(hActionCode,		pActionCode, strlen(pActionCode));
+
+    hAmount = atof(pAmount);
+    adjust_amount_numeric(nIndexCtx,&hAmount, hCurrency);
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO updateDecExtTransferErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.UPDATE_DEC_EXT_TRANSFER(  :hTerminal,
+                    :hAcqBank,/*ICH270715*/   
+                    :hActionCode/*ICH20190522*/ 
+					:hAmount,
+					:hCurrency,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   UpdateDecExtTransfer(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateDecExtTransfer(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateDecExtTransferErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateDecExtTransfer(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: UpdateAppCashDeposit()				**
+  **  desc	: maj des depot de cash accepte dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pAmount	-> montant accepte			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	UpdateAppCashDeposit(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pAmount, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+double		pAmount;
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    double		hAmount;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateAppCashDeposit(%.15s,%.6s,%.3f,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pAmount,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    hAmount = pAmount;
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO updateAppCashDepositErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.UPDATE_APP_CASH_DEPOSIT(  :hTerminal,
+                    :hAcqBank,/*ICH270715*/  
+					:hAmount,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   UpdateAppCashDeposit(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateAppCashDeposit(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateAppCashDepositErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateAppCashDeposit(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: UpdateRevCashDeposit()				**
+  **  desc	: maj des depot de cash annule dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pAmount	-> montant annule			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	UpdateRevCashDeposit(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pAmount, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+double		pAmount;
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    double		hAmount;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateRevCashDeposit(%.15s,%.6s,%.3f,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pAmount,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/       
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    hAmount = pAmount;
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO updateRevCashDepositErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.UPDATE_REV_CASH_DEPOSIT(  :hTerminal,
+                    :hAcqBank,/*ICH270715*/       
+					:hAmount,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   UpdateRevCashDeposit(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateRevCashDeposit(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateRevCashDepositErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateRevCashDeposit(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: IncAppChequeDeposit()					**
+  **  desc	: maj des depot de cheque accepte dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pNumber	-> Number accepte			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	IncAppChequeDeposit(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pNumber, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+int			pNumber;
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    int			hNumber;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start IncAppChequeDeposit(%.15s,%.6s,%d,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pNumber,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    hNumber = pNumber;
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO incAppChequeDepositErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.INC_APP_CHEQUE_DEPOSIT(  :hTerminal,
+                    :hAcqBank,/*ICH270715*/       
+					:hNumber,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   IncAppChequeDeposit(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   IncAppChequeDeposit(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+incAppChequeDepositErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   IncAppChequeDeposit(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: IncRevChequeDeposit()					**
+  **  desc	: maj des depot de cheque annule dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pNumber	-> Number annule			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	IncRevChequeDeposit(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pNumber, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+int			pNumber;
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    int			hNumber;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start IncRevChequeDeposit(%.15s,%.6s,%d,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pNumber,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+   	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    hNumber = pNumber;
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO incRevChequeDepositErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.INC_REV_CHEQUE_DEPOSIT(  :hTerminal,
+                    									  	   :hAcqBank,/*ICH270715*/       
+					:hNumber,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   IncRevChequeDeposit(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   IncRevChequeDeposit(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+incRevChequeDepositErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   IncRevChequeDeposit(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: IncAppDocumentDeposit()				**
+  **  desc	: maj des depot de document accepte dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pNumber	-> Number accepte			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	IncAppDocumentDeposit(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pNumber, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+int			pNumber;
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    int			hNumber;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start IncAppDocumentDeposit(%.15s,%.6s,%d,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pNumber,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+ 	
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    hNumber = pNumber;
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO incAppDocumentDepositErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.INC_APP_DOCUMENT_DEPOSIT(  :hTerminal,
+                    :hAcqBank,/*ICH270715*/       
+					:hNumber,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   IncAppDocumentDeposit(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   IncAppDocumentDeposit(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+incAppDocumentDepositErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   IncAppDocumentDeposit(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: IncRevDocumentDeposit()				**
+  **  desc	: maj des depot de document annule dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pNumber	-> Number annule			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	IncRevDocumentDeposit(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pNumber, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+int			pNumber;
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    int			hNumber;
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start IncRevDocumentDeposit(%.15s,%.6s,%d,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pNumber,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+   	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+    hNumber = pNumber;
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO incRevDocumentDepositErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.INC_REV_DOCUMENT_DEPOSIT(  :hTerminal,
+                    									  	     :hAcqBank,/*ICH270715*/       
+					:hNumber,
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   IncRevDocumentDeposit(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   IncRevDocumentDeposit(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+incRevDocumentDepositErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   IncRevDocumentDeposit(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: IncBalanceReq()					**
+  **  desc	: maj des demandes de soldes dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	IncBalanceReq(nIndexCtx, pAcqBank /*ICH270715*/,pTerminal, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start IncBalanceReq(%.15s,%.6s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/    
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO incBalanceReqErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.INC_BALANCE_REQ(  :hTerminal,
+                    :hAcqBank,/*ICH270715*/     
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   IncBalanceReq(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   IncBalanceReq(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+incBalanceReqErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   IncBalanceReq(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: IncStatementReq()					**
+  **  desc	: maj des demandes de releve dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	IncStatementReq(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start IncStatementReq(%.15s,%.6s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO incStatementReqErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.INC_STATEMENT_REQ(  :hTerminal,
+                    									  :hAcqBank,/*ICH270715*/       
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   IncStatementReq(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   IncStatementReq(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+incStatementReqErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   IncStatementReq(ERROR)", ERROR);
+    return (ERROR);
+}
+
+
+  /***********************************************************************
+  **  nom	: IncShortStatReq()					**
+  **  desc	: maj des demandes de mini-releve dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	IncShortStatReq(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start IncShortStatReq(%.15s,%.6s,%.12s,%.10s)",pTerminal,pAcqBank/*ICH270715*/,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO incShortStatReqErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.INC_SHORT_STAT_REQ(  :hTerminal,
+                    										:hAcqBank,/*ICH270715*/       
+															TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+															TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   IncShortStatReq(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   IncShortStatReq(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+incShortStatReqErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   IncShortStatReq(ERROR)", ERROR);
+    return (ERROR);
+}
+
+
+  /***********************************************************************
+  **  nom	: IncPinModifReq()					**
+  **  desc	: maj des demandes de modification de PIN dans		**
+  **		  watch_activity					**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	IncPinModifReq(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start IncPinModifReq(%.15s,%.6s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+ 	
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO incPinModifReqErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.INC_PIN_MODIF_REQ(  :hTerminal,
+                    :hAcqBank,/*ICH270715*/       
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   IncPinModifReq(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   IncPinModifReq(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+incPinModifReqErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   IncPinModifReq(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: IncChequeReq()					**
+  **  desc	: maj des demandes de chequier dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	IncChequeReq(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start IncChequeReq(%.15s,%.6s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO incChequeReqErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.INC_CHEQUE_REQ(  :hTerminal,
+                    :hAcqBank,/*ICH270715*/       
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   IncChequeReq(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   IncChequeReq(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+incChequeReqErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   IncChequeReq(ERROR)", ERROR);
+    return (ERROR);
+}
+
+
+  /***********************************************************************
+  **  nom	: IncCardReq()						**
+  **  desc	: maj des demandes de carte dans watch_activity		**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	IncCardReq(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start IncCardReq(%.15s,%.6s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO incCardReqErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.INC_CARD_REQ(  :hTerminal,
+                    :hAcqBank,/*ICH270715*/       
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   IncCardReq(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   IncCardReq(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+incCardReqErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   IncCardReq(ERROR)", ERROR);
+    return (ERROR);
+}
+
+
+  /***********************************************************************
+  **  nom	: IncAccountReq()					**
+  **  desc	: maj des demandes de compte dans watch_activity	**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	IncAccountReq(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start IncAccountReq(%.15s,%.6s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+ 	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO incAccountReqErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.INC_ACCOUNT_REQ(  :hTerminal,
+	                :hAcqBank,/*ICH270715*/       
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   IncAccountReq(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   IncAccountReq(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+incAccountReqErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   IncAccountReq(ERROR)", ERROR);
+    return (ERROR);
+}
+
+
+  /***********************************************************************
+  **  nom	: IncRendezVousReq()					**
+  **  desc	: maj des demandes de de rendez vous dans watch_activity**
+  **  entree	: pTerminal	-> numero du terminal			**
+  **		  pTrnDate	-> date de la transaction		**
+  **		  pTrsDate	-> dete de la transmission		**
+  **  sortie	: aucun							**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> erreur PL/SQL				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (19 Dec 1998)				**
+  ***********************************************************************/
+int	IncRendezVousReq(nIndexCtx,pTerminal, pAcqBank /*ICH270715*/, pTrnDate, pTrsDate)
+int			nIndexCtx;
+char		pTerminal	[16];
+char		pAcqBank	[6+1];/*ICH270715*/
+char		pTrnDate	[13];
+char		pTrsDate	[11];
+{
+struct sqlca sqlca;
+char		sLine	[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminal	[15 + 1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    char		hTrnDate	[12 + 1];
+    char		hTrsDate	[10 + 1];
+    int			hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start IncRendezVousReq(%.15s,%.6s,%.12s,%.10s)",
+        pTerminal,pAcqBank/*ICH270715*/,pTrnDate,pTrsDate);
+trace_event(sLine, PROCESSING);
+
+    /* - memset des buffer ---------------------------------------------- */
+    memset(hTerminal.arr,	0, sizeof(hTerminal.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hTrnDate,		0, sizeof(hTrnDate)	);
+    memset(hTrsDate,		0, sizeof(hTrsDate)	);
+
+
+    /* - initialisation des variables ----------------------------------- */
+    memcpy(hTerminal.arr,	pTerminal, strlen(pTerminal));
+    hTerminal.len	= strlen(pTerminal);
+
+  	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hTrnDate,		pTrnDate, strlen(pTrnDate));
+
+    memcpy(hTrsDate,		pTrsDate, strlen(pTrsDate));
+
+
+    /* - capture des exceptions ------------------------------------------ */
+    EXEC SQL WHENEVER SQLERROR GOTO incRendezVousReqErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - traitement PL/SQL ----------------------------------------------- */
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_ACTIVITY.INC_RENDEZ_VOUS_REQ(  :hTerminal,
+                    									  :hAcqBank,/*ICH270715*/       
+					TO_DATE(:hTrnDate, 'YYMMDDHH24MISS'),
+					TO_DATE(:hTrsDate, 'MMDDHH24MISS'));
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+        sprintf(sLine, "End   IncRendezVousReq(NOK)");
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   IncRendezVousReq(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+incRendezVousReqErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   IncRendezVousReq(ERROR)", ERROR);
+    return (ERROR);
+}
+
+
+
+  /***********************************************************************
+  **  nom	: GetWatchWarningJournal()					**
+  **  desc	: chargement de la commande pour le GAB			**
+  **  entree	: fTerminalNumber	-> numero du terminal		**
+  **  sortie	: fCommand		-> commande pour le terminal	**
+  **		  fPurgeDate		-> date d'expiration de la cmd	**
+  **  retour	: OK	-> si c'est OK					**
+  **		  ERROR	-> erreur fatal					**
+  **			(c) 1999 Hightech Payment Systems		**
+  ***********************************************************************/
+int	GetWatchWarningJournal(nIndexCtx,pTermNbr, pAcqBank /*ICH270715*/)
+int 		nIndexCtx;
+char		*pTermNbr;
+char		*pAcqBank;/*ICH270715*/
+{
+struct sqlca sqlca;
+   char  sLine[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar		hTermNbr		[15+1];
+    varchar		hAcqBank	    [6+1];/*ICH270715*/
+    char		hlog_printer_status	[1+1];
+    int			hRet;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start GetWatchWarningJournal(%.15s,%.6s)", pTermNbr,pAcqBank);
+trace_event(sLine, PROCESSING);
+
+    /* - initilialisation des variables ------------------------------------- */
+    memset(hTermNbr.arr,		0, sizeof(hTermNbr.arr)		  );
+    memset(hlog_printer_status,		0, sizeof(hlog_printer_status)		  );
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/
+    hTermNbr.len	= sizeof(hTermNbr.arr);
+
+    /* - renseignement des variables PL/SQL --------------------------------- */
+    memcpy(hTermNbr.arr,pTermNbr, strlen(pTermNbr));
+    hTermNbr.len	= strlen(pTermNbr);
+
+	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+
+    /* - capture des exceptions PL/SQL -------------------------------------- */
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO getUserCommandErr;
+
+    /* - execution du traitement PL/SQL ------------------------------------- */
+    EXEC SQL EXECUTE
+    DECLARE
+        enr_terminal_atm_watch_warning	TERMINAL_ATM_WATCH_WARNING%ROWTYPE;
+    BEGIN
+        -- preparation de l'enregistrement
+
+        :hRet := PCRD_ATM_TOOLS.GET_ATM_WATCH_WARNING(:hTermNbr,:hAcqBank/*ICH270715*/,enr_terminal_atm_watch_warning);
+
+        -- recuperation du resultat
+        IF :hRet = DECLARATION_CST.OK
+        THEN
+            :hlog_printer_status :=enr_terminal_atm_watch_warning.log_printer_status;
+        END IF;
+    END;
+    END-EXEC;
+
+    /* - examen du retour du traitement PL/SQL ------------------------------ */
+    if (hRet != OK)
+    {
+        sprintf(sLine, "End   GetWatchWarningJournal(%d)", hRet);
+        trace_event(sLine, PROCESSING);
+        return (hRet);
+    }
+
+    if ( memcmp(hlog_printer_status,"O",1) == 0 ) {
+        sprintf(sLine, "End   GetWatchWarningJournal(NOK %s)", hlog_printer_status);
+        trace_event(sLine, PROCESSING);
+	return(NOK);
+	}
+    else
+	{
+        sprintf(sLine, "End   GetWatchWarningJournal(OK %s)", hlog_printer_status);
+        trace_event(sLine, PROCESSING);
+	return(OK);
+	}
+	
+getUserCommandErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   GetWatchWarningJournal(ERROR)", ERROR);
+    return (ERROR);
+}
+  /***********************************************************************
+  **  nom	: GetWatchWarningTicket()				**
+  **  desc	: Get Status de Ticket 					**
+  **  retour	: OK	-> si c'est OK					**
+  **		  ERROR	-> erreur fatal					**
+  **			(c) 1999 Hightech Payment Systems		**
+  ***********************************************************************/
+int	GetWatchWarningTicket(nIndexCtx,pTermNbr,pAcqBank /*ICH270715*/)
+int 		nIndexCtx;
+char		*pTermNbr;
+char		*pAcqBank/*ICH270715*/;
+{
+   struct sqlca sqlca;
+   char  sLine[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar		hTermNbr		[15+1];
+    VARCHAR     	hAcqBank  		[6+1];/*ICH270715*/ 
+    char		hticket_printer_status	[1+1];
+    int			hRet;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start GetWatchWarningTicket(%.15s,%.6s)", pTermNbr,pAcqBank);
+trace_event(sLine, PROCESSING);
+
+    /* - initilialisation des variables ------------------------------------- */
+    memset(hTermNbr.arr,		0, sizeof(hTermNbr.arr)		  );
+    memset(hAcqBank.arr,	     0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hticket_printer_status,		0, sizeof(hticket_printer_status)		  );
+    hTermNbr.len	= sizeof(hTermNbr.arr);
+
+    /* - renseignement des variables PL/SQL --------------------------------- */
+    memcpy(hTermNbr.arr,pTermNbr, strlen(pTermNbr));
+    hTermNbr.len	= strlen(pTermNbr);
+
+
+	memcpy(hAcqBank.arr, pAcqBank, strlen(pAcqBank));
+	hAcqBank.len = strlen(pAcqBank);
+	
+    /* - capture des exceptions PL/SQL -------------------------------------- */
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO getUserCommandErr;
+
+    /* - execution du traitement PL/SQL ------------------------------------- */
+    EXEC SQL EXECUTE
+    DECLARE
+        enr_terminal_atm_watch_warning	TERMINAL_ATM_WATCH_WARNING%ROWTYPE;
+    BEGIN
+        -- preparation de l'enregistrement
+
+        :hRet := PCRD_ATM_TOOLS.GET_ATM_WATCH_WARNING(:hTermNbr, :hAcqBank/*ICH270715*/,enr_terminal_atm_watch_warning);
+
+        -- recuperation du resultat
+        IF :hRet = DECLARATION_CST.OK
+        THEN
+            :hticket_printer_status :=enr_terminal_atm_watch_warning.TICKET_PRINTER_STATUS;
+        END IF;
+    END;
+    END-EXEC;
+
+    /* - examen du retour du traitement PL/SQL ------------------------------ */
+    if (hRet != OK)
+    {
+        sprintf(sLine, "End   GetWatchWarningTicket(%d)", hRet);
+        trace_event(sLine, PROCESSING);
+        return (hRet);
+    }
+
+    if ( memcmp(hticket_printer_status,"O",1) == 0 ) {
+        sprintf(sLine, "End   GetWatchWarningTicket(NOK %s)", hticket_printer_status);
+        trace_event(sLine, PROCESSING);
+	return(NOK);
+	}
+    else
+	{
+        sprintf(sLine, "End   GetWatchWarningTicket(OK %s)", hticket_printer_status);
+        trace_event(sLine, PROCESSING);
+	return(OK);
+	}
+	
+getUserCommandErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   GetWatchWarningTicket(ERROR)", ERROR);
+    return (ERROR);
+}

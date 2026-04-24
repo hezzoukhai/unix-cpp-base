@@ -1,0 +1,89 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*                                                                             */
+/*                                                                             */
+/* Description                                                                 */
+/*                                                                             */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001AA     		18-01-2004   		Adil Attari    		Initial Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int Statemt_Inquiry  ( int nIndiceCtx , char *sTlvBuffer )
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_stat	  [ LG_MAX + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    trace_event ( "Start Statemt_Inquiry () ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_stat.arr            ,  0  ,   sizeof(T_tlv_stat.arr )  );
+	T_tlv_stat.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_stat.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_stat.len = strlen(sTlvBuffer );
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UpdateStatement;
+	EXEC SQL EXECUTE
+	BEGIN
+
+		:response_code := PCRD_ATM_TOOLS_1.INS_STATEMENT_REQ(:T_tlv_stat);
+	END;
+	END-EXEC;
+	
+    tlvcpy( sTlvBuffer , T_tlv_stat.arr, T_tlv_stat.len);
+	memset ( T_tlv_stat.arr            ,  0  ,   sizeof(T_tlv_stat.arr )  );
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine,"End Statemt_Inquiry (%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_UpdateStatement :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+    tlvcpy( sTlvBuffer , T_tlv_stat.arr, T_tlv_stat.len);
+	memset ( T_tlv_stat.arr            ,  0  ,   sizeof(T_tlv_stat.arr )  );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	
+	trace_event("End Statemt_Inquiry (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+

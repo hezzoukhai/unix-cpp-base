@@ -1,0 +1,101 @@
+#include <stdio.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+/***************************************************************************/
+
+int LogAtmJournal  (  int     nIndexCtx,
+                      char    *Note1,
+                      char    *Note2,
+                      char    *Note3,
+                      char    *Note4,
+                      char    *TlvBuffer)
+  {
+   
+	struct sqlca sqlca; /**Linux ***/
+    char     sLine[MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+ 
+       char T_cassette1_note   [ 3 ];
+       char T_cassette2_note   [ 3 ];
+       char T_cassette3_note   [ 3 ];
+       char T_cassette4_note   [ 3 ];
+       VARCHAR T_tlv_buffer    [ LG_MAX +1 ]; 
+       int response;
+   
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+      sprintf(sLine, "Start LogAtmJournal(%.2s,%.2s,%.2s,%.2s)",
+                      Note1, Note2, Note3, Note4);
+      trace_event(sLine, PROCESSING);
+
+      memset(T_cassette1_note,      0, sizeof(T_cassette1_note));
+      memset(T_cassette2_note,      0, sizeof(T_cassette2_note));
+      memset(T_cassette3_note,      0, sizeof(T_cassette3_note));
+      memset(T_cassette4_note,      0, sizeof(T_cassette4_note));
+      memset(T_tlv_buffer.arr,      0, sizeof(T_tlv_buffer.arr));
+      T_tlv_buffer.len = 0; 
+      memcpy(T_cassette1_note,  Note1, 2);
+      memcpy(T_cassette2_note,  Note2, 2);
+      memcpy(T_cassette3_note,  Note3, 2);
+      memcpy(T_cassette4_note,  Note4, 2);
+
+
+	  /*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(TlvBuffer)
+
+      memcpy(T_tlv_buffer.arr, TlvBuffer, strlen(TlvBuffer));
+      T_tlv_buffer.len = strlen(TlvBuffer);
+   EXEC SQL WHENEVER SQLERROR GOTO LogAtmJournal_error;
+   EXEC SQL EXECUTE
+   BEGIN
+
+       :response := PCRD_ATM_TOOLS_3.INSERT_ATM_JOURNAL (:T_tlv_buffer,
+                                                         :T_cassette1_note,
+                                                         :T_cassette2_note,
+                                                         :T_cassette3_note,
+                                                         :T_cassette4_note);
+
+   END;
+   END-EXEC;
+
+   memset(T_tlv_buffer.arr,      0, sizeof(T_tlv_buffer.arr)); /* PCI */
+   /*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(TlvBuffer)
+
+   if (response == OK)
+   {
+        CommitOracle( nIndexCtx );
+        trace_event("End   LogAtmJournal(OK)", PROCESSING);
+        return(OK);
+   }
+   else
+   {
+		
+        trace_event("End   LogAtmJournal(NOK)", PROCESSING);
+        return(NOK);
+   }
+   
+   
+
+   LogAtmJournal_error:
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine, ERROR);
+   memset(T_tlv_buffer.arr,      0, sizeof(T_tlv_buffer.arr)); /* PCI */
+   /*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(TlvBuffer)
+   trace_event("End   LogAtmJournal(SYSTEM_MALFUNCTION)",PROCESSING);
+   return(SYSTEM_MALFUNCTION);
+}
+
+
+

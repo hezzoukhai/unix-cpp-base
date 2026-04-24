@@ -1,0 +1,80 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+int ConvRateInquiry  ( int nIndiceCtx , char *sTlvBuffer )
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_bal	  [ LG_MAX + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    trace_event ( "Start ConvRateInquiry () ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  );
+	T_tlv_bal.len = 0;
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_bal.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_bal.len = strlen(sTlvBuffer );
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UpdateConvRate;
+	EXEC SQL EXECUTE
+	BEGIN
+
+		 :response_code := PCRD_ATM_TOOLS_1.GET_CONVERSION_RATE(:T_tlv_bal );
+	END;
+	END-EXEC;
+	
+    tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  ); /* PCI */
+	sprintf(sLine,"End ConvRateInquiry (%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_UpdateConvRate :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+    tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  ); /* PCI */
+
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	
+	trace_event("End ConvRateInquiry (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+

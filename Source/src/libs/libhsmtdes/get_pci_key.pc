@@ -1,0 +1,190 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <hsm_inc.h>
+#include <globals.h> 
+#include <stdlib.h>
+#include <string.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/*****************************************************************************/
+/*GetPciKey       AOU30112011                                                */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere les cles PCI KEY.                       */
+/*  Entree   : Key_COE Seq_Number.                                           */
+/*  Sortie   : La cle PCI KEY.                                               */
+/*****************************************************************************/
+
+int     GetPciKey( int nIndiceCtx , char *Keycode, char *SeqNum,char *ZMK )
+{
+
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_Keycode     				[4 + 1];
+        VARCHAR          T_SeqNum     				[4 + 1];
+        varchar          T_ZMK               [256 + 1];
+    EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	
+	memset(sLine,    		0, sizeof(sLine));
+	memset(T_ZMK.arr,    		0, sizeof(T_ZMK.arr));
+	memset(T_Keycode.arr, 	0, sizeof(T_Keycode.arr));
+	memset(T_SeqNum.arr, 	0, sizeof(T_SeqNum.arr));
+	T_SeqNum.len = 0;
+	T_Keycode.len = 0;
+	T_ZMK.len = 0;
+	
+	sprintf(sLine, "Start GetPciKey");
+	trace_event(sLine, PROCESSING);
+
+
+	memcpy(T_Keycode.arr, Keycode, strlen(Keycode));
+	T_Keycode.len = strlen(Keycode);
+
+	
+	memcpy(T_SeqNum.arr, SeqNum, strlen(SeqNum));
+	T_SeqNum.len = strlen(SeqNum);
+
+
+	response = HSM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO tmk_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response := PCRD_GET_KEY.GET_TMK_KEY_N      (  :T_Keycode,
+														:T_SeqNum,
+														:T_ZMK
+                                                			);
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+
+		memcpy(ZMK, T_ZMK.arr, T_ZMK.len );
+
+
+		if (debug_option == 1)
+		{
+				sprintf(sLine, "End   GetPciKey(%.32s)", ZMK);
+				trace_event(sLine, PROCESSING);
+		}
+
+		else
+		{
+				sprintf(sLine, "End   GetPciKey()");
+				trace_event(sLine, PROCESSING);
+		}
+
+		memset(T_ZMK.arr,    		0, sizeof(T_ZMK.arr));
+        return(OK);
+	}
+
+	memset(T_ZMK.arr,    		0, sizeof(T_ZMK.arr));
+	sprintf(sLine, "End   GetPciKey(NOK)");
+	trace_event(sLine, PROCESSING);
+	return(NOK);
+
+	tmk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+	memset(T_ZMK.arr,    		0, sizeof(T_ZMK.arr));
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetPciKey (MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+
+/*****************************************************************************/
+/* GetTMK_N                                                                    */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere la cle TMK/PCI.                         */
+/*  Entree   : L identificateur du resource.                                 */
+/*  Sortie   : La cle TMK.                                                   */
+/*****************************************************************************/
+
+int     GetTMK_N ( int nIndiceCtx , char *key_code, char *seq_number, char *TMK)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        int     response;
+        VARCHAR    T_KEY_CODE    [ 4 + 1 ];
+        char    T_SEQ_NUMBER     [ 3 + 1 ];
+        VARCHAR T_TMK            [256 + 1 ]; 
+        EXEC SQL END DECLARE SECTION;
+
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+		
+		memset(T_TMK.arr    ,       0, sizeof(T_TMK.arr));
+		memset(T_KEY_CODE.arr,  0, sizeof(T_KEY_CODE.arr));
+		memset(T_SEQ_NUMBER,  0, sizeof(T_SEQ_NUMBER));
+		memset(sLine,         0, sizeof(sLine));
+		T_TMK.len = 0;
+		T_KEY_CODE.len = 0;
+
+		
+		
+        sprintf(sLine, "Start GetTMK_N (%.3s)", seq_number);
+        trace_event(sLine, PROCESSING);
+
+ 
+		memcpy( T_KEY_CODE.arr, key_code, strlen(key_code));
+		T_KEY_CODE.len =strlen(key_code);
+		memcpy( T_SEQ_NUMBER, seq_number, 3);
+
+        response = 909;
+        EXEC SQL WHENEVER SQLERROR GOTO zmk_key_exception;
+        EXEC SQL EXECUTE
+        BEGIN
+		
+		
+   	:response := PCRD_GET_KEY.GET_TMK_KEY_N(:T_KEY_CODE,
+											:T_SEQ_NUMBER,
+											:T_TMK
+											);
+        END;
+        END-EXEC;
+
+        sprintf(sLine, "response :  (%d)", response);
+        trace_event(sLine, PROCESSING);
+
+        if (response == OK)
+        {
+        	memcpy(TMK, T_TMK.arr, T_TMK.len );
+			memset(T_TMK.arr    ,       0, sizeof(T_TMK.arr));
+        	if (debug_option == 1)
+        	{
+                	sprintf(sLine, "End   GetTMK_N (%.256s)", TMK);
+                	trace_event(sLine, PROCESSING);
+        	}
+        	else
+        	{
+                	sprintf(sLine, "End   GetTMK_N (OK)");
+                	trace_event(sLine, PROCESSING);
+        	}
+ 
+        	return(OK);
+        }
+		memset(T_TMK.arr    ,       0, sizeof(T_TMK.arr));
+        trace_event("End   GetTMK_N (NOK)", PROCESSING);
+        return(NOK);
+
+zmk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+	memset(T_TMK.arr    ,       0, sizeof(T_TMK.arr));
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetTMK_N(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}

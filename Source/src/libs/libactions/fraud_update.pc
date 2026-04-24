@@ -1,0 +1,148 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <tlv_autho.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int FraudUpdate  ( int nIndiceCtx , char *sTlvBuffer)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+    trace_event ( "Start FraudUpdate () ", PROCESSING );
+
+
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_FraudUpdate;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response_code := PCRD_RSKM_ON_FRAUD_TOOLS.FRAUD_UPDATE( :T_tlv_auth);
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	
+	sprintf(sLine,"End FraudUpdate (%d)", response_code );
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_FraudUpdate :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	trace_event("End FraudUpdate (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+
+int FraudControl  ( int nIndiceCtx , char *sTlvBuffer)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+    trace_event ( "Start FraudControl () ", PROCESSING );
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_FraudCtrl;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response_code := PCRD_P7_R_CTRLS_1.EXEC_CTRL_FRAUD( :T_tlv_auth);
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	
+	sprintf(sLine,"End FraudControl (%d)", response_code );
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_FraudCtrl :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	trace_event("End FraudControl (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+

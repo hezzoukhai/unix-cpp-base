@@ -1,0 +1,105 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetNetwork  (int nIndiceCtx, TSNetwork *network)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+        char   NETWORK_CODE           [ 2 ];
+        char   CREDIT_PRIMARY_PORT    [ 6 ];
+        char   CREDIT_ALTERNATE_PORT  [ 6 ];
+        char   DEBIT_PRIMARY_PORT     [ 6 ];
+        char   DEBIT_ALTERNATE_PORT   [ 6 ];
+        char   VIRTUAL_BANK_CODE      [ 6 ];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetNetwork() ", PROCESSING );
+        memset (   NETWORK_CODE           ,0,  2 );
+        memset (   CREDIT_PRIMARY_PORT    ,0,  6 );
+        memset (   CREDIT_ALTERNATE_PORT  ,0,  6 );
+        memset (   DEBIT_PRIMARY_PORT     ,0,  6 );
+        memset (   DEBIT_ALTERNATE_PORT   ,0,  6 );
+        memset (   VIRTUAL_BANK_CODE      ,0,  6 );
+
+	memcpy (   NETWORK_CODE,network->network_code,2);
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_network;
+	EXEC SQL EXECUTE
+	    DECLARE T_NETWORK   NETWORK%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_PARAM_GENERAL_ROWS.GET_NETWORK
+						(   :NETWORK_CODE, 
+	                                            T_NETWORK 
+	                                        );
+
+
+		IF :response_code = 0 THEN
+		:CREDIT_PRIMARY_PORT       := T_NETWORK.CREDIT_PRIMARY_PORT;
+		:CREDIT_ALTERNATE_PORT     := T_NETWORK.CREDIT_ALTERNATE_PORT;
+		:DEBIT_PRIMARY_PORT        := T_NETWORK.DEBIT_PRIMARY_PORT;
+		:DEBIT_ALTERNATE_PORT      := T_NETWORK.DEBIT_ALTERNATE_PORT;
+		:VIRTUAL_BANK_CODE         := T_NETWORK.VIRTUAL_BANK_CODE   ;
+		END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+            memcpy ( network->credit_primary_port, 
+						CREDIT_PRIMARY_PORT    ,  6 );
+            memcpy ( network->credit_alternate_port,  
+						CREDIT_ALTERNATE_PORT  ,  6 );
+            memcpy ( network->debit_primary_port,  
+						DEBIT_PRIMARY_PORT     ,  6 );
+            memcpy ( network->debit_alternate_port, 
+						DEBIT_ALTERNATE_PORT   ,  6 );
+            memcpy ( network->virtual_bank_code,   
+						VIRTUAL_BANK_CODE      ,  6 );
+	    trace_event ( "End GetNetwork( OK ) ", PROCESSING );
+	    return(OK);
+	}
+	trace_event ( "End GetNetwork( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_network:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+            memcpy ( network->credit_primary_port, 
+						CREDIT_PRIMARY_PORT    ,  6 );
+            memcpy ( network->credit_alternate_port,  
+						CREDIT_ALTERNATE_PORT  ,  6 );
+            memcpy ( network->debit_primary_port,  
+						DEBIT_PRIMARY_PORT     ,  6 );
+            memcpy ( network->debit_alternate_port, 
+						DEBIT_ALTERNATE_PORT   ,  6 );
+            memcpy ( network->virtual_bank_code,   
+						VIRTUAL_BANK_CODE      ,  6 );
+	    trace_event ( "End GetNetwork( OK ) ", PROCESSING );
+	    return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetNetwork( NOK ) ", PROCESSING );
+	return( NOK );
+}

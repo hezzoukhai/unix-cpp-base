@@ -1,0 +1,66 @@
+#ifndef HPS_ECCF_FIELDS_H
+#define HPS_ECCF_FIELDS_H
+
+#define ECCF_BITMAP_1							  		  0
+#define ECCF_PRIMARY_ACCOUNT_NUMBER				  		  1
+#define ECCF_PROCESSING_CODE					  		  2
+#define ECCF_AMOUNT_TRANSACTION					  		  3
+#define ECCF_AMOUNT_RECONCILIATION				  		  4
+#define ECCF_AMOUNT_CARDHOLDER					  		  5
+#define ECCF_CONVERSION_RATE_RECONCILIATION		  		  8
+#define ECCF_CONVERSION_RATE_CARDHOLDER_BILLING		 	  9
+#define ECCF_SYSTEM_TRACE_AUDIT_NUMBER       		 	 10
+#define ECCF_DATE_TIME_LOCAL_TRANSACTION              	 11
+#define ECCF_DATE_EXPIRATION						 	 13
+#define ECCF_DATE_SETTLEMENT						 	 14
+#define ECCF_DATE_CONVERSION						 	 15
+#define ECCF_POINT_OF_SERVICE_DATA_CODE				 	 21
+#define ECCF_CARD_SEQUENCE_NUMBER					 	 22
+#define ECCF_FUNCTION_CODE							 	 23
+#define ECCF_MESSAGE_REASON_CODE					 	 24
+#define ECCF_CARD_ACCEPTOR_BUSINESS_CODE			 	 25
+#define ECCF_DATE_RECONCILIATION					 	 27
+#define ECCF_RECONCILIATION_INDICATOR				 	 28
+#define ECCF_AMOUNTS_ORIGINAL                         	 29
+#define ECCF_ACQUIRING_REFERENCE_DATA                 	 30
+#define ECCF_ACQUIRING_INSTIT_IDENT_CODE_VERSION      	 31
+#define ECCF_FORWARDING_INSTIT_IDENT_CODE             	 32
+#define ECCF_RETRIEVAL_REFERENCE_NUMBER               	 36
+#define ECCF_APPROVAL_CODE                            	 37
+#define ECCF_ACTION_CODE                              	 38
+#define ECCF_CARD_ACCEPTOR_TERMINAL_IDENTIFICATION    	 40
+#define ECCF_CARD_ACCEPTOR_IDENTIFICATION_CODE        	 41
+#define ECCF_CARD_ACCEPTOR_NAME_LOCATION              	 42
+#define ECCF_AMOUNT_FEES                 			 	 45
+#define ECCF_CURRENCY_CODE_TRANSACTION   			 	 48
+#define ECCF_CURRENCY_CODE_RECONCILIATION			 	 49
+#define ECCF_CURRENCY_CODE_CARDHOLDER_BILLING         	 50
+#define ECCF_ICC_SYSTEM_RELATED_DATA                  	 54
+#define ECCF_ORIGINAL_DATA_ELEMENTS                   	 55
+#define ECCF_MESSAGE_NUMBER                           	 70
+#define ECCF_DATA_RECORD                              	 71
+#define ECCF_CREDITS_NUMBER                           	 73
+#define ECCF_CREDITS_REVERSAL_NUMBER                  	 74
+#define ECCF_DEBITS_NUMBER                            	 75
+#define ECCF_DEBITS_REVERSAL_NUMBER                   	 76
+#define ECCF_FEE_COLLECTION_NUMBER                    	 84
+#define ECCF_CREDITS_AMOUNT                           	 85
+#define ECCF_CREDITS_REVERSAL_AMOUNT                  	 86
+#define ECCF_DEBITS_AMOUNT                            	 87
+#define ECCF_DEBITS_REVERSAL_AMOUNT                   	 88
+#define ECCF_TRANS_DEST_INSTIT_IDENT_CODE             	 92
+#define ECCF_TRANS_ORIG_INSTIT_IDENT_CODE             	 93
+#define ECCF_CARD_ISSUER_REFERENCE_DATA               	 94
+#define ECCF_AMOUNT_NET_RECONCILIATION                	 96
+#define ECCF_RECEIVING_INSTIT_IDENT_CODE             	 99
+#define ECCF_TRANSACTION_DESCRIPTION                 	103
+#define ECCF_CREDITS_CHARGEBACK_AMOUNT               	104
+#define ECCF_DEBITS_CHARGEBACK_AMOUNT                	105
+#define ECCF_CREDITS_CHARGEBACK_NUMBER               	106
+#define ECCF_DEBITS_CHARGEBACK_NUMBER                	107
+#define ECCF_CREDITS_FEE_AMOUNTS                     	108
+#define ECCF_DEBITS_FEE_AMOUNTS                      	109
+#define ECCF_MISCELLANEOUS_DATA                      	122
+#define ECCF_EUROCHEQUE_PRIVATE_DATA                 	124
+
+#endif /** HPS_ECCF_FIELDS_H **/

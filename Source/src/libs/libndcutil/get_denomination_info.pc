@@ -1,0 +1,344 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_denomination_info.pc                                                                 */
+/*                                                                             */
+/* Description                                                                 */
+/*      ATM Reply Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+0001MK     		17-11-2003   		Mahjoub KARROUM    		Initial Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <define.h>
+#include <langue.h>
+#include <param_ctx.h>
+
+/*****************************************************************************/
+/* Fonction GetDenominationInfo                                                     */
+/* ----------------------------------------                                  */
+/*  Retour   : OK                                                            */
+/*  Revision :                                                               */
+/*****************************************************************************/
+int     GetDenominationInfo(
+	int    nIndexCtx,
+	char   *pTreminalNumber,
+	char   *pAcqBank/*ICH270715*/,
+	char   *pDenominationType,
+	float    *pDenominationNote)
+
+{
+
+	struct sqlca sqlca;
+	char    sLine[MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR	T_pTreminalNumber	[15+1];
+	VARCHAR    T_AcqBank  	 	[6+1];/*ICH270715*/ 
+	char    T_pDenominationType	[2+1];
+	float 	T_pDenominationNote;
+	int		plRetour;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start GetDenominationInfo(%s,%s,type:%s)", pTreminalNumber,pAcqBank,pDenominationType);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_pTreminalNumber.arr,    0,sizeof(T_pTreminalNumber.arr));
+	T_pTreminalNumber.len = 0;
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/       
+	memset(T_pDenominationType,    0,sizeof(T_pDenominationType));
+	T_pDenominationNote = 0;
+
+	memcpy(T_pTreminalNumber.arr , pTreminalNumber,8);
+	T_pTreminalNumber.len = strlen(pTreminalNumber);
+
+	memcpy(T_AcqBank.arr, pAcqBank, strlen(pAcqBank));
+	T_AcqBank.len = strlen(pAcqBank);
+
+	memcpy(T_pDenominationType , pDenominationType,2);
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO GetDenominationInfoErr;
+	EXEC SQL EXECUTE
+		DECLARE
+		v_ndc_denomination_type_record               NDC_DENOMINATION_TYPE%ROWTYPE;
+	BEGIN
+		:plRetour := PCRD_ATM_CDM_TOOLS_1.GET_NDC_DENOMINATION_TYPE(
+		:T_pTreminalNumber,
+		:T_AcqBank,/*ICH270715*/
+		:T_pDenominationType,
+		v_ndc_denomination_type_record	
+		);
+	IF ( :plRetour = declaration_cst.OK )
+		THEN
+		:T_pDenominationNote:= NVL(v_ndc_denomination_type_record.note_value,0);
+	ELSE
+		:T_pDenominationNote :=0;
+	END IF;
+	END;
+	END-EXEC;
+
+	if(plRetour == OK)
+	{
+		*pDenominationNote = T_pDenominationNote;
+		sprintf(sLine, "END   GetDenominationInfo(%f,%d)", *pDenominationNote, T_pDenominationNote);
+		trace_event(sLine, PROCESSING);
+		return(OK);
+	}
+	else
+	{
+		*pDenominationNote = 0;
+		sprintf(sLine, "END   GetDenominationInfo(%s,%s)", "UNKNOWN Denomination", T_pDenominationType);
+		trace_event(sLine, PROCESSING);
+		trace_event("END   GetDenominationInfo(NOK)", PROCESSING);
+		return(NOK);
+	}
+GetDenominationInfoErr :
+	sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   GetDenominationInfo(ERROR)", ERROR);
+	return (ERROR);
+}
+
+
+
+int   cash_depo_stat( int nIndexCtx , char *V_terminal_number,char *V_AcqBank /*ICH270715*/, char *V_status)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR         T_terminal_number   [15];
+	VARCHAR      		T_AcqBank   [6+1];/*ICH270715*/ 
+	char                    T_status                [ 1+1];
+	int                             retour;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start cash_depo_stat(%s)", V_status);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/  
+	memset(T_status, 0, sizeof(T_status));
+
+	memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+	T_terminal_number.len = strlen(V_terminal_number);
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+	memcpy(T_status, V_status, sizeof(T_status));
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR  GOTO cash_depo_stat_error;
+	EXEC SQL EXECUTE
+		BEGIN
+		:retour := PCRD_ATM_CDM_TOOLS_1.CASH_DEPOSIT_FAULT(:T_terminal_number,:T_AcqBank/*ICH270715*/,:T_status);
+	END;
+	END-EXEC;
+	trace_event("End   cash_depo_stat(OK) ",PROCESSING);
+	return(OK);
+
+cash_depo_stat_error   :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   cash_depo_stat(NOK) ",PROCESSING);
+	return(NOK);
+}
+
+int   cash_depo_stat_wn( int nIndexCtx , char *V_terminal_number,char *V_AcqBank /*ICH270715*/, char *V_status)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR         T_terminal_number   [15];
+	VARCHAR      		T_AcqBank  	 		[6+1];/*ICH270715*/ 
+	char                    T_status                [ 1+1];
+	int                             retour;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start cash_depo_stat_wn(%s)", V_status);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/  
+	memset(T_status, 0, sizeof(T_status));
+
+	memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+	T_terminal_number.len = strlen(V_terminal_number);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+	memcpy(T_status, V_status, sizeof(T_status));
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR  GOTO cash_depo_stat_wn_error;
+	EXEC SQL EXECUTE
+		BEGIN
+			:retour := -1;
+		--:retour := PCRD_ATM_CDM_TOOLS_1.WN_CASH_DEPOSIT_FAULT(:T_terminal_number,:T_AcqBank,/*ICH270715*/:T_status);
+	END;
+	END-EXEC;
+	trace_event("End   cash_depo_stat_wn(OK) ",PROCESSING);
+	return(OK);
+
+cash_depo_stat_wn_error   :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   cash_depo_stat_wn(NOK) ",PROCESSING);
+	return(NOK);
+}
+
+
+int   cheq_depo_stat_wn( int nIndexCtx , char *V_terminal_number,char *V_AcqBank /*ICH270715*/, char *V_status)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR         T_terminal_number   [15];
+	VARCHAR      		T_AcqBank  	 		[6+1];/*ICH270715*/ 
+	char                    T_status                [ 1+1];
+	int                             retour;
+	EXEC SQL END DECLARE SECTION;
+
+
+	sprintf(sLine, "Start cheq_depo_stat_wn(%s)", V_status);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+	memset(T_status, 0, sizeof(T_status));
+
+	memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+	T_terminal_number.len = strlen(V_terminal_number);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+	memcpy(T_status, V_status, sizeof(T_status));
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR  GOTO cheq_depo_stat_wn_error;
+	EXEC SQL EXECUTE
+		BEGIN
+			:retour := -1;
+		--:retour := PCRD_ATM_CDM_TOOLS_1.WN_CHEQ_DEPOSIT_FAULT(:T_terminal_number,:T_AcqBank,/*ICH270715*/:T_status);
+	END;
+	END-EXEC;
+	trace_event("End   cheq_depo_stat_wn(OK) ",PROCESSING);
+	return(OK);
+
+cheq_depo_stat_wn_error   :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   cheq_depo_stat_wn(NOK) ",PROCESSING);
+	return(NOK);
+}
+
+int   cash_depo_stat_ncr( int nIndexCtx , char *V_terminal_number, char *V_AcqBank /*ICH270715*/, char *V_status)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR         T_terminal_number   [15];
+	VARCHAR      		T_AcqBank  	 		[6+1];/*ICH270715*/ 
+	char                    T_status                [ 1+1];
+	int                             retour;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start cash_depo_stat_ncr(%s)", V_status);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+	memset(T_status, 0, sizeof(T_status));
+
+	memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+	T_terminal_number.len = strlen(V_terminal_number);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+	memcpy(T_status, V_status, sizeof(T_status));
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR  GOTO cash_depo_stat_ncr_error;
+	EXEC SQL EXECUTE
+		BEGIN
+			:retour := -1;
+		--:retour := PCRD_ATM_CDM_TOOLS_1.NCR_CASH_DEPOSIT_FAULT(:T_terminal_number,:T_AcqBank,/*ICH270715*/ :T_status);
+	END;
+	END-EXEC;
+	trace_event("End   cash_depo_stat_ncr(OK) ",PROCESSING);
+	return(OK);
+
+cash_depo_stat_ncr_error   :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   cash_depo_stat_ncr(NOK) ",PROCESSING);
+	return(NOK);
+}
+
+
+int   cheq_depo_stat_ncr( int nIndexCtx , char *V_terminal_number, char *V_AcqBank /*ICH270715*/, char *V_status)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR         T_terminal_number   [15];
+	VARCHAR      		T_AcqBank  	 		[6+1];/*ICH270715*/ 
+	char                    T_status                [ 1+1];
+	int                             retour;
+	EXEC SQL END DECLARE SECTION;
+
+
+	sprintf(sLine, "Start cheq_depo_stat_ncr(%s)", V_status);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/       
+	memset(T_status, 0, sizeof(T_status));
+
+	memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+	T_terminal_number.len = strlen(V_terminal_number);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+	memcpy(T_status, V_status, sizeof(T_status));
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR  GOTO cheq_depo_stat_ncr_error;
+	EXEC SQL EXECUTE
+		BEGIN
+			:retour := -1;
+		--:retour := PCRD_ATM_CDM_TOOLS_1.NCR_CHEQ_DEPOSIT_FAULT(:T_terminal_number,:T_AcqBank,/*ICH270715*/:T_status);
+	END;
+	END-EXEC;
+	trace_event("End   cheq_depo_stat_ncr(OK) ",PROCESSING);
+	return(OK);
+
+cheq_depo_stat_ncr_error   :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   cheq_depo_stat_ncr(NOK) ",PROCESSING);
+	return(NOK);
+}
+

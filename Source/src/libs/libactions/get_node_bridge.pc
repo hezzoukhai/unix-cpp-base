@@ -1,0 +1,329 @@
+#include <stdio.h>
+#include <define.h>
+
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+int  GetBridgeResourceId (int  nIndexCtx, char  *sSrcNodeId, char  *sSrcResourceId, pid_t* nSrcPid )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_src_node_id			[4 + 1];
+        char       T_resource_id			[6 + 1];
+		pid_t	   T_pid;
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf (sLine,"Start  GetBridgeResourceId(%s)", sSrcNodeId);
+   trace_event (sLine, PROCESSING);
+
+   memset (T_src_node_id,       0, sizeof(T_src_node_id));
+   memset (T_resource_id,        0, sizeof(T_resource_id));
+   T_pid =  -1;
+
+   memcpy (T_src_node_id, sSrcNodeId, 4);
+   
+   
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_bridge_res_id_err;
+   EXEC SQL EXECUTE  
+   BEGIN
+      :result := PCRD_P7_BRIDGE.GET_BRIDGE_RESOURCE_ID (
+															:T_src_node_id,
+															:T_resource_id,
+															:T_pid);
+
+   END;
+   END-EXEC;
+
+   *nSrcPid = T_pid;
+
+   if (result == OK && kill ( T_pid , 0 ) != 0 )
+   {
+	   result = NOK;
+   }
+
+   if( result == OK )
+   {
+      memcpy (sSrcResourceId,    T_resource_id,   6);
+	  sSrcResourceId[6]='\0';
+	  sprintf(sLine,"End GetBridgeResourceId(OK): [%s,%d]",sSrcResourceId,*nSrcPid);
+      trace_event (sLine, PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      trace_event ("End GetBridgeResourceId(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_bridge_res_id_err:   
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event ("End GetBridgeResourceId (NOK)", PROCESSING);
+	return (NOK);
+}
+
+/*
+int  GetNodeBridgeResourceId (int  nIndexCtx, char  *sSrcNodeId, char traffic_flag, char* sDstNodeId, char  *sResourceId )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_src_node_id			[4 + 1];
+		char       T_dst_node_id			[4 + 1];
+		char	   T_traffic_flag;
+        char       T_resource_id			[6 + 1];
+       
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf (sLine,"Start  GetNodeBridgeResourceId(%s,%c,%s)", sSrcNodeId,traffic_flag,sDstNodeId);
+   trace_event (sLine, PROCESSING);
+
+   memset (T_src_node_id,       0, sizeof(T_src_node_id));
+   memset (T_dst_node_id,       0, sizeof(T_dst_node_id));
+   memset (T_resource_id,        0, sizeof(T_resource_id));
+   
+
+   memcpy (T_src_node_id, sSrcNodeId, 4);
+   memcpy (T_dst_node_id, sDstNodeId, 4);
+   T_traffic_flag = traffic_flag;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_node_bridge_res_id_err;
+   EXEC SQL EXECUTE  
+   BEGIN
+      :result := PCRD_P7_BRIDGE.GET_NODE_BRIDGE_RESOURCE_ID (
+															:T_src_node_id,
+															:T_traffic_flag,
+															:T_dst_node_id,
+															:T_resource_id);
+
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+      memcpy (sResourceId,    T_resource_id,   6);
+	  sResourceId[6]='\0';
+	  sprintf(sLine,"End GetNodeBridgeResourceId(OK): [%s]",sResourceId);
+      trace_event (sLine, PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      trace_event ("End GetNodeBridgeResourceId(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_node_bridge_res_id_err:   
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event ("End GetNodeBridgeResourceId (NOK)", PROCESSING);
+	return (NOK);
+}
+*/
+
+
+int  GetBEBridgeResourceId (int  nIndexCtx, char  *sSrcNodeId, char* sSrcResourceId, pid_t* srcPid,  
+											char  *sDstNodeId, char* sDstResourceId, pid_t* dstPid)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	
+   EXEC SQL BEGIN DECLARE SECTION;
+		char		T_src_node_id				[4 + 1];
+        char		T_src_resource_id			[6 + 1];
+		pid_t		T_src_pid;
+
+		char		T_dst_node_id				[4 + 1];
+        char		T_dst_resource_id			[6 + 1];
+		pid_t		T_dst_pid;
+       
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf(sLine,"Start  GetBEBridgeResourceId(%s)",sSrcNodeId);
+   trace_event (sLine, PROCESSING);
+
+   memset (T_src_node_id,        0, sizeof(T_src_node_id));
+   memset (T_src_resource_id,        0, sizeof(T_src_resource_id));
+   memset (T_dst_node_id,        0, sizeof(T_dst_node_id));
+   memset (T_dst_resource_id,        0, sizeof(T_dst_resource_id));
+   
+   T_src_pid = -1;
+   T_dst_pid = -1;
+
+   memcpy(T_src_node_id,sSrcNodeId,4);
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_bridge_res_id_err;
+   EXEC SQL EXECUTE  
+   BEGIN
+      :result := PCRD_P7_BRIDGE.GET_BE_BRIDGE_NODE_ID (:T_src_node_id,:T_src_resource_id,:T_src_pid,:T_dst_node_id,:T_dst_resource_id,:T_dst_pid);
+
+   END;
+   END-EXEC;
+
+   if (result == OK && kill ( T_src_pid , 0 ) != 0)
+   {
+	   result = NOK;
+   }
+   
+   if (result == OK)
+   {
+      memcpy (sSrcResourceId,    T_src_resource_id,   6); sSrcResourceId[6]='\0';
+	  memcpy (sDstResourceId,    T_dst_resource_id,   6); sDstResourceId[6]='\0';
+	  memcpy (sDstNodeId,    T_dst_node_id,   6); sDstNodeId[4]='\0';
+	  (*srcPid) = T_src_pid;
+	  (*dstPid) = T_dst_pid;
+	  sprintf(sLine,"End GetBEBridgeResourceId(OK): [(%s,%s,%d)(%s,%s,%d)]",sSrcNodeId,sSrcResourceId,(*srcPid),sDstNodeId,sDstResourceId,(*dstPid));
+      trace_event (sLine, PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      trace_event ("End GetBEBridgeResourceId(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_bridge_res_id_err:   
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event ("End GetBEBridgeResourceId (NOK)", PROCESSING);
+	return (NOK);
+}
+
+
+
+int  GetBridgeNodeId (int  nIndexCtx, char  *sSrcNodeId, char* sAppName, char traffic_flag, char* sDstNodeId, char* Bridge_type)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_src_node_id			[4 + 1];
+		char       T_dst_node_id			[4 + 1];
+		char            T_node_type                     [1 + 1];/* AAB31052016 */
+		char	   T_traffic_flag;
+        VARCHAR    T_app_name				[256 + 1];
+       
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf (sLine,"Start  GetBridgeNodeId(%s,%s,%c)", sSrcNodeId,sAppName,traffic_flag);
+   trace_event (sLine, PROCESSING);
+
+   memset (T_src_node_id,       0, sizeof(T_src_node_id));
+   memset (T_dst_node_id,       0, sizeof(T_dst_node_id));
+   memset (T_app_name.arr,        0, sizeof(T_app_name.arr));T_app_name.len=0;
+   memset (T_node_type,                    0, sizeof(T_node_type));
+   
+
+   memcpy (T_src_node_id, sSrcNodeId, 4);
+   strncpy (T_app_name.arr, sAppName, sizeof(T_app_name.arr) - 1);
+   T_app_name.len = strlen(T_app_name.arr);
+   memcpy (T_node_type, Bridge_type, 1);
+
+   T_traffic_flag = traffic_flag;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_bridge_node_id_err;
+   EXEC SQL EXECUTE  
+   BEGIN
+      :result := PCRD_P7_BRIDGE.GET_BRIDGE_NODE_ID (
+															:T_src_node_id,
+															:T_app_name,
+															:T_traffic_flag,
+															:T_node_type,
+															:T_dst_node_id);
+
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+      memcpy (sDstNodeId,    T_dst_node_id,   4);
+	  sDstNodeId[4]='\0';
+	  sprintf(sLine,"End GetBridgeNodeId(OK): [%s]",sDstNodeId);
+      trace_event (sLine, PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      trace_event ("End GetBridgeNodeId(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_bridge_node_id_err:   
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event ("End GetBridgeNodeId (NOK)", PROCESSING);
+	return (NOK);
+}
+
+int  GetLocDBServId (int  nIndexCtx, char  *sSrcNodeId, char* sDBServId)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_src_node_id			[4 + 1];
+		char       T_db_serv_id				[4 + 1];
+		
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf (sLine,"Start  GetLocDBServId(%s)", sSrcNodeId);
+   trace_event (sLine, PROCESSING);
+
+   memset (T_src_node_id,       0, sizeof(T_src_node_id));
+   memset (T_db_serv_id,       0, sizeof(T_db_serv_id));
+   
+
+   memcpy (T_src_node_id, sSrcNodeId, 4);
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_loc_dbserv_id_err;
+   EXEC SQL EXECUTE  
+   BEGIN
+      :result := PCRD_P7_FUNCTION_TOOLS.GET_LOC_DBSERV (
+															:T_src_node_id,
+															:T_db_serv_id);
+
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+      memcpy (sDBServId,    T_db_serv_id,   4);
+	  sDBServId[4]='\0';
+	  sprintf(sLine,"End GetLocDBServId(OK): [%s]",sDBServId);
+      trace_event (sLine, PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      trace_event ("End GetLocDBServId(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_loc_dbserv_id_err:   
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event ("End GetBridgeNodeId (NOK)", PROCESSING);
+	return (NOK);
+}

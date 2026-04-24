@@ -1,0 +1,204 @@
+#include <stdio.h>
+
+#include <define.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <ascii.h>
+#include <dblcmd.h>
+#include <dbl_protocol.h>
+#include <dbl_paramdef.h>
+#include <dbl_param.h>
+
+
+/******************************************************************************/
+/* Function: FctDblGetEmvData()                                               */
+/* -----------------                                                          */
+/******************************************************************************/
+int FctDblGetEmvData(int pnIndexCtx, char *psTermNbr,char *pAcqBank/*ICH270715*/, int pnParamType, char *psParamsData, int *pnParamsLen)
+{
+
+char sLine [MAX_LINE_TRC];
+
+EXEC SQL BEGIN DECLARE SECTION;
+   int             pl_RetCode                             ;
+   int             pl_ParamType                           ;
+   char            pl_BankCode                   [    6+1];
+   char            pl_ProfileCode                [    3+1];
+   VARCHAR         pl_ParamsData                 [30000+1];
+   short           pl_null_ParamsData_ind                 ; /** To Overcome the "Fetch Column is Null" Error **/
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "START FctDblGetEmvData(%s,%s,%d)", psTermNbr,pAcqBank/*ICH270715*/, pnParamType);
+trace_event(sLine, PROCESSING);
+
+   memset(pl_ParamsData.arr,         0, sizeof(pl_ParamsData.arr)); pl_ParamsData.len = 0;
+   memset(pl_BankCode,               0, sizeof(pl_BankCode));
+   memset(pl_ProfileCode,            0, sizeof(pl_ProfileCode));
+
+	memcpy(pl_BankCode,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+
+   pl_ParamType = pnParamType;
+
+   pl_RetCode = GetTerminalProfile(pnIndexCtx, psTermNbr, pl_BankCode, pl_ProfileCode);
+   if(pl_RetCode != OK)
+   {
+      trace_event("END   FctDblGetEmvData(NOK) <ERROR ON GetTerminalProfile()>", FATAL);
+      return (NOK);
+   }
+ 
+   sprintf(sLine, "=> pl_BankCode     =[%s]", pl_BankCode);    trace_event(sLine, PROCESSING);
+   sprintf(sLine, "=> pl_ProfileCode  =[%s]", pl_ProfileCode); trace_event(sLine, PROCESSING);
+   sprintf(sLine, "=> pl_ParamType    =[%d]", pl_ParamType);   trace_event(sLine, PROCESSING);
+
+   EXEC SQL WHENEVER SQLERROR GOTO sql_error_tag;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[pnIndexCtx].ctx;
+
+   EXEC SQL EXECUTE
+   BEGIN
+
+      :pl_RetCode := PCRD_DBL_EMV_PARAMS.FCT_GET_EMV_DATA(
+                                                        :pl_BankCode,
+                                                        :pl_ProfileCode,
+                                                        :pl_ParamType,
+                                                        :pl_ParamsData:pl_null_ParamsData_ind
+                                                        );
+
+   END;
+   END-EXEC;
+
+   if (pl_RetCode != OK)
+   {
+      trace_event("END   FctDblGetEmvData(NOK) <ERROR ON PCRD_DBL_EMV_PARAMS.FCT_GET_EMV_STATE()>", FATAL);
+      return(NOK);
+   }
+
+   if( -1 != pl_null_ParamsData_ind ) /** Only when OutPut Data is Not NULL **/
+   {
+      memcpy(psParamsData, pl_ParamsData.arr, pl_ParamsData.len);
+      *pnParamsLen = pl_ParamsData.len;
+      sprintf(sLine, "=> pl_ParamsData  .len=[%d] .arr", pl_ParamsData.len);   trace_event(sLine, PROCESSING);
+      dump_buffer(pl_ParamsData.arr, pl_ParamsData.len,'A','X','X');
+   }
+   else
+      trace_event("WARNING!! <No Data Found>",PROCESSING);
+
+   sprintf(sLine, "END   FctDblGetEmvData(OK)");
+   trace_event(sLine,PROCESSING);
+   return(OK);
+
+sql_error_tag:
+    sprintf(sLine, "!!!SQLERRM=<%.79s>", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, FATAL);
+    trace_event("END   FctDblGetEmvData(ERROR)", FATAL);
+    return (ERROR);
+}
+
+
+/******************************************************************************/
+/* Function: FctSendEmvParams()                                               */
+/* -----------------                                                          */
+/******************************************************************************/
+int FctSendEmvParams(int pnIndexCtx, char *psTermNbr,char *pAcqBank/*ICH270715*/, int pnParamType)
+{
+char  sLine [ MAX_LINE_TRC ], vsParamsData[30000+1], vsBuffer[LG_MAX], vsTmpData[LG_MAX];
+int   vnOffset, vnRetCode, vnParamsLen, vnLen, vnTmpLen, nTcpSocketFd;
+
+
+   sprintf(sLine, "START FctSendEmvParams(%s,%s,%d)", psTermNbr,pAcqBank,pnParamType);
+   trace_event(sLine, PROCESSING);
+
+   memset(vsParamsData, 0, sizeof(vsParamsData));
+   vnParamsLen = 0;
+
+   vnRetCode = FctDblGetEmvData(pnIndexCtx, psTermNbr,pAcqBank, pnParamType, vsParamsData, &vnParamsLen);
+   if ( OK != vnRetCode )
+   {
+      trace_event("END   FctSendEmvParams(NOK) <ERROR ON FctDblGetEmvData()>", FATAL);
+      return(NOK);
+   }
+
+   vnOffset = 0;
+   while ( vnOffset < vnParamsLen )
+   {
+      memset(vsBuffer, 0, sizeof(vsBuffer));
+      vnLen = 0;
+      vnTmpLen = 0;
+
+      Prepare_Header(DATA_COMMAND, psTermNbr, vsBuffer);
+      vnLen += 11;
+
+      if ( GN_DBL_EMV_STATES == pnParamType )
+         Prepare_Header_Config(CUSTOMISATION_DATA, STATE_TABLE_LOAD, vsBuffer);
+      else
+         Prepare_Header_Config(CUSTOMISATION_DATA, ENHANCED_CONFIGURATION_LOAD, vsBuffer);
+      vnLen += 3;
+
+      if ( GN_DBL_EMV_AIDS == pnParamType )
+      {
+         memcpy(vsBuffer+vnLen,"AI",2);
+         vnLen+=2;
+      }
+
+      vnTmpLen = vnParamsLen-vnOffset>MSG_MAX_LEN?MSG_MAX_LEN:vnParamsLen-vnOffset;
+
+      if ( vnParamsLen-vnOffset>MSG_MAX_LEN )
+         while( vsParamsData[vnOffset+vnTmpLen-1] != FS 
+             && vsParamsData[vnOffset+vnTmpLen-1] != RS  
+             && vsParamsData[vnOffset+vnTmpLen-1] != GS) 
+            --vnTmpLen;
+         
+
+      memcpy(vsBuffer+vnLen, vsParamsData+vnOffset, vnTmpLen);
+      vnLen+=vnTmpLen;
+
+      vnOffset+=vnTmpLen;
+
+      dump_buffer(vsBuffer,vnLen,'A','L','O');
+
+      nTcpSocketFd = GetFdByOraCtx(pnIndexCtx);
+      vnRetCode = WriteLineMsg( nTcpSocketFd, vsBuffer, vnLen);
+      if ( OK != vnRetCode )
+      {
+         trace_event("END   FctSendEmvParams(NOK) <ERROR ON WriteLineMsg()>", FATAL);
+         return(NOK);
+      }
+
+      while (1)
+      {
+         vnRetCode = ReadLineMsg( nTcpSocketFd, vsBuffer, &vnLen);
+         if ( OK != vnRetCode )
+         {
+            trace_event("END   FctSendEmvParams(NOK) <ERROR ON ReadLineMsg()>", FATAL);
+            return(NOK);
+         }
+	 dump_buffer(vsBuffer, vnLen, 'A', 'L', 'I');
+
+         if( 0 == memcmp(vsBuffer,"12",2) )
+         {
+            FCT_UNSOLICITED();
+            continue;
+         }
+         else
+         {
+            memset(vsTmpData, 0, sizeof(vsTmpData));
+            Download_Field(vsBuffer, 3, vsTmpData, vnLen);
+
+            if( '9'==vsTmpData[0] || 'B'==vsTmpData[0] )
+               break;
+            else
+            {
+               trace_event("END   FctSendEmvParams(NOK) <ERROR: Wrong Response From ATM>", FATAL);
+               return(NOK);
+            }
+         }
+      }
+      
+   }
+
+   trace_event("END   FctSendEmvParams(OK)", PROCESSING);
+   return(OK);
+}
+

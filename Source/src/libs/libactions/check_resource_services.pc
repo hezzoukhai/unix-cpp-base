@@ -1,0 +1,114 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <service.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int CheckResourceServices  (   	int 		nIndiceCtx,
+			       				char 		*sResourceId,
+			       				TSService	*rpService
+						    )
+							
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	char   	T_resource_id    [ 6 + 1];
+ 	char   	T_mti    		 [ 4 + 1];
+ 	char   	T_proc_code		 [ 2 + 1];
+ 	char   	T_fct_code		 [ 3 + 1];
+ 	char   	T_src_account	 [ 2 + 1];
+ 	char   	T_dest_account	 [ 2 + 1];
+	char 	T_payment_type   [ 4 + 1];/*ICH20190525*/
+
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start CheckResourceServices() ", PROCESSING );
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_resource_id            ,  0  ,   sizeof(T_resource_id )  );
+	memset ( T_mti                    ,  0  ,   sizeof(T_mti         )  );
+	memset ( T_proc_code              ,  0  ,   sizeof(T_proc_code   )  );
+	memset ( T_fct_code               ,  0  ,   sizeof(T_fct_code    )  );
+	memset ( T_src_account            ,  0  ,   sizeof(T_src_account )  );
+	memset ( T_dest_account           ,  0  ,   sizeof(T_dest_account)  );
+	memset ( T_payment_type           ,  0  ,   sizeof(T_payment_type)  );/*ICH20190525*/
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+
+	memcpy ( T_resource_id     ,  sResourceId   ,   strlen(sResourceId )  );
+	memcpy ( T_mti         , rpService->szMti, strlen(rpService->szMti      )  );
+	memcpy ( T_proc_code   , rpService->szProcCode, strlen(rpService->szProcCode  )  );
+	memcpy ( T_fct_code    , rpService->szFctCode, strlen(rpService->szFctCode    )  );
+	memcpy ( T_src_account , rpService->szSrcAcc, strlen(rpService->szSrcAcc)  );
+	memcpy ( T_dest_account, rpService->szDestAcc, strlen(rpService->szDestAcc)  );
+	memcpy ( T_payment_type, rpService->sZPaymType, strlen(rpService->sZPaymType)  );/*ICH20190525*/
+
+/****************************************************************************/
+/*      TRACE CHAMP PRO*C                                                   */
+/****************************************************************************/
+
+	sprintf ( sLine,"Resource Id  : %s", T_resource_id	 );
+	trace_event(sLine,STREAM);
+	sprintf ( sLine,"Mti          : %s", T_mti		 	 );
+	trace_event(sLine,STREAM);
+	sprintf ( sLine,"Proc Code    : %s", T_proc_code	 );
+	trace_event(sLine,STREAM);
+	sprintf ( sLine,"Fct Code     : %s", T_fct_code		 );
+	trace_event(sLine,STREAM);
+	sprintf ( sLine,"Src  Account : %s", T_src_account	 );
+	trace_event(sLine,STREAM);
+	sprintf ( sLine,"Dest Account : %s", T_dest_account	 );
+	trace_event(sLine,STREAM);
+	sprintf ( sLine,"PaymType Account : %s", T_payment_type	 );
+	trace_event(sLine,STREAM);
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                        */
+/****************************************************************************/
+
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_check_resource_services;
+	EXEC SQL EXECUTE
+	BEGIN
+
+       :response_code := PCRD_P7_CTRL_RESOURCE_SERVICES.CTRL_SERVICES( :T_resource_id  ,
+ 								  :T_mti    	  ,
+ 								  :T_proc_code	  ,
+ 								  :T_fct_code	  ,
+ 								  :T_src_account  ,
+ 								  :T_dest_account ,
+								   NULL           ,/*Tcc*/
+								   :T_payment_type );
+
+
+	END;
+	END-EXEC;
+
+	sprintf(sLine,"End CheckResourceServices(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_check_resource_services :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End CheckResourceServices(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

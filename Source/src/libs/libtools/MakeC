@@ -1,0 +1,16 @@
+include $(HOME)/src/libs/env_precomp.mk
+
+
+
+OBJCR = crypt.o
+
+
+.c.o :
+	$(CC) $<
+
+
+CRYPT : $(OBJCR)
+	$(GCC) $(OBJCR) -o CRYPT
+
+
+

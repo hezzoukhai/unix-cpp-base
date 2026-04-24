@@ -1,0 +1,400 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int PreControl (    int   nIndiceCtx ,
+                    char *sTlvBuffer          
+               )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int			response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start PreControl() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_PreControl;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_CTRL.PRECONTROL( :T_tlv_auth ); 
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr )); /**PA DSS*/
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+
+	if (response_code == OK)
+	{
+		
+		trace_event("End PreControl(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	sprintf(sLine,"End PreControl(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_PreControl :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr )); /**PA DSS*/
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	
+	trace_event("End PreControl(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+int ControlRisk (    int   nIndiceCtx ,
+                    char *sTlvBuffer          
+				)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int			response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start ControlRisk() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_exec_prectrl;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_R_CTRLS_1.EXEC_PRECTRL( :T_tlv_auth ); 
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+
+	if (response_code == OK)
+	{
+		
+		trace_event("End ControlRisk(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	sprintf(sLine,"End ControlRisk(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_exec_prectrl :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	
+	trace_event("End ControlRisk(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+int ControlRiskUnit (int   nIndiceCtx,char *sTlvBuffer, int nCtrlId)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int			response_code;
+	int			T_ctrl_unit;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	sprintf(sLine,"Start ControlRiskUnit(%d)",nCtrlId);
+	trace_event ( sLine, PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+	T_ctrl_unit = nCtrlId;
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_ctrl_risk_unit;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_R_CTRLS_1.EXEC_CTRL_UNIT( :T_tlv_auth, :T_ctrl_unit ); 
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+
+	if (response_code == OK)
+	{
+		
+		
+		sprintf(sLine,"End   ControlRiskUnit(%d:OK)",nCtrlId);
+		trace_event(sLine,PROCESSING);
+		return(OK);
+	}	
+
+	sprintf(sLine,"End   ControlRiskUnit(%d:%d)",nCtrlId,response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_ctrl_risk_unit :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	
+	trace_event("End ControlRiskUnit(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+
+int ControlLuhnKey ( int   nIndiceCtx , char *sTlvBuffer)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int			response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start ControlLuhnKey() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_exec_prectrl;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_R_CTRLS_1.CTRL_LUHN_KEY( :T_tlv_auth ); 
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+
+	if (response_code == OK)
+	{
+		
+		trace_event("End ControlLuhnKey(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	sprintf(sLine,"End ControlLuhnKey(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_exec_prectrl :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	
+	trace_event("End ControlLuhnKey(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+
+
+int ControlRiskOffus (    int   nIndiceCtx ,
+						char *sTlvBuffer          
+				)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int			response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start ControlRiskOffus() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_exec_prectrl;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_R_CTRLS_1.EXEC_PRECTRL( :T_tlv_auth ); 
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+
+	if (response_code == OK)
+	{
+		
+		trace_event("End ControlRiskOffus(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	sprintf(sLine,"End ControlRiskOffus(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_exec_prectrl :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	
+	trace_event("End ControlRiskOffus(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+

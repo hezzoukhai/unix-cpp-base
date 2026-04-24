@@ -1,0 +1,340 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_reply_data.c                                                                 */
+/*                                                                             */
+/* Description                                                                 */
+/*      ATM Reply Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <define.h>
+#include <langue.h>
+#include <param_ctx.h>
+
+/*****************************************************************************/
+/* Fonction GetReplyData                                                     */
+/* ----------------------------------------                                  */
+/*  Fonction : La fonction GetReplyData() cherche l'etat suivant du GAB en se*/
+/*             basant                                                        */
+/*             sur le RESPONSE CODE, CURRENT TRANSACTION et NEXT TRANSACTION.*/
+/*             En consultant la table ATM_REPLY_SWITCH, si la fonction ne    */
+/*             trouve aucun enregistrement correspondant au triplet          */
+/*             (pRepCode, pCurTrn, pNextTrn), alors elle retourne le triplet*/
+/*             (NEXT_STATE, SCREEN_NUMBER, UPDATE_SCREEN_NUMBER) par defaut  */
+/*  Entree   : Le code reponse                                               */
+/*             Le code de la transaction courrante                           */
+/*             Le code de la prochaine transaction                           */
+/*  Sortie   : La next state                                                 */
+/*             La screen number                                              */
+/*             La update_screen_number                                       */ 
+/*  Retour   : OK                                                            */
+/*  Revision :                                                               */
+/*****************************************************************************/
+int     GetReplyData(
+					int    nIndexCtx,
+					int    pRepCode,
+					int    pCurTrn,
+					int    pNextTrn,
+					char   *pTerminalNumber, /**IDA22012015**/
+					char   *pAcqBank,
+					char   *pNextState,
+					char   *pScrNbr,
+					char   *pUpScrNbr)
+
+{
+	struct sqlca sqlca; /*MK 060606*/
+	char ligne[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	int		T_pRepCode;
+	int		T_pCurTrn;
+	int		T_pNextTrn;			
+	VARCHAR	T_pTerminalNumber[15 + 1];		/**IDA22012015**/	
+	VARCHAR	T_AcqBank		 [6+1];/*ICH270715*/
+	char    T_pNextState	[3+1];
+	char    T_pScrNbr		[3+1];
+	char    T_pUpScrNbr		[3+1];
+	int		plRetour;
+	EXEC SQL END DECLARE SECTION;
+
+	
+	sprintf(ligne, "Start GetReplyData(RespCode:%d,CurrOp:%d,NextOp:%d,Termial:%s,Bank:%s)", pRepCode, pCurTrn, pNextTrn,pTerminalNumber,pAcqBank);
+	trace_event(ligne, PROCESSING);
+
+	memset(T_pNextState,       0,sizeof(T_pNextState));
+	memset(T_pScrNbr,          0,sizeof(T_pScrNbr));
+	memset(T_pUpScrNbr,        0,sizeof(T_pUpScrNbr));
+
+	memset(T_pTerminalNumber.arr,  0,sizeof(T_pTerminalNumber.arr));/**IDA22012015**/
+	T_pTerminalNumber.len = 0;/**IDA22012015**/
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+
+	T_pRepCode = pRepCode;
+	T_pCurTrn   = pCurTrn;
+	T_pNextTrn  = pNextTrn;
+	memcpy ( T_pTerminalNumber.arr     , pTerminalNumber ,   strlen(pTerminalNumber )  );/**IDA22012015**/
+	T_pTerminalNumber.len = strlen(pTerminalNumber);/**IDA22012015**/
+
+	memcpy(T_AcqBank.arr, pAcqBank, strlen(pAcqBank));
+	T_AcqBank.len = strlen(pAcqBank);
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL EXECUTE
+
+		BEGIN
+		:plRetour := PCRD_ATM_TOOLS.GET_REPLY_DATA(
+		:T_pRepCode,
+		:T_pCurTrn,
+		:T_pNextTrn,
+		:T_pTerminalNumber, /**IDA22012015**/
+		:T_AcqBank,/*ICH270715*/
+		:T_pNextState,
+		:T_pScrNbr,
+		:T_pUpScrNbr
+		);
+	END;
+	END-EXEC;
+
+	if(plRetour == OK)
+	{
+		memcpy(pNextState, T_pNextState, sizeof(T_pNextState));
+		memcpy(pScrNbr, T_pScrNbr, sizeof(T_pScrNbr));
+		memcpy(pUpScrNbr, T_pUpScrNbr, sizeof(T_pUpScrNbr));
+		sprintf(ligne, "END   GetReplyData(NextState:%s,ScreenNbr:%s,UpdScreenNbr%s)", pNextState, pScrNbr, pUpScrNbr);
+		trace_event(ligne, PROCESSING);
+		return(OK);
+	}
+	else
+	{
+		trace_event("END   GetReplyData(FATAL)", PROCESSING);
+		return(NOK);
+	}
+}
+/*****************************************************************************/
+/* Fonction Get_Reply_Data                                                     */
+/* ----------------------------------------                                  */
+/*  Fonction : La fonction Get_Reply_Data() cherche l'etat suivant du GAB en se*/
+/*             basant                                                        */
+/*             sur le RESPONSE CODE, CURRENT TRANSACTION et NEXT TRANSACTION.*/
+/*             En consultant la table ATM_REPLY_SWITCH, si la fonction ne    */
+/*             trouve aucun enregistrement correspondant au triplet          */
+/*             (pRepCode, pCurTrn, pNextTrn), alors elle retourne le triplet*/
+/*             (NEXT_STATE, SCREEN_NUMBER, UPDATE_SCREEN_NUMBER) par defaut  */
+/*  Entree   : Le code reponse                                               */
+/*             Le code de la transaction courrante                           */
+/*             Le code de la prochaine transaction                           */
+/*  Sortie   : La next state                                                 */
+/*             La screen number                                              */
+/*             La update_screen_number                                       */ 
+/*  Retour   : OK                                                            */
+/*  Revision :                                                               */
+/*****************************************************************************/
+int     Get_Reply_Data(
+					int    nIndexCtx,
+					int    pRepCode,
+					int    pCurTrn,
+					int    pNextTrn,
+					char   *pTerminalNumber,
+					char   *pTerminalprofile,
+					char   *pAcqBank,					
+					char   *pCardType,
+					int     pMasterIdx,					
+					char   *pNextState,
+					char   *pScrNbr,
+					char   *pUpScrNbr)
+
+{
+	struct sqlca sqlca; /*MK 060606*/
+	char ligne[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	int		T_pRepCode;
+	int		T_pCurTrn;
+	int		T_pNextTrn;			
+	VARCHAR	T_pTerminalNumber[15 + 1];		
+	VARCHAR	T_pTerminalProfile[3 + 1];		
+	VARCHAR	T_AcqBank		 [6+1];
+	char    T_pNextState	[3+1];
+	char    T_pScrNbr		[3+1];
+	char    T_pUpScrNbr		[3+1];
+	int		plRetour;
+	VARCHAR	T_Cardtype		 [2+1];
+	VARCHAR	T_MasterIdx		 [1+1];
+	
+	EXEC SQL END DECLARE SECTION;
+
+	
+	sprintf(ligne, "Start Get_Reply_Data(RespCode:%d,CurrOp:%d,NextOp:%d,Termial:%s,Bank:%s)", pRepCode, pCurTrn, pNextTrn,pTerminalNumber,pAcqBank);
+	trace_event(ligne, PROCESSING);
+	sprintf(ligne, "pMasterIdx : [%d] Profile [%s]", pMasterIdx,pTerminalprofile);trace_event(ligne, PROCESSING);
+	
+
+	memset(T_pNextState,       0,sizeof(T_pNextState));
+	memset(T_pScrNbr,          0,sizeof(T_pScrNbr));
+	memset(T_pUpScrNbr,        0,sizeof(T_pUpScrNbr));
+	
+    memset(T_Cardtype.arr,          0,sizeof(T_Cardtype.arr));
+	memset(T_MasterIdx.arr,        0,sizeof(T_MasterIdx.arr));
+	T_Cardtype.len  = 0 ;
+	T_MasterIdx.len = 0;
+	
+	
+	memset(T_pTerminalNumber.arr,  0,sizeof(T_pTerminalNumber.arr)); 
+	T_pTerminalNumber.len = 0; 
+    
+	memset(T_pTerminalProfile.arr,  0,sizeof(T_pTerminalProfile.arr)); 
+	T_pTerminalProfile.len = 0; 
+	 
+	
+	
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+
+	T_pRepCode = pRepCode;
+	T_pCurTrn   = pCurTrn;
+	T_pNextTrn  = pNextTrn;
+	memcpy ( T_pTerminalNumber.arr     , pTerminalNumber ,   strlen(pTerminalNumber )  ); 
+	T_pTerminalNumber.len = strlen(pTerminalNumber); 
+
+	memcpy ( T_pTerminalProfile.arr     , pTerminalprofile ,   strlen(pTerminalprofile )  ); 
+	T_pTerminalProfile.len = strlen(pTerminalprofile); 
+	
+
+	memcpy(T_AcqBank.arr, pAcqBank, strlen(pAcqBank));
+	T_AcqBank.len = strlen(pAcqBank);
+
+	memcpy ( T_Cardtype.arr     , pCardType ,   strlen(pCardType )  );
+	T_Cardtype.len = strlen(pCardType);
+	
+    sprintf ( T_MasterIdx.arr     ,"%d" ,pMasterIdx   );
+	T_MasterIdx.len = 1;
+ 
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL EXECUTE
+
+		BEGIN
+		:plRetour := PCRD_ATM_TOOLS_3.GET_ATM_REPLY_SWITCH( 
+		:T_pRepCode,
+		:T_pCurTrn,
+		:T_pNextTrn,
+		:T_pTerminalNumber,   
+		:T_pTerminalProfile,
+		:T_Cardtype,
+		:T_MasterIdx,
+		:T_AcqBank,/*ICH270715*/
+		:T_pNextState,
+		:T_pScrNbr,
+		:T_pUpScrNbr
+		); 
+	END;
+	END-EXEC;
+
+	if(plRetour == OK)
+	{
+		memcpy(pNextState, T_pNextState, sizeof(T_pNextState));
+		memcpy(pScrNbr, T_pScrNbr, sizeof(T_pScrNbr));
+		memcpy(pUpScrNbr, T_pUpScrNbr, sizeof(T_pUpScrNbr));
+		sprintf(ligne, "END   Get_Reply_Data(NextState:%s,ScreenNbr:%s,UpdScreenNbr%s)", pNextState, pScrNbr, pUpScrNbr);
+		trace_event(ligne, PROCESSING);
+		return(OK);
+	}
+	else
+	{
+		trace_event("END   Get_Reply_Data(FATAL)", PROCESSING);
+		return(NOK);
+	}
+}
+
+/*****************************************************************************/
+/* Fonction GetResponseLabel                                                 */
+/* ----------------------------------------                                  */
+/*  Fonction : La fonction GeResponseLabel() cherche le label correspondant  */
+/*             a un code reponse et la sequence number                       */
+/*  Entree   : Le code reponse                                               */
+/*             Le sequence number                                            */
+/*  Sortie   : Le label reponse                                              */
+/*  Retour   : OK                                                            */
+/*  Auteur   : 02/06/99 F. BELLAMINE                                         */
+/*  Revision :                                                               */
+/*****************************************************************************/
+int     GetResponseLabel(
+	int	   nIndexCtx,
+	int    pRepCode,
+	int    pCurTrn,
+	int    pNextTrn,
+	char   *pAcqBank,
+	char   pTransLang,
+	int    pCategory,
+	char   *pRepLabel)
+
+{
+	struct sqlca sqlca; /*MK 060606*/
+	char ligne[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	int             T_pRepCode;
+	int				T_pCurTrn;
+	int				T_pNextTrn;
+	VARCHAR			T_AcqBank		[6+1];/*ICH270715*/
+	int             T_pSeqNbr;
+	varchar         T_pRepLabel[80+1];
+	int             plRetour;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(ligne, "Start GetResponseLabel(%d,%d,%d,%s,%c)", pRepCode, pCurTrn, pNextTrn,pAcqBank/*ICH270715*/,pTransLang);
+	trace_event(ligne, PROCESSING);
+	memset(T_pRepLabel.arr, 0,sizeof(T_pRepLabel.arr));
+	T_pRepLabel.len	= 0;
+
+	switch(pTransLang)
+	{
+	case ARABIC         : T_pSeqNbr = 0; break;
+	case ENGLISH        : T_pSeqNbr = 1; break;
+	case FRENSH         : T_pSeqNbr = 2; break;
+	default             : T_pSeqNbr = 1;
+	}
+
+
+	T_pRepCode	= pRepCode;
+	T_pCurTrn	= pCurTrn;
+	T_pNextTrn	= pNextTrn;
+
+	memcpy(T_AcqBank.arr, pAcqBank, strlen(pAcqBank));
+	T_AcqBank.len = strlen(pAcqBank);
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL EXECUTE
+		BEGIN
+		:plRetour := PCRD_ATM_TOOLS.GET_RESPONSE_LABEL(
+		:T_pRepCode,
+		:T_pCurTrn,
+		:T_pNextTrn,
+		:T_AcqBank,/*ICH270715*/
+		:T_pSeqNbr,
+		:T_pRepLabel
+		);
+	END;
+	END-EXEC;
+
+	if(plRetour == OK)
+	{
+		memcpy(pRepLabel, T_pRepLabel.arr,       T_pRepLabel.len);
+		sprintf(ligne,"END   GetResponseLabel(%s)", pRepLabel);
+		trace_event(ligne , PROCESSING);
+		return(strlen(pRepLabel));
+	}
+	else
+	{
+		trace_event("End   GetResponseLabel(FATAL)", PROCESSING);
+		return(NOK);
+	}
+}
+

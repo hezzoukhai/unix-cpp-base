@@ -1,0 +1,201 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetCard  (int nIndiceCtx, TSCard *card )
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   CARD_NUMBER [ 22 ];
+ 	int    CARD_SEQ;
+ 	VARCHAR   CLIENT_CODE [ 24 ];
+ 	char   BANK_CODE [ 6 ];
+ 	char   BRANCH_CODE [ 6 ];
+ 	char   CARD_PRODUCT_CODE [ 3 ];
+ 	char   CARD_FEES_CODE [ 3 ];
+ 	char   BASIC_CARD_FLAG [ 1 ];
+ 	VARCHAR   BASIC_CARD_NUMBER [ 22 ];
+ 	char   VIP_LEVEL [ 1 ];
+ 	char   START_VAL_DATE[ 8] ;   /* YYYYMMDD */
+ 	char    EXPIRY_DATE [ 4];      /* YYMM */
+ 	char    FORMER_EXPIRY_DATE [ 4]; /* YYMM */
+ 	char   DELIVERY_MODE [ 1 ];
+ 	char   DELIVERY_FLAG [ 1 ];
+ 	char    DELIVERY_DATE [ 8];     /* YYYYMMDD */
+ 	char   LIMITS_INDEXES [ 4 ];
+ 	char   PERIODICITY_CODE [ 3 ];
+ 	VARCHAR   CHANNEL_NUMBER [ 15 ];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetCard() ", PROCESSING );
+ 	memset ( CARD_NUMBER.arr, 0, sizeof(CARD_NUMBER.arr));
+ 	CARD_SEQ = 0;
+ 	memset ( CLIENT_CODE.arr, 0, sizeof(CLIENT_CODE.arr));
+ 	memset ( BANK_CODE      , 0,                     6  );
+ 	memset ( BRANCH_CODE    , 0,                     6  );
+ 	memset ( CARD_PRODUCT_CODE,0,                    3  );
+ 	memset ( CARD_FEES_CODE   ,0,                    3  );
+ 	memset ( BASIC_CARD_FLAG  ,0,                    1  );
+ 	memset ( BASIC_CARD_NUMBER.arr , 0, sizeof ( BASIC_CARD_NUMBER.arr ));
+ 	memset ( VIP_LEVEL        ,0,                    1  );
+ 	memset ( START_VAL_DATE   ,0,                    8  );   /* YYYYMMDD */
+ 	memset ( EXPIRY_DATE      ,0,                    4  );      /* YYMM */
+ 	memset ( FORMER_EXPIRY_DATE,0,                   4  ); /* YYMM */
+ 	memset ( DELIVERY_MODE     ,0,                   1  );
+ 	memset ( DELIVERY_FLAG     ,0,                   1  );
+ 	memset ( DELIVERY_DATE     ,0,                   8  );    /* YYYYMMDD */
+ 	memset ( LIMITS_INDEXES    ,0,                   4  );
+ 	memset ( PERIODICITY_CODE  ,0,                   3  );
+ 	memset ( CHANNEL_NUMBER.arr,0, sizeof( CHANNEL_NUMBER.arr) );
+
+	memcpy ( CARD_NUMBER.arr, card->card_number, 
+			strlen ( card->card_number ));
+        CARD_NUMBER.len = strlen ( card->card_number );
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_card;
+	EXEC SQL EXECUTE
+	    DECLARE T_CARD   CARD%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_DATA_CARD_ROWS.GET_CARD
+						(   :CARD_NUMBER, 
+	                                            T_CARD 
+	                                        );
+		IF :response_code = 0 THEN
+		:CARD_NUMBER        := T_CARD.CARD_NUMBER;
+		:CARD_SEQ           := T_CARD.CARD_SEQ   ;
+		:CLIENT_CODE        := T_CARD.CLIENT_CODE;
+		:BANK_CODE          := T_CARD.BANK_CODE  ;
+		:BRANCH_CODE        := T_CARD.BRANCH_CODE;
+		:CARD_PRODUCT_CODE  := T_CARD.CARD_PRODUCT_CODE;
+		:CARD_FEES_CODE     := T_CARD.CARD_FEES_CODE   ;
+		:BASIC_CARD_FLAG    := T_CARD.BASIC_CARD_FLAG  ;
+		:BASIC_CARD_NUMBER  := T_CARD.BASIC_CARD_NUMBER;
+		:VIP_LEVEL          := T_CARD.VIP_LEVEL        ;
+		:START_VAL_DATE     := T_CARD.START_VAL_DATE   ;
+		:EXPIRY_DATE        := T_CARD.EXPIRY_DATE      ;
+		:FORMER_EXPIRY_DATE := T_CARD.FORMER_EXPIRY_DATE      ;
+		:DELIVERY_MODE      := T_CARD.DELIVERY_MODE           ;
+		:DELIVERY_FLAG      := T_CARD.DELIVERY_FLAG           ;
+		:DELIVERY_DATE      := T_CARD.DELIVERY_DATE           ;
+		:LIMITS_INDEXES     := T_CARD.LIMITS_INDEXES          ;
+		:PERIODICITY_CODE   := T_CARD.PERIODICITY_CODE        ;
+		:CHANNEL_NUMBER     := T_CARD.CHANNEL_NUMBER          ;
+		END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+		card->card_seq = CARD_SEQ;
+		memcpy(card->client_code, 
+				CLIENT_CODE.arr , CLIENT_CODE.len );
+		card->client_code[ CLIENT_CODE.len ] = 0;
+
+		memcpy(card->bank_code, BANK_CODE, 6 );
+		memcpy(card->branch_code, BRANCH_CODE, 6 );
+		memcpy(card->card_product_code, 
+						CARD_PRODUCT_CODE, 3 );
+		memcpy(card->card_fees_code, 
+						CARD_FEES_CODE, 3 );
+		memcpy(card->basic_card_flag, 
+						BASIC_CARD_FLAG, 1);
+		memcpy(card->basic_card_number, 
+				BASIC_CARD_NUMBER.arr, BASIC_CARD_NUMBER.len );
+		card->basic_card_number[BASIC_CARD_NUMBER.len]=0;
+
+		memcpy(card->vip_level, VIP_LEVEL, 1);
+		memcpy(card->start_val_date, 
+                                                 START_VAL_DATE ,   8);
+		memcpy(card->expiry_date, 
+                                                 EXPIRY_DATE ,   4);
+		memcpy(card->former_expiry_date, 
+                                                 FORMER_EXPIRY_DATE ,   4);
+		memcpy(card->delivery_mode     , 
+                                                 DELIVERY_MODE ,   1);
+		memcpy(card->delivery_flag      , 
+                                                 DELIVERY_FLAG ,   1);
+		memcpy(card->delivery_date      , 
+                                                 DELIVERY_DATE ,   8);
+		memcpy(card->limits_indexes      , 
+                                                 LIMITS_INDEXES ,   4);
+		memcpy(card->periodicity_code      , 
+                                                 PERIODICITY_CODE , 3);
+		memcpy(card->channel_number, 
+				CHANNEL_NUMBER.arr, CHANNEL_NUMBER.len );
+		card->channel_number[CHANNEL_NUMBER.len] = 0;
+
+	        trace_event ( "End GetCard( OK ) ", PROCESSING );
+		return(OK);
+	}
+	trace_event ( "End GetCard( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_card:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+		card->card_seq = CARD_SEQ;
+		memcpy(card->client_code, 
+				CLIENT_CODE.arr , CLIENT_CODE.len );
+		card->client_code[ CLIENT_CODE.len ] = 0;
+
+		memcpy(card->bank_code, BANK_CODE, 6 );
+		memcpy(card->branch_code, BRANCH_CODE, 6 );
+		memcpy(card->card_product_code, 
+						CARD_PRODUCT_CODE, 3 );
+		memcpy(card->card_fees_code, 
+						CARD_FEES_CODE, 3 );
+		memcpy(card->basic_card_flag, 
+						BASIC_CARD_FLAG, 1);
+		memcpy(card->basic_card_number, 
+				BASIC_CARD_NUMBER.arr, BASIC_CARD_NUMBER.len );
+		card->basic_card_number[BASIC_CARD_NUMBER.len]=0;
+
+		memcpy(card->vip_level, VIP_LEVEL, 1);
+		memcpy(card->start_val_date, 
+                                                 START_VAL_DATE ,   8);
+		memcpy(card->expiry_date, 
+                                                 EXPIRY_DATE ,   4);
+		memcpy(card->former_expiry_date, 
+                                                 FORMER_EXPIRY_DATE ,   4);
+		memcpy(card->delivery_mode     , 
+                                                 DELIVERY_MODE ,   1);
+		memcpy(card->delivery_flag      , 
+                                                 DELIVERY_FLAG ,   1);
+		memcpy(card->delivery_date      , 
+                                                 DELIVERY_DATE ,   8);
+		memcpy(card->limits_indexes      , 
+                                                 LIMITS_INDEXES ,   4);
+		memcpy(card->periodicity_code      , 
+                                                 PERIODICITY_CODE , 3);
+		memcpy(card->channel_number, 
+				CHANNEL_NUMBER.arr, CHANNEL_NUMBER.len );
+		card->channel_number[CHANNEL_NUMBER.len] = 0;
+
+	        trace_event ( "End GetCard( OK ) ", PROCESSING );
+		return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetCard( NOK ) ", PROCESSING );
+	return( NOK );
+}

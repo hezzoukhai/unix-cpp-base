@@ -1,0 +1,422 @@
+
+  /***********************************************************************
+  nom	: gabd_terminal_config.pc
+  desc	: gestion de configuration gabd	
+  ***********************************************************************/
+#include <stdio.h>
+#include <string.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <define.h>
+#include <atmcmd.h>
+#include <gabd_config.h>
+#include <param_ctx.h>
+
+  /***********************************************************************
+	nom   : UpdateCommsKeyFlag()
+	desc  : maj du flag LOAD_MASTER_KEY_FLAG
+	entree: 	pTermNbr	-> numero du terminal
+		  		pCommsKeyFlag-> nouvelle valeur du flag
+	sortie: aucune
+	retour: OK	-> si c'est OK
+		  ERROR	-> erreur fatal
+			(c) 1999 Hightech Payment Systems
+  ***********************************************************************/
+
+int	UpdateCommsKeyFlag(int nIndexCtx, char *pTermNbr,char *pAcqBank /*ICH270715*/, char *pCommsKeyFlag)
+{
+	
+	EXEC SQL BEGIN DECLARE SECTION;
+		char  sLine[MAX_LINE_TRC];
+		varchar	hTermNbr		[15+1];
+    	varchar	hAcqBank		[6+1];/*ICH270715*/ 
+		char	hCommsKeyFlag	[ 1+1];
+		int		hRet;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start UpdateCommsrKeyFlag(%.15s,%.6s,%.1s)", pTermNbr,pTermNbr, pCommsKeyFlag);
+	trace_event(sLine, PROCESSING);
+
+	memset(hTermNbr.arr,  0, sizeof(hTermNbr.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+	memset(hCommsKeyFlag, 0, sizeof(hCommsKeyFlag));
+
+	memcpy(hCommsKeyFlag, pCommsKeyFlag, strlen(pCommsKeyFlag));
+	memcpy(hTermNbr.arr,  pTermNbr, 	 strlen(pTermNbr));
+	hTermNbr.len		  = strlen(pTermNbr);
+	
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO updateCommsKeyFlagErr;
+
+	EXEC SQL EXECUTE
+	BEGIN
+        :hRet := PCRD_GABD_TERMINAL_CONFIG.UPDATE_COMMS_KEY_FLAG(:hTermNbr,:hAcqBank/*ICH270715*/, :hCommsKeyFlag);
+	END;
+	END-EXEC;
+
+	if(hRet != OK)
+	{
+		sprintf(sLine, "End   UpdateCommsKeyFlag(%d)", hRet);
+		trace_event(sLine, PROCESSING);
+		return (NOK);
+	}
+
+	sprintf(sLine, "End   UpdateCommsKeyFlag(OK)");
+	trace_event(sLine, PROCESSING);
+	return (OK);
+
+	updateCommsKeyFlagErr:
+	sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   UpdateCommsKeyFlag(ERROR)", ERROR);
+	return (ERROR);
+}
+
+
+
+
+  /***********************************************************************
+	  nom		: GetTerminalConfig()
+	  desc		: 
+	  entree	: 
+			  		
+	  sortie	: aucune
+	  retour	: OK	-> si c'est OK
+			     ERROR	-> erreur fatal	
+				(c) 1999 Hightech Payment Systems
+  ***********************************************************************/
+int	GetTerminalConfig(	int  nIndexCtx,
+						char *pTermNbr,
+						char *pAcqBank /*ICH270715*/
+						char *pacceptedoperation,
+						char *peditiontype)
+
+{
+
+	EXEC SQL BEGIN DECLARE SECTION;
+		char  sLine[MAX_LINE_TRC];
+		varchar	hTermNbr			[15+1];
+    	varchar	hAcqBank			[6+1];/*ICH270715*/ 
+		char	hacceptedoperation	[ 5+1];
+		char	heditiontype		[ 4+1];
+		int		hRet;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start GetTerminalConfig(%.15s,%.6s)", pTermNbr,pAcqBank);
+	trace_event(sLine, PROCESSING);
+
+	memset(hTermNbr.arr,		0, sizeof(hTermNbr.arr));
+	memset(hacceptedoperation,	0, sizeof(hacceptedoperation));
+	memset(heditiontype,		0, sizeof(heditiontype));
+
+	memcpy(hTermNbr.arr,	pTermNbr, 	strlen(pTermNbr)	);
+	hTermNbr.len			= strlen(pTermNbr);
+	
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO get_terminalprofileErr;
+
+	EXEC SQL EXECUTE
+	BEGIN
+        :hRet := PCRD_GABD_TERMINAL_CONFIG.GET_TERMINAL_CONFIG(	:hTermNbr,
+        														:hAcqBank/*ICH270715*/,
+																:hacceptedoperation,
+																:heditiontype);
+	END;
+	END-EXEC;
+
+	if(hRet != OK)
+	{
+		sprintf(sLine, "End   GetTerminalConfig(%d)", hRet);
+		trace_event(sLine, PROCESSING);
+		return (NOK);
+	}
+
+	memcpy(pacceptedoperation,	hacceptedoperation, strlen(hacceptedoperation)	);
+	memcpy(peditiontype,		heditiontype, strlen(heditiontype)	);
+	sprintf(sLine, "End   GetTerminalConfig(OK)");
+	trace_event(sLine, PROCESSING);
+	return (OK);
+
+	get_terminalprofileErr:
+	sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   GetTerminalConfig(ERROR)", ERROR);
+	return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: GetATMMngCmd()					**
+  **  desc	: chargement de la commande pour le GAB			**
+  **  entree	: fTerminalNumber	-> numero du terminal		**
+  **  sortie	: fCommand		-> commande pour le terminal	**
+  **		  fPurgeDate		-> date d'expiration de la cmd	**
+  **  retour	: OK	-> si c'est OK					**
+  **		  ERROR	-> erreur fatal					**
+  **			(c) 1999 Hightech Payment Systems		**
+  ***********************************************************************/
+int	GetATMMngCmd(nIndexCtx,pATMCommand)
+int 		nIndexCtx;
+atm_command	*pATMCommand;
+{
+   
+EXEC SQL BEGIN DECLARE SECTION;
+	char  		sLine[MAX_LINE_TRC];
+    varchar		hTermNbr	[15+1];
+    varchar		hAcqBank	[6+1];/*ICH270715*/ 
+    int			hCmdSeq;
+    varchar		hCmd		[30+1];
+    char		hPurgeDate	[12+1];
+    int			hRet;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start GetATMMngCmd(%.15s,%.6s)", pATMCommand->fTerminalNumber, pATMCommand->fAcqBank/*ICH270715*/);
+trace_event(sLine, PROCESSING);
+
+    /* - initilialisation des variables ------------------------------------- */
+    memset(pATMCommand->fPurgeDate,	0, sizeof(pATMCommand->fPurgeDate));
+    memset(pATMCommand->fCommand,	0, sizeof(pATMCommand->fCommand)  );
+    memset(hTermNbr.arr,		0, sizeof(hTermNbr.arr)		  );
+    memset(hAcqBank.arr,		0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hCmd.arr,			0, sizeof(hCmd.arr)		  );
+    memset(hPurgeDate,			0, sizeof(hPurgeDate)		  );
+    hTermNbr.len	= sizeof(hTermNbr.arr);
+    hAcqBank.len	= sizeof(hAcqBank.arr);/*ICH270715*/  
+    hCmd.len		= sizeof(hCmd.arr);
+
+    /* - renseignement des variables PL/SQL --------------------------------- */
+    memcpy(hTermNbr.arr,pATMCommand->fTerminalNumber,
+			strlen(pATMCommand->fTerminalNumber));
+    hTermNbr.len	= strlen(pATMCommand->fTerminalNumber);
+
+    memcpy(hAcqBank.arr,	pATMCommand.fAcqBank, strlen(pATMCommand.fAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pATMCommand.fAcqBank);
+	
+    /* - capture des exceptions PL/SQL -------------------------------------- */
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO getUserCommandErr;
+
+    /* - execution du traitement PL/SQL ------------------------------------- */
+    EXEC SQL EXECUTE
+    DECLARE
+        enr_atm_commands	ATM_COMMANDS%ROWTYPE;
+    BEGIN
+        -- preparation de l'enregistrement
+        enr_atm_commands.terminal_number := :hTermNbr;
+        enr_atm_commands.bank_code		 := :hAcqBank;/*ICH270715*/
+
+        -- execution du PL/SQL
+        :hRet := PCRD_ATM_MNG.GET_ATM_CMD(enr_atm_commands);
+
+        -- recuperation du resultat
+        IF :hRet = DECLARATION_CST.OK
+        THEN
+            :hCmd	:=enr_atm_commands.command;
+            :hCmdSeq	:=enr_atm_commands.cmd_seq;
+            :hPurgeDate :=TO_CHAR(enr_atm_commands.purge_date,'YYMMDDHH24MISS');
+        END IF;
+    END;
+    END-EXEC;
+
+    /* - examen du retour du traitement PL/SQL ------------------------------ */
+    if (hRet != OK)
+    {
+        sprintf(sLine, "End   GetATMMngCmd(%d)", hRet);
+        trace_event(sLine, PROCESSING);
+        return (hRet);
+    }
+
+    /* - recuperation du resultat du traitement PL/SQL ---------------------- */
+    memcpy(pATMCommand->fCommand,	hCmd.arr,	hCmd.len);
+    memcpy(pATMCommand->fPurgeDate,	hPurgeDate,	      12);
+    pATMCommand->fCmdSeq		= hCmdSeq;
+
+sprintf(sLine, "End   GetATMMngCmd(%d,%.30s,%.12s)",
+                 pATMCommand->fCmdSeq,
+                 pATMCommand->fCommand,
+                 pATMCommand->fPurgeDate);
+trace_event(sLine, PROCESSING);
+return (OK);
+
+getUserCommandErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   GetATMMngCmd(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: PutATMMngCmdRes()					**
+  **  desc	: avis a la table ATM_COMMANDS				**
+  **  entree	: fTerminalNumber	-> numero du terminal		**
+  **  sortie	: fCommand		-> commande pour le terminal	**
+  **  retour	: OK	-> si c'est OK					**
+  **		  ERROR	-> erreur fatal					**
+  **			(c) 1999 Hightech Payment Systems		**
+  ***********************************************************************/
+int	PutATMMngCmdRes(nIndexCtx,pATMCommand)
+int 		nIndexCtx;
+atm_command	pATMCommand;
+{
+EXEC SQL BEGIN DECLARE SECTION;
+    char  sLine[MAX_LINE_TRC];
+    varchar		hTermNbr	[15+1];
+    varchar		hAcqBank	[6+1];/*ICH270715*/ 
+    int			hCmdSeq;
+    varchar		hCmd		[30+1];
+    char		hPurgeDate	[12+1];
+    char		hStatus		[ 1+1];
+    int			hRet;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start PutATMMngCmdRes(%.15s,%.6s,%d,%.30s,%.12s,%.1s)",
+                pATMCommand.fTerminalNumber,
+                pATMCommand.fAcqBank,/*ICH270715*/
+                pATMCommand.fCmdSeq,
+                pATMCommand.fCommand,
+                pATMCommand.fPurgeDate,
+                pATMCommand.fStatus);
+trace_event(sLine, PROCESSING);
+
+    /* - initilialisation des variables ------------------------------------- */
+    memset(hTermNbr.arr,		0, sizeof(hTermNbr.arr)		);
+    memset(hAcqBank.arr,		0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hCmd.arr,			0, sizeof(hCmd.arr)		);
+    memset(hPurgeDate,			0, sizeof(hPurgeDate)		);
+    memset(hStatus,				0, sizeof(hStatus)		);
+
+    /* - renseignement des variables PL/SQL --------------------------------- */
+    memcpy(hTermNbr.arr,pATMCommand.fTerminalNumber,
+			strlen(pATMCommand.fTerminalNumber));
+    hTermNbr.len	= strlen(pATMCommand.fTerminalNumber);
+  
+    memcpy(hAcqBank.arr,	pATMCommand.fAcqBank, strlen(pATMCommand.fAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pATMCommand.fAcqBank);
+    
+    memcpy(hCmd.arr,	pATMCommand.fCommand,
+			strlen(pATMCommand.fCommand));
+    hCmd.len		= strlen(pATMCommand.fCommand);
+    memcpy(hPurgeDate,	pATMCommand.fPurgeDate,
+			strlen(pATMCommand.fPurgeDate));
+    memcpy(hStatus,	pATMCommand.fStatus, 1);
+    hCmdSeq		= pATMCommand.fCmdSeq;
+
+
+    /* - capture des exceptions PL/SQL -------------------------------------- */
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO getUserCommandErr;
+
+    /* - execution du traitement PL/SQL ------------------------------------- */
+
+    EXEC SQL EXECUTE
+    DECLARE
+        enr_atm_commands	ATM_COMMANDS%ROWTYPE;
+    BEGIN
+        -- preparation de l'enregistrement
+        enr_atm_commands.terminal_number	:= :hTermNbr;
+        enr_atm_commands.bank_code		:= :hAcqBank;/*ICH270715*/
+        enr_atm_commands.cmd_seq		:= :hCmdSeq;
+        enr_atm_commands.command		:= :hCmd;
+        enr_atm_commands.purge_date		:= TO_DATE(:hPurgeDate,'YYMMDDHH24MISS');
+        enr_atm_commands.status			:= :hStatus;
+
+        -- execution du PL/SQL
+        :hRet := PCRD_ATM_MNG.PUT_ATM_CMD_RES(enr_atm_commands);
+    END;
+    END-EXEC;
+
+
+    /* - examen du retour du traitement PL/SQL ------------------------------ */
+    if (hRet != OK)
+    {
+        sprintf(sLine, "End   PutATMMngCmdRes(%d)", hRet);
+        trace_event(sLine, PROCESSING);
+        return (hRet);
+    }
+
+sprintf(sLine, "End   PutATMMngCmdRes(%s)", pATMCommand.fCommand);
+trace_event(sLine, PROCESSING);
+return (OK);
+
+getUserCommandErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   PutATMMngCmdRes(ERROR)", ERROR);
+    return (ERROR);
+}
+
+
+  /***********************************************************************
+  **  nom		: UpdateGabdEtat()					**
+  **  desc		: maj du flag LOAD_MASTER_KEY_FLAG			**
+  **  entree	: 	pTermNbr	-> numero du terminal			**
+  **		  		pGabdEtatFlag-> nouvelle valeur du flag		**
+  **  sortie	: aucune						**
+  **  retour	: OK	-> si c'est OK					**
+  **		  ERROR	-> erreur fatal					**
+  **			(c) 1999 Hightech Payment Systems		**
+  ***********************************************************************/
+int	UpdateGabdEtat(nIndexCtx,pTermNbr, pAcqBank /*ICH270715*/, pGabdEtatFlag)
+int 	nIndexCtx;
+char	*pTermNbr;
+char	*pAcqBank;/*ICH270715*/
+char	*pGabdEtatFlag;
+{
+EXEC SQL BEGIN DECLARE SECTION;
+    char  sLine[MAX_LINE_TRC];
+    varchar	hTermNbr		[15+1];
+    varchar	hAcqBank		[6+1];/*ICH270715*/ 
+    char	hGabdEtatFlag	[ 1+1];
+    int		hRet;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateGabdEtat (%.15s,%.6s,%.1s)",
+                 pTermNbr,pAcqBank, pGabdEtatFlag);
+trace_event(sLine, PROCESSING);
+
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hGabdEtatFlag,	0, sizeof(hGabdEtatFlag));
+
+    memcpy(hGabdEtatFlag,	pGabdEtatFlag, strlen(pGabdEtatFlag)	);
+    memcpy(hTermNbr.arr,	pTermNbr, 	strlen(pTermNbr)	);
+    hTermNbr.len		= strlen(pTermNbr);
+    
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO UpdateGabdEtatErr ;
+
+    EXEC SQL EXECUTE
+    BEGIN
+        :hRet := PCRD_GABD_TERMINAL_CONFIG.UPDATE_GABD_ETAT(:hTermNbr,
+        													:hAcqBank/*ICH270715*/,
+															:hGabdEtatFlag);
+    END;
+    END-EXEC;
+
+    if(hRet != OK)
+    {
+        sprintf(sLine, "End   UpdateGabdEtat(%d)", hRet);
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateGabdEtat(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+UpdateGabdEtatErr :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateGabdEtat(ERROR)", ERROR);
+    return (ERROR);
+}

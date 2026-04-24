@@ -1,0 +1,303 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetShadowAccountActivity  (int nIndiceCtx, 
+			TSShadowAccountActivity *shadow_account_activity)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   SHADOW_ACCOUNT_NBR [ 24 ];
+ 	char   BANK_CODE [ 6 ];
+ 	VARCHAR   CLIENT_CODE [ 24 ];
+ 	char   CURRENCY_CODE;
+ 	double    CREDIT_LIMIT;
+ 	double    CASH_TRANSFER_LIMIT;
+ 	double    LOAN_LIMIT;
+ 	char   VIP_LEVEL [ 1 ];
+ 	char   INITIAL_PROFILE_CODE [ 3 ];
+ 	char   CURRENT_PROFILE_CODE [ 3 ];
+ 	int    LOAN_DUE_DAY;
+ 	char   BASIC_SHADOW_ACCOUNT_FLAG [ 1 ];
+ 	VARCHAR   BASIC_SHADOW_ACCOUNT_NUMBER [ 24 ];
+ 	double    CREDIT_BALANCE;
+ 	double    CASH_TRANSFER_BALANCE;
+ 	double    LOAN_BALANCE;
+ 	double    PENDING_AUT_CREDIT;
+ 	double    PENDING_AUT_CASH_TRANSFER;
+ 	double    PENDING_AUT_LOAN;
+ 	double    LIVE_DEPOSIT;
+ 	double    LOYALTY_POINT_BALANCE;
+ 	double    LAST_PENDING_AUT_CREDIT;
+ 	double    LAST_PENDING_AUT_CASH_TRANSFER;
+ 	double    LAST_PENDING_AUT_LOAN;
+ 	double    LAST_LIVE_DEPOSIT;
+ 	double    REDEMPTION_POINT_BALANCE;
+ 	double    BEHAVIOUR_POINT_BALANCE;
+ 	char      DATE_LAST_AUT_CREDIT [ 8] ; /* YYYYMMDD */
+ 	char      DATE_LAST_AUT_CASH_TRANSFER [ 8]; /* YYYYMMDD */
+ 	char      DATE_LAST_AUT_LOAN [ 8 ]; /* YYYYMMDD */
+ 	char   CODE_ACTION [ 3 ];
+ 	char   LAST_CODE_ACTION [ 3 ];
+ 	VARCHAR   STATEMENT_NUMBER [ 12 ];
+ 	char   SENSITIVE_OPERATION_RECORD [ 1 ];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+ 	memset (   SHADOW_ACCOUNT_NBR.arr , 0 , strlen(SHADOW_ACCOUNT_NBR.len));
+ 	memset (   BANK_CODE , 0 ,  6 );
+ 	memset (   CLIENT_CODE.arr ,  0 ,  24 );
+ 	memset (   CURRENCY_CODE , 0 , 3 );
+ 	CREDIT_LIMIT = 0.0;
+ 	CASH_TRANSFER_LIMIT = 0.0;
+ 	LOAN_LIMIT = 0.0;
+ 	memset (   VIP_LEVEL  , 0 ,  1 );
+ 	memset (   INITIAL_PROFILE_CODE  , 0 ,  3 );
+ 	memset (   CURRENT_PROFILE_CODE  , 0 ,  3 );
+ 	LOAN_DUE_DAY = 0;
+ 	memset (   BASIC_SHADOW_ACCOUNT_FLAG  , 0 ,  1 );
+ 	memset (   BASIC_SHADOW_ACCOUNT_NUMBER.arr ,   0 ,  24 );
+ 	CREDIT_BALANCE = 0.0; 
+ 	CASH_TRANSFER_BALANCE = 0.0;
+ 	LOAN_BALANCE = 0.0;
+ 	PENDING_AUT_CREDIT = 0.0;
+ 	PENDING_AUT_CASH_TRANSFER = 0.0;
+ 	PENDING_AUT_LOAN = 0.0;
+ 	LIVE_DEPOSIT = 0.0;
+ 	LOYALTY_POINT_BALANCE = 0.0;
+ 	LAST_PENDING_AUT_CREDIT = 0.0;
+ 	LAST_PENDING_AUT_CASH_TRANSFER = 0.0;
+ 	LAST_PENDING_AUT_LOAN = 0.0;
+ 	LAST_LIVE_DEPOSIT = 0.0;
+ 	REDEMPTION_POINT_BALANCE = 0.0;
+ 	BEHAVIOUR_POINT_BALANCE = 0.0;
+ 	memset (   DATE_LAST_AUT_CREDIT , 0 ,  8) ; /* YYYYMMDD */
+ 	memset (   DATE_LAST_AUT_CASH_TRANSFER  , 0,  8); /* YYYYMMDD */
+ 	memset (   DATE_LAST_AUT_LOAN  , 0,  8 ); /* YYYYMMDD */
+ 	memset (   CODE_ACTION  , 0,  3 );
+ 	memset (   LAST_CODE_ACTION  , 0,  3 );
+ 	memset (   STATEMENT_NUMBER.arr ,  0,  12 );
+ 	memset (   SENSITIVE_OPERATION_RECORD , 0,  1 );
+
+	trace_event ( "Start GetShadowAccountActivity() ", PROCESSING );
+
+	memcpy ( SHADOW_ACCOUNT_NBR.arr , 
+		shadow_account_activity->shadow_account_nbr, 
+	strlen(shadow_account_activity->shadow_account_nbr));
+
+	SHADOW_ACCOUNT_NBR.len = strlen ( shadow_account_activity->shadow_account_nbr);
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_shadow_account_activity;
+	EXEC SQL EXECUTE
+	    DECLARE T_SHADOW_ACCOUNT_ACTIVITY   SHADOW_ACCOUNT_ACTIVITY%ROWTYPE;
+	BEGIN
+
+       :response_code :=PCRD_GET_DATA_REVOLVING_ROWS.GET_SHADOW_ACCOUNT_ACTIVITY
+						(  :SHADOW_ACCOUNT_NBR,
+	                                            T_SHADOW_ACCOUNT_ACTIVITY 
+	                                        );
+
+
+		IF :response_code = 0 THEN
+ :BANK_CODE   := T_SHADOW_ACCOUNT_ACTIVITY.BANK_CODE;
+ :CLIENT_CODE := T_SHADOW_ACCOUNT_ACTIVITY.CLIENT_CODE;
+ :CURRENCY_CODE := T_SHADOW_ACCOUNT_ACTIVITY.CURRENCY_CODE;
+ :CREDIT_LIMIT  := T_SHADOW_ACCOUNT_ACTIVITY.CREDIT_LIMIT;
+ :CASH_TRANSFER_LIMIT  := T_SHADOW_ACCOUNT_ACTIVITY.CASH_TRANSFER_LIMIT;
+ :LOAN_LIMIT           := T_SHADOW_ACCOUNT_ACTIVITY.LOAN_LIMIT;
+ :VIP_LEVEL            := T_SHADOW_ACCOUNT_ACTIVITY.VIP_LEVEL ;
+ :INITIAL_PROFILE_CODE := T_SHADOW_ACCOUNT_ACTIVITY.INITIAL_PROFILE_CODE;
+ :CURRENT_PROFILE_CODE := T_SHADOW_ACCOUNT_ACTIVITY.CURRENT_PROFILE_CODE;
+ :LOAN_DUE_DAY    := T_SHADOW_ACCOUNT_ACTIVITY.LOAN_DUE_DAY ;
+ :BASIC_SHADOW_ACCOUNT_FLAG := T_SHADOW_ACCOUNT_ACTIVITY.BASIC_SHADOW_ACCOUNT_FLAG;
+ :BASIC_SHADOW_ACCOUNT_NUMBER := T_SHADOW_ACCOUNT_ACTIVITY.BASIC_SHADOW_ACCOUNT_NUMBER;
+
+ :CREDIT_BALANCE := T_SHADOW_ACCOUNT_ACTIVITY.CREDIT_BALANCE ;
+ :CASH_TRANSFER_BALANCE := T_SHADOW_ACCOUNT_ACTIVITY.CASH_TRANSFER_BALANCE ; 
+ :LOAN_BALANCE := T_SHADOW_ACCOUNT_ACTIVITY.LOAN_BALANCE ;
+ :PENDING_AUT_CREDIT := T_SHADOW_ACCOUNT_ACTIVITY.PENDING_AUT_CREDIT ;
+ :PENDING_AUT_CASH_TRANSFER := T_SHADOW_ACCOUNT_ACTIVITY.PENDING_AUT_CASH_TRANSFER ;
+ :PENDING_AUT_LOAN := T_SHADOW_ACCOUNT_ACTIVITY.PENDING_AUT_LOAN ;
+ :LIVE_DEPOSIT := T_SHADOW_ACCOUNT_ACTIVITY.LIVE_DEPOSIT ;
+ :LOYALTY_POINT_BALANCE := T_SHADOW_ACCOUNT_ACTIVITY.LOYALTY_POINT_BALANCE ;
+ :LAST_PENDING_AUT_CREDIT := T_SHADOW_ACCOUNT_ACTIVITY.LAST_PENDING_AUT_CREDIT ;
+ :LAST_PENDING_AUT_CASH_TRANSFER := T_SHADOW_ACCOUNT_ACTIVITY.LAST_PENDING_AUT_CASH_TRANSFER;
+ :LAST_PENDING_AUT_LOAN := T_SHADOW_ACCOUNT_ACTIVITY.LAST_PENDING_AUT_LOAN ;
+
+ :LAST_LIVE_DEPOSIT := T_SHADOW_ACCOUNT_ACTIVITY.LAST_LIVE_DEPOSIT ;
+ :REDEMPTION_POINT_BALANCE :=T_SHADOW_ACCOUNT_ACTIVITY.REDEMPTION_POINT_BALANCE;
+
+ :BEHAVIOUR_POINT_BALANCE := T_SHADOW_ACCOUNT_ACTIVITY.BEHAVIOUR_POINT_BALANCE;
+
+ :DATE_LAST_AUT_CREDIT := TO_CHAR ( T_SHADOW_ACCOUNT_ACTIVITY.DATE_LAST_AUT_CREDIT,'YYYYMMDD'); 
+
+ :DATE_LAST_AUT_CASH_TRANSFER := TO_CHAR ( T_SHADOW_ACCOUNT_ACTIVITY.DATE_LAST_AUT_CASH_TRANSFER , 'YYYYMMDD' );
+
+ :DATE_LAST_AUT_LOAN := TO_CHAR ( T_SHADOW_ACCOUNT_ACTIVITY.DATE_LAST_AUT_LOAN , 'YYYYMMDD' );
+
+ :CODE_ACTION := T_SHADOW_ACCOUNT_ACTIVITY.CODE_ACTION;
+ :LAST_CODE_ACTION := T_SHADOW_ACCOUNT_ACTIVITY.LAST_CODE_ACTION;
+ :STATEMENT_NUMBER := T_SHADOW_ACCOUNT_ACTIVITY.STATEMENT_NUMBER;
+ :SENSITIVE_OPERATION_RECORD := T_SHADOW_ACCOUNT_ACTIVITY.SENSITIVE_OPERATION_RECORD;
+
+
+		END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+
+ 	memcpy ( shadow_account_activity->bank_code , 
+		   BANK_CODE , 6 );
+
+ 	memcpy ( shadow_account_activity->client_code , 
+		   CLIENT_CODE.arr ,  CLIENT_CODE.len );
+ 	shadow_account_activity->client_code[CLIENT_CODE.len] =0;
+
+ 	memcpy ( shadow_account_activity->currency_code , 
+		   CURRENCY_CODE , 3 );
+
+ 	shadow_account_activity->credit_limit =  CREDIT_LIMIT;
+ 	shadow_account_activity->cash_transfer_limit =  CASH_TRANSFER_LIMIT;
+ 	shadow_account_activity->loan_limit =  LOAN_LIMIT;
+ 	memcpy ( shadow_account_activity->vip_level ,
+		   VIP_LEVEL  , 1 );
+ 	memcpy ( shadow_account_activity->initial_profile_code , 
+		   INITIAL_PROFILE_CODE  ,   3 );
+ 	memcpy ( shadow_account_activity->current_profile_code , 
+		   CURRENT_PROFILE_CODE  ,   3 );
+ 	shadow_account_activity->loan_due_day = LOAN_DUE_DAY;
+ 	memcpy ( shadow_account_activity->basic_shadow_account_flag , BASIC_SHADOW_ACCOUNT_FLAG  ,  1 );
+
+ 	memcpy(shadow_account_activity->basic_shadow_account_number, 			BASIC_SHADOW_ACCOUNT_NUMBER.arr ,
+			BASIC_SHADOW_ACCOUNT_NUMBER.len);
+ 	shadow_account_activity->basic_shadow_account_number[BASIC_SHADOW_ACCOUNT_NUMBER.len ] = 0;
+
+
+ 	shadow_account_activity->credit_balance = CREDIT_BALANCE;
+ 	shadow_account_activity->cash_transfer_balance = CASH_TRANSFER_BALANCE;
+ 	shadow_account_activity->loan_balance = LOAN_BALANCE ;
+ 	shadow_account_activity->pending_aut_credit = PENDING_AUT_CREDIT ;
+ 	shadow_account_activity->pending_aut_cash_transfer = PENDING_AUT_CASH_TRANSFER ;
+ 	shadow_account_activity->pending_aut_loan = PENDING_AUT_LOAN ;
+ 	shadow_account_activity->live_deposit = LIVE_DEPOSIT ;
+ 	shadow_account_activity->loyalty_point_balance = LOYALTY_POINT_BALANCE ;
+ 	shadow_account_activity->last_pending_aut_credit = LAST_PENDING_AUT_CREDIT ;
+ 	shadow_account_activity->last_pending_aut_cash_transfer = LAST_PENDING_AUT_CASH_TRANSFER ;
+ 	shadow_account_activity->last_pending_aut_loan = LAST_PENDING_AUT_LOAN ;
+ 	shadow_account_activity->last_live_deposit = LAST_LIVE_DEPOSIT ;
+ 	shadow_account_activity->redemption_point_balance = REDEMPTION_POINT_BALANCE ;
+ 	shadow_account_activity->behaviour_point_balance = BEHAVIOUR_POINT_BALANCE ;
+
+ 	memcpy ( shadow_account_activity->date_last_aut_credit ,
+		      DATE_LAST_AUT_CREDIT , 8) ; /* YYYYMMDD */
+ 	memcpy ( shadow_account_activity->date_last_aut_cash_transfer, DATE_LAST_AUT_CASH_TRANSFER  ,  8); /* YYYYMMDD */
+ 	memcpy ( shadow_account_activity->date_last_aut_loan ,
+		      DATE_LAST_AUT_LOAN  ,  8 ); /* YYYYMMDD */
+ 	memcpy ( shadow_account_activity->code_action, 
+		   CODE_ACTION  , 3 );
+ 	memcpy ( shadow_account_activity->last_code_action , 
+		   LAST_CODE_ACTION  , 3 );
+
+ 	memcpy ( shadow_account_activity->statement_number ,
+		   STATEMENT_NUMBER.arr ,  STATEMENT_NUMBER.len  );
+ 	shadow_account_activity->statement_number[ STATEMENT_NUMBER.len ] = 0;
+
+
+ 	memcpy ( shadow_account_activity->sensitive_operation_record , SENSITIVE_OPERATION_RECORD , 1);
+
+	     trace_event ( "End GetShadowAccountActivity( OK ) ", PROCESSING );
+	     return(OK);
+	}
+	trace_event ( "End GetShadowAccountActivity( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_shadow_account_activity:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+ 	memcpy ( shadow_account_activity->bank_code , 
+		   BANK_CODE , 6 );
+
+ 	memcpy ( shadow_account_activity->client_code , 
+		   CLIENT_CODE.arr ,  CLIENT_CODE.len );
+ 	shadow_account_activity->client_code[CLIENT_CODE.len] =0;
+
+ 	memcpy ( shadow_account_activity->currency_code , 
+		   CURRENCY_CODE , 3 );
+
+ 	shadow_account_activity->credit_limit =  CREDIT_LIMIT;
+ 	shadow_account_activity->cash_transfer_limit =  CASH_TRANSFER_LIMIT;
+ 	shadow_account_activity->loan_limit =  LOAN_LIMIT;
+ 	memcpy ( shadow_account_activity->vip_level ,
+		   VIP_LEVEL  , 1 );
+ 	memcpy ( shadow_account_activity->initial_profile_code , 
+		   INITIAL_PROFILE_CODE  ,   3 );
+ 	memcpy ( shadow_account_activity->current_profile_code , 
+		   CURRENT_PROFILE_CODE  ,   3 );
+ 	shadow_account_activity->loan_due_day = LOAN_DUE_DAY;
+ 	memcpy ( shadow_account_activity->basic_shadow_account_flag , BASIC_SHADOW_ACCOUNT_FLAG  ,  1 );
+
+ 	memcpy(shadow_account_activity->basic_shadow_account_number, 			BASIC_SHADOW_ACCOUNT_NUMBER.arr ,
+			BASIC_SHADOW_ACCOUNT_NUMBER.len);
+ 	shadow_account_activity->basic_shadow_account_number[BASIC_SHADOW_ACCOUNT_NUMBER.len ] = 0;
+
+
+ 	shadow_account_activity->credit_balance = CREDIT_BALANCE;
+ 	shadow_account_activity->cash_transfer_balance = CASH_TRANSFER_BALANCE;
+ 	shadow_account_activity->loan_balance = LOAN_BALANCE ;
+ 	shadow_account_activity->pending_aut_credit = PENDING_AUT_CREDIT ;
+ 	shadow_account_activity->pending_aut_cash_transfer = PENDING_AUT_CASH_TRANSFER ;
+ 	shadow_account_activity->pending_aut_loan = PENDING_AUT_LOAN ;
+ 	shadow_account_activity->live_deposit = LIVE_DEPOSIT ;
+ 	shadow_account_activity->loyalty_point_balance = LOYALTY_POINT_BALANCE ;
+ 	shadow_account_activity->last_pending_aut_credit = LAST_PENDING_AUT_CREDIT ;
+ 	shadow_account_activity->last_pending_aut_cash_transfer = LAST_PENDING_AUT_CASH_TRANSFER ;
+ 	shadow_account_activity->last_pending_aut_loan = LAST_PENDING_AUT_LOAN ;
+ 	shadow_account_activity->last_live_deposit = LAST_LIVE_DEPOSIT ;
+ 	shadow_account_activity->redemption_point_balance = REDEMPTION_POINT_BALANCE ;
+ 	shadow_account_activity->behaviour_point_balance = BEHAVIOUR_POINT_BALANCE ;
+
+ 	memcpy ( shadow_account_activity->date_last_aut_credit ,
+		      DATE_LAST_AUT_CREDIT , 8) ; /* YYYYMMDD */
+ 	memcpy ( shadow_account_activity->date_last_aut_cash_transfer, DATE_LAST_AUT_CASH_TRANSFER  ,  8); /* YYYYMMDD */
+ 	memcpy ( shadow_account_activity->date_last_aut_loan ,
+		      DATE_LAST_AUT_LOAN  ,  8 ); /* YYYYMMDD */
+ 	memcpy ( shadow_account_activity->code_action, 
+		   CODE_ACTION  , 3 );
+ 	memcpy ( shadow_account_activity->last_code_action , 
+		   LAST_CODE_ACTION  , 3 );
+
+ 	memcpy ( shadow_account_activity->statement_number ,
+		   STATEMENT_NUMBER.arr ,  STATEMENT_NUMBER.len  );
+ 	shadow_account_activity->statement_number[ STATEMENT_NUMBER.len ] = 0;
+
+
+ 	memcpy ( shadow_account_activity->sensitive_operation_record , SENSITIVE_OPERATION_RECORD , 1);
+	        trace_event ( "End GetShadowAccountActivity( OK ) ", PROCESSING );
+		return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetShadowAccountActivity( NOK ) ", PROCESSING );
+	return( NOK );
+}
+

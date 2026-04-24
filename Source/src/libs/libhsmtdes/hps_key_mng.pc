@@ -1,0 +1,411 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      hps_key_mng.pc                                                         */
+/*                                                                             */
+/* Description                                                                 */
+/*      Save Key Tools Management                                              */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#include <string.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <hsm_inc.h>
+#include <param_ctx.h>
+
+
+/*This file is only for PowerCARD-ATM*/
+
+
+/*****************************************************************************/
+/* GetHostPublicRSA                                                          */
+/*----------------                                                           */
+/*  Function : Get host public key.                      					 */
+/*  Input    : Terminal ID.                                                  */
+/*  Output   : 256-bytes public key.                                         */
+/*****************************************************************************/
+int     GetHostPublicRSA ( int nIndiceCtx , char *terminal_id,char *V_AcqBank, char *RSA_PUB, char* RSA_SIG)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+        int      response;
+        VARCHAR  T_terminal_id      [15 + 1 ];
+		VARCHAR  T_AcqBank  	 	[6	+  1];	
+        VARCHAR  T_RSA_PUB          [2048 + 1 ];
+		VARCHAR  T_RSA_SIG          [2048 + 1 ];
+    EXEC SQL END DECLARE SECTION;
+
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	printf(sLine, "Start GetHostPublicRSA (%.15s,%.6s)", terminal_id,V_AcqBank);
+    trace_event(sLine, PROCESSING);
+
+
+    memset(T_RSA_PUB.arr    ,       0, sizeof(T_RSA_PUB.arr));
+    T_RSA_PUB.len = 0;
+
+	memset(T_RSA_SIG.arr    ,       0, sizeof(T_RSA_SIG.arr));
+    T_RSA_SIG.len = 0;
+
+    memset(T_terminal_id.arr,  0, sizeof(T_terminal_id.arr));
+    memcpy(T_terminal_id.arr, terminal_id, strlen(terminal_id));
+	  T_terminal_id.len = strlen(terminal_id);
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));   
+	
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+	
+
+    response = 909;
+    EXEC SQL WHENEVER SQLERROR GOTO RSA_PUB_key_exception;
+    EXEC SQL EXECUTE
+    BEGIN
+        :response := PCRD_ATM_GET_HSM_KEY.GET_HOST_PUB_RSA_KEY(  	:T_terminal_id,
+																:T_AcqBank,
+                                                                :T_RSA_PUB,
+																:T_RSA_SIG);
+    END;
+    END-EXEC;
+
+
+    if (response == OK)
+    {
+        memcpy(RSA_PUB, T_RSA_PUB.arr, T_RSA_PUB.len ); RSA_PUB[T_RSA_PUB.len]='\0';
+		memcpy(RSA_SIG, T_RSA_SIG.arr, T_RSA_SIG.len ); RSA_SIG[T_RSA_SIG.len]='\0';
+
+        sprintf(sLine, "End   GetHostPublicRSA (%.256s,%.256s)", RSA_PUB,RSA_SIG);
+        trace_event(sLine, PROCESSING);       	
+        
+        return(OK);
+    }
+
+    trace_event("End   GetHostPublicRSA (NOK)", PROCESSING);
+    return(NOK);
+
+    RSA_PUB_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetHostPublicRSA(MALFUNCTION)", PROCESSING);
+    return(SYSTEM_MALFUNCTION);
+
+}
+/*****************************************************************************/
+/* GetHostSecretRSA                                                          */
+/*----------------                                                           */
+/*  Function : Get terminal secret key.                         			 */
+/*  Input    : Terminal ID.                                                  */
+/*  Output   : HSM private key.                                              */
+/*****************************************************************************/
+int     GetHostSecretRSA ( int nIndiceCtx , char *terminal_id,char *V_AcqBank , char *RSA_SECRET)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+        int      response;
+        VARCHAR  T_terminal_id      [15 + 1 ];
+		VARCHAR  T_AcqBank  	 	[6+1]; 
+        VARCHAR  T_RSA_SECRET       [4000 + 1 ];
+    EXEC SQL END DECLARE SECTION;
+
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	sprintf(sLine, "Start GetHostSecretRSA (%.15s,%.6s)", terminal_id,V_AcqBank);
+    trace_event(sLine, PROCESSING);
+
+
+    memset(T_RSA_SECRET.arr    ,       0, sizeof(T_RSA_SECRET.arr));
+    T_RSA_SECRET.len = 0;
+
+    memset(T_terminal_id.arr,  0, sizeof(T_terminal_id.arr));
+    T_terminal_id.len = 0;
+    memcpy(T_terminal_id.arr, terminal_id, strlen(terminal_id));
+	  T_terminal_id.len = strlen(terminal_id);
+	  
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));   
+	
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+    
+
+    response = 909;
+    EXEC SQL WHENEVER SQLERROR GOTO RSA_PUB_key_exception;
+    EXEC SQL EXECUTE
+    BEGIN
+        :response := PCRD_ATM_GET_HSM_KEY.GET_HOST_PRIV_RSA_KEY(  :T_terminal_id,
+																:T_AcqBank,
+																:T_RSA_SECRET);
+    END;
+    END-EXEC;
+
+
+    if (response == OK)
+    {
+        memcpy(RSA_SECRET, T_RSA_SECRET.arr, T_RSA_SECRET.len );
+
+				if (debug_option == 1)
+        	sprintf(sLine, "End   GetHostSecretRSA (%.32s)", RSA_SECRET);
+        else
+         	sprintf(sLine, "End   GetHostSecretRSA (OK)");
+        trace_event(sLine, PROCESSING);       	
+        
+        return(OK);
+    }
+
+    trace_event("End   GetHostSecretRSA (NOK)", PROCESSING);
+    return(NOK);
+
+    RSA_PUB_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetHostSecretRSA(MALFUNCTION)", PROCESSING);
+    return(SYSTEM_MALFUNCTION);
+
+}
+
+/***********************************************************************
+** Save the EPP public key and its signature in the database 
+***********************************************************************/
+int     SaveTerminalPublicRSA ( int nIndiceCtx , char *terminal_id,char *V_AcqBank, char *RSA_PUB, char *RSA_KEY_MAC)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+        int      response;
+        VARCHAR  T_terminal_id     [15  + 1 ];
+		VARCHAR  T_AcqBank  	 	[6+1];
+        VARCHAR  T_RSA_PUB         [BUF_LG_MAX + 1 ];
+        VARCHAR  T_RSA_KEY_MAC     [512+ 1 ];
+    EXEC SQL END DECLARE SECTION;
+
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    sprintf(sLine, "Start SaveTerminalPublicRSA (%.15s,%.6s)",  terminal_id,V_AcqBank);
+    trace_event(sLine, PROCESSING);
+
+
+    memset(T_RSA_PUB.arr    ,       0, sizeof(T_RSA_PUB.arr));
+    T_RSA_PUB.len = 0;
+    
+    
+    memset(T_RSA_KEY_MAC.arr,       0, sizeof(T_RSA_KEY_MAC.arr));
+    T_RSA_KEY_MAC.len = 0;
+
+    memset(T_terminal_id.arr,  0, sizeof(T_terminal_id.arr));
+    T_terminal_id.len = 0;
+    
+    memcpy(T_terminal_id.arr, terminal_id, strlen(terminal_id));
+	  T_terminal_id.len = strlen(terminal_id);
+    
+    memcpy(T_RSA_PUB.arr, RSA_PUB, strlen(RSA_PUB));
+	  T_RSA_PUB.len = strlen(RSA_PUB);
+	  
+	  
+	  memcpy(T_RSA_KEY_MAC.arr, RSA_KEY_MAC, strlen(RSA_KEY_MAC));
+	  T_RSA_KEY_MAC.len = strlen(RSA_KEY_MAC);
+	
+	
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));   
+	
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+	
+
+    response = 909;
+    EXEC SQL WHENEVER SQLERROR GOTO epp_pub_key_exception;
+    EXEC SQL EXECUTE
+    BEGIN
+        :response := PCRD_ATM_GET_HSM_KEY.SAVE_TERMINAL_PUBLIC_RSA_KEY(  :T_terminal_id,
+																  :T_AcqBank,
+                                                                  :T_RSA_PUB,
+                                                                  :T_RSA_KEY_MAC);
+    END;
+    END-EXEC;
+
+
+    if (response == OK)
+    {
+       	sprintf(sLine, "End   SaveTerminalPublicRSA (OK)");
+        trace_event(sLine, PROCESSING);       	
+        return(OK);
+    }
+
+    trace_event("End   SaveTerminalPublicRSA (NOK)", PROCESSING);
+    return(NOK);
+
+    epp_pub_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  SaveTerminalPublicRSA(MALFUNCTION)", PROCESSING);
+    return(SYSTEM_MALFUNCTION);
+
+}
+/*****************************************************************************/
+/* GetEppPublicRSA                                                            */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere la cle RSA_PUB.                             */
+/*  Entree   : L'identificateur du resource.                                */
+/*  Sortie   : La cle RSA_PUB.                                                   */
+/*****************************************************************************/
+int     GetTerminalPublicRSA ( int nIndiceCtx , char *terminal_id,char *V_AcqBank , char *RSA_PUB)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+        int      response;
+        VARCHAR  T_terminal_id      [15 + 1 ];
+		VARCHAR  T_AcqBank  	 	[6+1];/*OBE03082016*/ 
+        VARCHAR  T_RSA_PUB         [2048 + 1 ];
+		VARCHAR	 T_RSA_MAC			[256];
+    EXEC SQL END DECLARE SECTION;
+
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    sprintf(sLine, "Start GetTerminalPublicRSA (%.15s,%.6s)",  terminal_id,V_AcqBank);
+    trace_event(sLine, PROCESSING);
+
+    memset(T_RSA_PUB.arr    ,       0, sizeof(T_RSA_PUB.arr));
+    T_RSA_PUB.len = 0;
+
+	 memset(T_RSA_MAC.arr    ,       0, sizeof(T_RSA_MAC.arr));
+    T_RSA_MAC.len = 0;
+
+    memset(T_terminal_id.arr,  0, sizeof(T_terminal_id.arr));
+    memcpy(T_terminal_id.arr, terminal_id, strlen(terminal_id));
+	  T_terminal_id.len = strlen(terminal_id);
+	
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*OBE03082016*/   
+	
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+	
+
+    response = 909;
+    EXEC SQL WHENEVER SQLERROR GOTO rsa_priv_key_exception;
+    EXEC SQL EXECUTE
+    BEGIN
+        :response := PCRD_ATM_GET_HSM_KEY.GET_TERMINAL_PUBLIC_RSA_KEY(  :T_terminal_id,
+																		:T_AcqBank,
+																		:T_RSA_PUB,
+																		:T_RSA_MAC);
+    END;
+    END-EXEC;
+
+
+    if (response == OK)
+    {
+        memcpy(RSA_PUB, T_RSA_PUB.arr, T_RSA_PUB.len );
+
+        sprintf(sLine, "End   GetTerminalPublicRSA (%lu, %.256s)",strlen(RSA_PUB),RSA_PUB);
+        
+        trace_event(sLine, PROCESSING);       	
+        
+        return(OK);
+    }
+
+    trace_event("End   GetTerminalPublicRSA (NOK)", PROCESSING);
+    return(NOK);
+
+    rsa_priv_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetTerminalPublicRSA(MALFUNCTION)", PROCESSING);
+    return(SYSTEM_MALFUNCTION);
+
+}
+/*****************************************************************************/
+/* GetNCRPublicRSA                                                           */
+/*----------------                                                           */
+/*  Function : Get terminal public key with MAC created during import.       */
+/*  Input    : Terminal ID.                                                  */
+/*  Output   : Formatted Public key + MAC.                                   */
+/*****************************************************************************/
+int     GetNCRPublicRSA ( int nIndiceCtx , char *terminal_id,char *V_AcqBank, char *RSA_PUB)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+        int      response;
+        VARCHAR  T_terminal_id      [15 + 1 ];
+		VARCHAR  T_AcqBank  	 	[6+1];
+        VARCHAR  T_RSA_PUB          [2048 + 1 ];
+		VARCHAR	 T_RSA_MAC			[256];
+    EXEC SQL END DECLARE SECTION;
+
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+
+    sprintf(sLine, "Start GetNCRPublicRSA (%.15s,%.6s)",  terminal_id,V_AcqBank);
+    trace_event(sLine, PROCESSING);
+
+    memset(T_RSA_PUB.arr    ,       0, sizeof(T_RSA_PUB.arr));
+    T_RSA_PUB.len = 0;
+
+	memset(T_RSA_MAC.arr    ,       0, sizeof(T_RSA_MAC.arr));
+    T_RSA_MAC.len = 0;
+
+    memset(T_terminal_id.arr,  0, sizeof(T_terminal_id.arr));
+    memcpy(T_terminal_id.arr, terminal_id, strlen(terminal_id)); 
+    T_terminal_id.len = strlen(terminal_id);
+	
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+	
+
+    response = 909;
+    EXEC SQL WHENEVER SQLERROR GOTO RSA_PUB_key_exception;
+    EXEC SQL EXECUTE
+    BEGIN
+        :response := PCRD_ATM_GET_HSM_KEY.GET_NCR_PUBLIC_RSA_KEY(  	:T_terminal_id,
+																	:T_AcqBank,
+																	:T_RSA_PUB,
+																	:T_RSA_MAC);
+    END;
+    END-EXEC;
+
+
+    if (response == OK)
+    {
+        memcpy(RSA_PUB, T_RSA_PUB.arr, T_RSA_PUB.len );
+		RSA_PUB[T_RSA_PUB.len]='\0';
+
+
+		sprintf(sLine, "End   GetNCRPublicRSA (%lu, %.30s)", strlen(RSA_PUB), RSA_PUB); 
+        trace_event(sLine, PROCESSING);
+        
+        return(OK);
+    }
+
+    trace_event("End   GetNCRPublicRSA (NOK)", PROCESSING);
+    return(NOK);
+
+    RSA_PUB_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetNCRPublicRSA(MALFUNCTION)", PROCESSING);
+    return(SYSTEM_MALFUNCTION);
+}
+

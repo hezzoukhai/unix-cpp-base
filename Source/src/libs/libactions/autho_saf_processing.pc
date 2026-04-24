@@ -1,0 +1,170 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <tlv_autho.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+/*********************************************************************************************************************************/
+/* IssuerAutSafProcessing                                                                                                        */
+/* -----------------------                                                                                                       */
+/* Description : In case of stand in processing this function also insert in SAF table in case of decline or approuved advices   */
+/*               Are checked for the destination resource                                                                        */
+/* Entree       :                                                                                                                */
+/*              nIndexCtx : OracleContexte                                                                                       */
+/*              sTlvBuffer: Original TLV data used in the on-line processing to the issuer                                       */
+/* Sortie       :                                                                                                                */
+/* Author/Date  : H. YOUSFI 05/06/2002                                                                                           */
+/* Revision     :                                                                                                                */
+/*********************************************************************************************************************************/
+
+int AutSafProcessing  ( int nIndiceCtx , char *sTlvBuffer, char *sSrcResource, char *sDestResource)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+	int				nRetCode;
+	char			sMsgType [4 + 1];
+	int				nLength;
+
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+ 	char   		T_src_resource [ 6 + 1];
+ 	char   		T_dst_resource [ 6 + 1];
+ 	VARCHAR   	T_tlv_warning [ 6 + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+    sprintf (sLine, "Start AutSafProcessing (%s|%s) ", sSrcResource,sDestResource);
+	trace_event(sLine,PROCESSING);
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	memset ( T_tlv_warning.arr         ,  0  ,   sizeof(T_tlv_warning.arr )  );
+	T_tlv_warning.len = 0;
+
+	memset ( T_src_resource         ,  0  ,   sizeof(T_src_resource )  );
+	memset ( T_dst_resource         ,  0  ,   sizeof(T_dst_resource )  );
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+    
+	memcpy ( T_src_resource         ,  sSrcResource  ,   6);
+	memcpy ( T_dst_resource         ,  sDestResource  ,   6);
+
+    memset(sMsgType, 0, sizeof(sMsgType));
+    GetTlvBuffer ( AUTO_MSG_TYPE , sTlvBuffer , sMsgType ,&nLength);
+    memcpy(sMsgType + 2, "20",2);
+    PutTlvBuffer(AUTO_MSG_TYPE,T_tlv_auth.arr ,sMsgType,4);
+
+
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_AutSafProcessing;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response_code := PCRD_SAF_MANAGE.SAF_PROCESSING( :T_tlv_auth,
+														  :T_src_resource,
+														  :T_dst_resource,
+														  :T_tlv_warning); 
+	END;
+	END-EXEC;
+	
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+
+	sprintf(sLine,"End AutSafProcessing (%d,%.6s)", response_code, T_tlv_warning.arr);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_AutSafProcessing :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	trace_event("End AutSafProcessing (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+/*********************************************************************************************************************************/
+/* CheckDynamicAdvice																			                                 */
+/* -----------------------                                                                                                       */
+/* Description : In case of System Malfunction From the Issuer This Function Check of Stand In Processing ot not                 */
+/* Entree       :                                                                                                                */
+/*              nIndexCtx : OracleContexte                                                                                       */
+/*              sPrimResource: Primary Resource                                                                                  */
+/* Sortie       :                                                                                                                */
+/* Author/Date  : H. YOUSFI 05/06/2002                                                                                           */
+/* Revision     :                                                                                                                */
+/*********************************************************************************************************************************/
+int CheckDynamicAdvice(int nIndiceCtx, char *sSrcResource)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+	int				nRetCode;
+
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	char   		T_src_resource [ 6 + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    sprintf ( sLine,"Start CheckDynamicAdvice (%s) ", sSrcResource);
+	trace_event(sLine,PROCESSING);
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_src_resource         ,  0  ,   sizeof(T_src_resource )  );
+	memcpy ( T_src_resource         ,  sSrcResource  ,   6);
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_CheckDynamicAdvice;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response_code := PCRD_SAF_MANAGE.CHECK_DYNAMIC_ADVICE(:T_src_resource); 
+	END;
+	END-EXEC;
+	
+	sprintf(sLine,"End CheckDynamicAdvice (%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_CheckDynamicAdvice :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End CheckDynamicAdvice (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

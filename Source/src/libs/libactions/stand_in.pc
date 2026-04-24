@@ -1,0 +1,202 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <tlv_fields.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int  CheckAccAvailable ( int nIndiceCtx , char *sTlvBuffer )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	trace_event ( "Start CheckAccAvailable() ", PROCESSING );
+
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  ); /**PA DSS*/
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_CheckAccAvailable;
+	EXEC SQL EXECUTE
+	BEGIN
+		 :response_code := PCRD_P7_OFFLINE_TOOLS.CTRL_AUT_PROCESSING( :T_tlv_auth); 
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr )); /**PA DSS*/
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		
+		trace_event("End CheckAccAvailable(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	
+	sprintf(sLine,"End CheckAccAvailable(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_CheckAccAvailable :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr )); /**PA DSS*/
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine,"End CheckAccAvailable(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+
+	return(response_code);
+
+}
+int  CheckPartialAccAvailable ( int nIndiceCtx , char *sTlvBuffer )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	trace_event ( "Start CheckPartialAccAvailable() ", PROCESSING );
+
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  ); /**PA DSS*/
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_CheckAccAvailable;
+	EXEC SQL EXECUTE
+	BEGIN
+		 :response_code := PCRD_P7_OFFLINE_TOOLS.CTRL_PARTIAL_AUT_PROCESSING( :T_tlv_auth); 
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr )); /**PA DSS*/
+	
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		trace_event("End CheckPartialAccAvailable(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	sprintf(sLine,"End CheckPartialAccAvailable( %d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_CheckAccAvailable :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr )); /**PA DSS*/
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine,"End CheckPartialAccAvailable(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+
+	return(response_code);
+
+}
+
+int  GetShadowAccBalance ( int nIndiceCtx , char *sTlvBuffer )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	trace_event ( "Start GetShadowAccBalance() ", PROCESSING );
+
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  ); /**PA DSS*/
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_sa_balance;
+	EXEC SQL EXECUTE
+	BEGIN
+		 :response_code := PCRD_P7_ACCOUNT_MNG.GET_SA_CURRENT_BALANCE( :T_tlv_auth, 
+																				'Y' ); /*ZKO21022022 PLUTONL-4251: *put 'Y' in inc_auth_amount */
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr )); /**PA DSS*/
+	
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+
+	if (response_code == OK)
+	{
+		trace_event("End GetShadowAccBalance(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	sprintf(sLine,"End GetShadowAccBalance( %d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_get_sa_balance :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr )); /**PA DSS*/
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine,"End GetShadowAccBalance(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+
+	return(response_code);
+
+}

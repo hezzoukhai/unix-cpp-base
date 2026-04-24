@@ -1,0 +1,88 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+/************************************************************/
+/*****************   GetAbrevBankName()   *******************/
+/************************************************************/
+int GetAbrevBankName  (int nIndiceCtx, char  *sAcquirerBank, char *sAbrevName)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	char      T_BANK_CODE    [ 6+1 ];
+ 	VARCHAR   T_ABREV_NAME   [ 15+1 ];
+        int       response_code;
+	
+        EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetAbrevBankName() ", PROCESSING );
+
+/******************************************************************/
+/*      INITIALISATION                                            */
+/******************************************************************/
+	memset ( T_BANK_CODE       ,  0, sizeof(T_BANK_CODE) );
+        T_ABREV_NAME.len = 0;
+	memset ( T_ABREV_NAME.arr  ,  0, sizeof(T_ABREV_NAME.arr) );
+
+/******************************************************************/
+/*      CHAMP CLE                                                 */
+/******************************************************************/
+	memcpy ( T_BANK_CODE , sAcquirerBank, 6);
+
+/*******************************************************************/
+/*      LECTURE                                                    */
+/*******************************************************************/
+
+        response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_abrev_bank_name;
+	EXEC SQL EXECUTE
+            DECLARE    T_BANK     BANK%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_PARAM_GENERAL_ROWS.GET_BANK ( :T_BANK_CODE,
+                                                                T_BANK);
+
+	IF :response_code = 0 THEN
+		:T_ABREV_NAME      := RPAD (NVL(T_BANK.ABREV_NAME, ' '), 15, ' ');
+		END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+		memcpy(sAbrevName, T_ABREV_NAME.arr,T_ABREV_NAME.len);
+		sAbrevName[ T_ABREV_NAME.len ] = 0;
+		sprintf (detail , " AbrevName is :[%s], AcqBank is:[%s] ", sAbrevName, sAcquirerBank);
+		trace_event ( detail, PROCESSING );
+		trace_event ( "End GetAbrevBankName( OK ) ", PROCESSING );
+		return(OK);
+	}
+	trace_event ( "End GetAbrevBankName( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_abrev_bank_name :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+		memcpy(sAbrevName, T_ABREV_NAME.arr,15);
+		trace_event ( "End GetAbrevBankName( OK ) ", PROCESSING );
+		return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetAbrevBankName( MALFUNCTION ) ", PROCESSING );
+	return( NOK );
+}

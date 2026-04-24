@@ -1,0 +1,181 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      atm_seq_mng.c                                                                 */
+/*                                                                             */
+/* Description                                                                 */
+/*      NDC Sequence Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <define.h>
+#include <param_ctx.h>
+
+
+
+  /***********************************************************************
+  **  nom	: GetTermTransSeq()					**
+  **  desc	: Recupere le numero de sequence pour la transaction	**
+  **  entree	: pTermNbr	-> numero du terminal			**
+  **  sortie	: pTransSeq	-> le numero de sequence		**
+  **  retour	: OK	-> le numero de sequence est recupere		**
+  **		  NOK	-> Pas de sequenceur pour ce terminal		**
+  **		  ERROR	-> fatal					**
+  **  auteur	: Younes OUADI (10/06/99)				**
+  ***********************************************************************/
+int	GetTermTransSeq(
+int 	nIndexCtx,
+char	*pTermNbr,
+char	*pAcqBank,/*ICH270715*/
+char	*pTransSeq)
+{
+   struct sqlca sqlca;
+   char	detail[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+  varchar	hTermNbr	[15+1];
+  VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+  char		hTransSeq	[ 6+1]; /*DDA21122016 from 4 to 6*/
+  int		hRet;
+EXEC SQL END DECLARE SECTION;
+
+	sprintf(detail, "Start GetTermTransSeq(%.15s,%0.6s)", pTermNbr,pAcqBank/*ICH270715*/);
+	trace_event(detail, PROCESSING);
+
+    /* - initialisation ---------------------------------------------- */
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr)	);
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hTransSeq,		0, sizeof(hTransSeq)	);
+
+    /*memset(pTransSeq,		0, sizeof(hTransSeq) + 1);**SKA050508**/
+    memset(pTransSeq,		0, sizeof(hTransSeq));
+
+    memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr));
+    hTermNbr.len	= strlen(pTermNbr);
+
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    /* - Capture des exceptions --------------------------------------- */
+   	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO getTermTransSeqErr;
+
+
+    /* - Appel du PL/SQL ---------------------------------------------- */
+    EXEC SQL EXECUTE
+    BEGIN
+      :hRet := PCRD_ATM_SEQ_MNG.GET_TRANS_SEQ(:hTermNbr,:hAcqBank/*ICH270715*/, :hTransSeq);
+    END;
+    END-EXEC;
+
+
+    /* - Examen du retour --------------------------------------------- */
+    if(hRet != OK)
+    {
+        trace_event("End   GetTermTransSeq(NOK)", PROCESSING);
+        return (NOK);
+    }
+
+
+    /* - recuperation du retour --------------------------------------- */
+    memcpy(pTransSeq,	hTransSeq, 4); /*IBO20220929 PLUTONL-5237*/
+
+sprintf(detail, "End   GetTermTransSeq(%.4s)", pTransSeq);
+trace_event(detail, PROCESSING);
+return (OK);
+
+getTermTransSeqErr :
+    sprintf(detail, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(detail, ERROR);
+    trace_event("End   GetTermTransSeq(ERROR)", ERROR);
+    return (ERROR);
+}
+
+
+  /***********************************************************************
+  **  nom	: SetTermTransSeq()					**
+  **  desc	: incremente le numero de sequence			**
+  **  entree	: pTermNbr	-> numero du terminal			**
+  **  sortie	: aucune						**
+  **  retour	: OK	-> le numero de sequence est recupere		**
+  **		  	  NOK	-> Pas de sequenceur pour ce terminal		**
+  **		  	  ERROR	-> fatal					**
+  **  auteur	: Younes OUADI (10/06/99)				**
+  ***********************************************************************/
+int	SetTermTransSeq(
+int 	nIndexCtx,
+char	*pTermNbr,
+char	*pAcqBank,/*ICH270715*/
+char	*pTermTransSeq)
+{
+   struct sqlca sqlca;
+   char	detail[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+  varchar	hTermNbr    	[15+1];
+  VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+  char	    hTermTransSeq	[4+1];
+  int		hRet;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(detail, "Start SetTermTransSeq(%.15s,%0.6s)", pTermNbr,pAcqBank/*ICH270715*/);
+trace_event(detail, PROCESSING);
+
+    /* - initialisation ---------------------------------------------- */
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr)	);
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hTermTransSeq,	0, sizeof(hTermTransSeq)	);
+
+    memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr));
+    hTermNbr.len	= strlen(pTermNbr);
+
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+	if (strlen(pTermTransSeq) < 4)
+	{
+        trace_event("End   SetTermTransSeq(NOK seq)", PROCESSING);
+        return (NOK);
+    }
+	memcpy(hTermTransSeq,	pTermTransSeq, 4);
+
+    /* - Capture des exceptions --------------------------------------- */
+   	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO setTermTransSeqErr;
+
+
+    /* - Appel du PL/SQL ---------------------------------------------- */
+    EXEC SQL EXECUTE
+    BEGIN
+      /* :hRet := PCRD_ATM_SEQ_MNG.SET_TRANS_SEQ(:hTermNbr, :hTermTransSeq);
+       no need managed in package when getting the sequence     */
+	:hRet := 0;
+    END;
+    END-EXEC;
+
+
+    /* - Examen du retour --------------------------------------------- */
+    if(hRet != OK)
+    {
+        trace_event("End   SetTermTransSeq(NOK)", PROCESSING);
+        return (NOK);
+    }
+
+
+sprintf(detail, "End   SetTermTransSeq(OK)");
+trace_event(detail, PROCESSING);
+return (OK);
+
+setTermTransSeqErr :
+    sprintf(detail, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(detail, ERROR);
+    trace_event("End   SetTermTransSeq(ERROR)", ERROR);
+    return (ERROR);
+}
+

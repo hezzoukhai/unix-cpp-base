@@ -1,0 +1,122 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetRangeSwitch  (int nIndiceCtx, TSRangeSwitch *range_switch)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+   	VARCHAR  CARD    [ 22];
+   	char     MTI             [ 4];
+   	char     PROCESSING_CODE [ 2];
+   	char     FUNCTION_CODE   [ 3];
+   	char     SOURCE_ACCOUNT  [ 2];
+   	char     DESTINATION_ACCOUNT  [ 2];
+
+   	char  	ROUTING_CREDIT [ 6];
+   	char  	ROUTING_DEBIT  [ 6];
+   	char  	ALTERNATE_ROUTING_CREDIT [ 6];
+   	char  	ALTERNATE_ROUTING_DEBIT  [ 6];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetRangeSwitch() ", PROCESSING );
+
+   	memset (  CARD.arr        , 0,  sizeof ( CARD.arr ) );
+   	memset (  MTI             , 0,  4 );
+   	memset (  PROCESSING_CODE , 0,  2 );
+   	memset (  FUNCTION_CODE   , 0,  3 );
+   	memset (  SOURCE_ACCOUNT  , 0,  2 );
+   	memset (  DESTINATION_ACCOUNT  , 0,  2 );
+
+   	memset (  ROUTING_CREDIT , 0,  6 );
+   	memset (  ROUTING_DEBIT  , 0,  6 );
+   	memset (  ALTERNATE_ROUTING_CREDIT , 0,  6 );
+   	memset (  ALTERNATE_ROUTING_DEBIT  , 0,  6 );
+
+     memcpy ( CARD.arr   ,range_switch->card, 
+				strlen ( range_switch->card ));
+     memcpy ( MTI          ,range_switch->mti ,4);
+     memcpy ( PROCESSING_CODE,range_switch->processing_code,2);
+     memcpy ( FUNCTION_CODE ,range_switch->function_code   ,3);
+     memcpy( SOURCE_ACCOUNT ,range_switch->source_account  ,2);
+     memcpy( DESTINATION_ACCOUNT ,range_switch->destination_account  ,2);
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_range_switch;
+	EXEC SQL EXECUTE
+	    DECLARE T_P7_RANGE_SWITCH   P7_RANGE_SWITCH%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_PARAM_GENERAL_ROWS.GET_P7_RANGE_SWITCH
+						(   :CARD, 
+						    :MTI, 
+						    :PROCESSING_CODE, 
+						    :FUNCTION_CODE, 
+						    :SOURCE_ACCOUNT, 
+						    :DESTINATION_ACCOUNT, 
+	                                             T_P7_RANGE_SWITCH 
+	                                        );
+
+
+	   IF :response_code = 0 THEN
+	   :ROUTING_CREDIT := T_P7_RANGE_SWITCH.ROUTING_CODE_CREDIT;
+	   :ALTERNATE_ROUTING_CREDIT := T_P7_RANGE_SWITCH.ALTERNATE_ROUTING_CODE_CREDIT;
+	   :ROUTING_DEBIT  := T_P7_RANGE_SWITCH.ROUTING_CODE_DEBIT;
+	   :ALTERNATE_ROUTING_DEBIT  := T_P7_RANGE_SWITCH.ALTERNATE_ROUTING_CODE_DEBIT;
+	    END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+            memcpy ( range_switch->routing_credit, 
+						ROUTING_CREDIT     ,  6 );
+            memcpy ( range_switch->alternate_credit,  
+					       ALTERNATE_ROUTING_CREDIT,6);
+            memcpy ( range_switch->routing_debit,  
+					       ROUTING_DEBIT     ,  6 );
+            memcpy ( range_switch->alternate_debit, 
+					       ALTERNATE_ROUTING_DEBIT,6);
+	    trace_event ( "End GetRangeSwitch( OK ) ", PROCESSING );
+	    return(OK);
+	}
+	trace_event ( "End GetRangeSwitch( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_range_switch:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+            memcpy ( range_switch->routing_credit, 
+						ROUTING_CREDIT     ,  6 );
+            memcpy ( range_switch->alternate_credit,  
+					       ALTERNATE_ROUTING_CREDIT,6);
+            memcpy ( range_switch->routing_debit,  
+					       ROUTING_DEBIT     ,  6 );
+            memcpy ( range_switch->alternate_debit, 
+					       ALTERNATE_ROUTING_DEBIT,6);
+	    trace_event ( "End GetRangeSwitch( OK ) ", PROCESSING );
+	    return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetRangeSwitch( NOK ) ", PROCESSING );
+	return( NOK );
+}

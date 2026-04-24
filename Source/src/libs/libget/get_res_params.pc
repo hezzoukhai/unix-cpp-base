@@ -1,0 +1,82 @@
+/*                                                                                                          
+------------------------------------------------------------------------------------------------------------
+-- Description : 
+    --------------------------------------------------------------------------------------------------------
+	
+------------------------------------------------------------------------------------------------------------
+-- Modification History : 
+    --------------------------------------------------------------------------------------------------------
+    -- Version    Date          	Author       Activity         Comment
+    --------------------------------------------------------------------------------------------------------
+    -- V3.0.0     26/02/2015    	HPS                           Initial version
+------------------------------------------------------------------------------------------------------------
+*/
+#include <string.h>
+#include <stdio.h>
+
+#include <define.h>
+#include <param_ctx.h>
+#include <resources.h>
+#include <thread_var.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int  GetResourceParams (int  nIndexCtx, char  *pResourceId, char* tlv_params)
+{
+	char		sLine[MAX_LINE_TRC];
+	struct sqlca sqlca;
+	EXEC SQL BEGIN DECLARE SECTION;
+        char		T_resource_id     [6 + 1];
+	VARCHAR		T_params		[1024 + 1];
+        int        result;
+
+
+
+   EXEC SQL END DECLARE SECTION;
+
+   fprintf (stderr,"Start  GetResourceParams()\n");
+
+
+	
+   memset (T_resource_id,       0, sizeof(T_resource_id));
+   memset (T_params.arr,       0, sizeof(T_params.arr));T_params.len = 0;
+
+   memcpy (T_resource_id, pResourceId, 6);
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO resource_params_error;
+   EXEC SQL EXECUTE
+   BEGIN
+      :result :=  PCRD_SWI_RESOURCES_PARAM.GET_RESOURCE_PARAM ( :T_resource_id, :T_params);
+
+   END;
+   END-EXEC;
+
+   if (result == OK)
+	{
+	  sprintf(tlv_params,"%04d",T_params.len);
+          memcpy (tlv_params + 4,  T_params.arr, T_params.len);
+          trace_event ("End    GetResourceParams(ok)",PROCESSING);
+          return (OK);
+
+	}
+   
+   else
+	{
+		fprintf (stderr,"Error to get parameters, ResourceId[%s]\n",T_resource_id);
+		fprintf (stderr,"End GetResourceParams (NOK)\n");
+		return (NOK);
+	}
+
+	
+  resource_params_error:
+      fprintf(stderr, "%s \n",sqlca.sqlerrm.sqlerrmc);
+      fprintf (stderr,"End GetResourceParams (MALFUNCTION)\n");
+      return (NOK);
+}
+
+

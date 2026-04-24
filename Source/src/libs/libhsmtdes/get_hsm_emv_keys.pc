@@ -1,0 +1,891 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <hsm_inc.h>
+#include <tlv_private.h>
+#include <tlv_fields.h>
+/*
+#include <sqlca.h>
+#include <sqlcpr.h>
+*/
+
+#include <p7_config.h>
+
+/** START MAW20050916: Retrieving the AC Key for Cryptogram Verification **/
+
+int Get_AC_Key( int nIndiceCtx, char *sPan, char *sAC_Key)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_Pan    [ 22 + 1];
+        VARCHAR          T_AC_Key [256 + 1];
+        EXEC SQL END DECLARE SECTION;
+
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	/*MKB060309 PCI Norme Integration */
+	if (debug_option == 1)
+        	sprintf(sLine, "Start Get_AC_Key(%.16s)", sPan);
+	else
+        	sprintf(sLine, "Start Get_AC_Key(OK)");
+        trace_event(sLine, PROCESSING);				
+	
+        memset( T_Pan.arr,              0, sizeof(T_Pan.arr));
+        T_Pan.len = 0;
+    
+        memset( T_AC_Key.arr,           0, sizeof(T_AC_Key.arr));
+        T_AC_Key.len = 0;
+    
+
+        memcpy( T_Pan.arr, sPan, strlen(sPan) );
+        T_Pan.len = strlen(sPan);
+	/*MKB060309 PCI Norme Integration */
+	if (debug_option == 1)
+	{
+        	sprintf(sLine, "T_Pan.arr=[%s], T_Pan.len=[%d])", T_Pan.arr, T_Pan.len);
+        	trace_event(sLine, PROCESSING);
+	}
+        response = 909;
+        EXEC SQL WHENEVER SQLERROR GOTO sql_exception_tag;
+        EXEC SQL EXECUTE
+        BEGIN
+        :response := PCRD_GET_HSM_KEY_2.GET_AC_KEY (      
+                                                          :T_Pan   ,
+                                                          :T_AC_Key
+                                                   );
+        END;
+        END-EXEC;
+
+        if (response == OK)
+        {
+           	memcpy(sAC_Key, T_AC_Key.arr, T_AC_Key.len);
+		/*MKB060309 PCI Norme Integration */
+		if (debug_option == 1)
+           		sprintf(sLine, "End   Get_AC_Key(%s)", sAC_Key);
+		else
+           		sprintf(sLine, "End   Get_AC_Key(OK)");
+           	trace_event(sLine, PROCESSING);
+          	
+           	return(OK);
+        }
+
+        trace_event("End   Get_AC_Key(NOK)", PROCESSING);
+        return(NOK);
+
+    sql_exception_tag :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "[%.100s]",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  Get_AC_Key(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+/** END   MAW20050916 **/
+
+/**** ME140906 Mehdi ELyajizi 12/06/2006  ***/
+int GET_EMV_KEYS( int nIndiceCtx, char *p_card_number,            
+                                 char *p_issuing_bank_code,
+                                 char *p_issuing_bin,
+                                 char *p_product_code,
+                                 char *p_icc_application_index,
+                                 char *p_key_code,
+                                 char *sEMV_key)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+   char *CardTrunc[22 +1];
+   
+   memset(CardTrunc, 0, sizeof(CardTrunc));
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_Pan    [ 22 + 1];
+        VARCHAR          T_EMV_Key [256 + 1];
+        VARCHAR          T_ISSUING_BANK_CODE[6 + 1];
+        VARCHAR          T_ISSUING_BIN[11 + 1];
+        VARCHAR          T_PRODUCT_CODE[3 + 1];
+        VARCHAR          T_ICC_APP_INDX[4 + 1];
+        VARCHAR          T_KEY_CODE[ 5 + 1];
+        EXEC SQL END DECLARE SECTION;
+
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	/*MKB060309 PCI Norme Integration */
+	if (debug_option == 1)
+        	sprintf(sLine, "Start GET_EMV_KEYS(%.16s)", p_card_number);
+	else
+		sprintf(sLine, "Start GET_EMV_KEYS()");
+	trace_event(sLine, PROCESSING);
+	
+
+        memset( T_Pan.arr,              0, sizeof(T_Pan.arr));
+        T_Pan.len = 0;
+   
+        memset( T_EMV_Key.arr,           0, sizeof(T_EMV_Key.arr));
+        T_EMV_Key.len = 0;
+        
+        memset( T_ISSUING_BANK_CODE.arr,           0, sizeof(T_ISSUING_BANK_CODE.arr));
+        T_ISSUING_BANK_CODE.len = 0;
+        
+        memset( T_ISSUING_BIN.arr,           0, sizeof(T_ISSUING_BIN.arr));
+        T_ISSUING_BIN.len = 0;
+        
+        memset( T_PRODUCT_CODE.arr,           0, sizeof(T_PRODUCT_CODE.arr));
+        T_PRODUCT_CODE.len = 0;
+        
+        memset( T_ICC_APP_INDX.arr,           0, sizeof(T_ICC_APP_INDX.arr));
+        T_ICC_APP_INDX.len = 0;
+        
+        memset( T_KEY_CODE.arr,           0, sizeof(T_KEY_CODE.arr));
+        T_KEY_CODE.len = 0;
+        
+         
+
+        memcpy( T_Pan.arr, p_card_number, strlen(p_card_number) );
+        T_Pan.len = strlen(p_card_number);
+        
+        memcpy( T_ISSUING_BANK_CODE.arr, p_issuing_bank_code, strlen(p_issuing_bank_code) );
+        T_ISSUING_BANK_CODE.len = strlen(p_issuing_bank_code);
+        sprintf(sLine, "T_ISSUING_BANK_CODE.arr=[%s], T_ISSUING_BANK_CODE.len=[%d])", T_ISSUING_BANK_CODE.arr, T_ISSUING_BANK_CODE.len);
+        trace_event(sLine, PROCESSING);
+        
+        memcpy( T_ISSUING_BIN.arr, p_issuing_bin, strlen(p_issuing_bin) );
+        T_ISSUING_BIN.len = strlen(p_issuing_bin);
+        sprintf(sLine, "T_ISSUING_BIN.arr=[%s], T_ISSUING_BIN.len=[%d])", T_ISSUING_BIN.arr, T_ISSUING_BIN.len);
+        trace_event(sLine, PROCESSING);
+
+	memcpy( T_PRODUCT_CODE.arr, p_product_code, strlen(p_product_code) );
+	T_PRODUCT_CODE.len = strlen(p_product_code);
+	sprintf(sLine, "T_PRODUCT_CODE.arr=[%s], T_PRODUCT_CODE.len=[%d])", T_PRODUCT_CODE.arr, T_PRODUCT_CODE.len);
+	trace_event(sLine, PROCESSING);
+
+	memcpy( T_ICC_APP_INDX.arr, p_icc_application_index, strlen(p_icc_application_index) );
+	T_ICC_APP_INDX.len = strlen(p_icc_application_index);
+	sprintf(sLine, "T_ICC_APP_INDX.arr=[%s], T_ICC_APP_INDX.len=[%d])", T_ICC_APP_INDX.arr, T_ICC_APP_INDX.len);
+	trace_event(sLine, PROCESSING);
+				
+	memcpy( T_KEY_CODE.arr, p_key_code, strlen(p_key_code) );
+	T_KEY_CODE.len = strlen(p_key_code);
+	sprintf(sLine, "T_KEY_CODE.arr=[%s], T_KEY_CODE.len=[%d])", T_KEY_CODE.arr, T_KEY_CODE.len);
+	trace_event(sLine, PROCESSING);
+				
+        response = 909;
+        EXEC SQL WHENEVER SQLERROR GOTO sql_exception_tag;
+        EXEC SQL EXECUTE
+        BEGIN
+           :response := PCRD_GET_HSM_KEY_2.GET_EMV_KEYS  (:T_Pan,
+																													:T_ISSUING_BANK_CODE,      
+																													:T_ISSUING_BIN,            
+																													:T_PRODUCT_CODE ,         
+																													:T_ICC_APP_INDX, 
+																													:T_KEY_CODE,				
+																													:T_EMV_Key	
+																										);
+        END;
+        END-EXEC;
+
+        if (response == OK)
+        {
+           	memcpy(sEMV_key, T_EMV_Key.arr, T_EMV_Key.len);
+		/*MKB060309 PCI Norme Integration */
+		if (debug_option == 1)
+           		sprintf(sLine, "End   GET_EMV_KEYS(%s)", sEMV_key);
+		else
+           		sprintf(sLine, "End   GET_EMV_KEYS(OK)");
+           	trace_event(sLine, PROCESSING);           	
+           	
+           	return(OK);
+        }
+
+        trace_event("End   GET_EMV_KEYS(NOK)", PROCESSING);
+        return(NOK);
+
+    sql_exception_tag :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "[%.100s]",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GET_EMV_KEYS(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+
+/*****************************************************************************/
+/* GetCVRFromIAD                                                             */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere le CVR de l'Issuer Application Data IAD */
+/*  Author   : M.EL KABLI   Date: 25/04/2006				     */
+/*  Entree   : Issuer Application Data, Bank Code, Acc Application Code      */
+/*  Sortie   : CVR 							     */
+/*****************************************************************************/
+
+int     GetCVRFromIAD ( int nIndiceCtx , char *Iss_App_Data, char *Iss_Bank_Code, char *Product_Code/*ICH2019*/, char *Icc_App_Index, char *Cvr)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR  T_Cvr              [64 + 1 ]; /**Linux MKB110907**/
+        int      response;
+        char     T_Iss_App_Data     [256 + 1 ]; /**Linux MKB110907**/
+        char     T_Icc_App_Index    [4  + 1 ];
+        char     T_Iss_Bank_Code    [6  + 1 ];
+        char     T_Product_Code     [3  + 1 ];/*ICH20179*/
+
+    EXEC SQL END DECLARE SECTION;
+
+
+    sprintf(sLine, "Start GetCVRFromIAD:IAD(%s),len(%lu),Iss(%s),Prd(%s),Icc(%s)", 
+		   Iss_App_Data,strlen(Iss_App_Data),Iss_Bank_Code,Product_Code,Icc_App_Index);
+    trace_event(sLine, PROCESSING);
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    memset(T_Cvr.arr    ,       0, sizeof(T_Cvr.arr));
+    T_Cvr.len = 0;
+    
+    memset(T_Iss_App_Data,  0, sizeof(T_Iss_App_Data));
+    memcpy(T_Iss_App_Data, Iss_App_Data, strlen(Iss_App_Data));
+
+    memset(T_Icc_App_Index,  0, sizeof(T_Icc_App_Index));
+    memcpy(T_Icc_App_Index, Icc_App_Index, strlen(Icc_App_Index));
+
+    memset(T_Iss_Bank_Code,  0, sizeof(T_Iss_Bank_Code));
+    memcpy(T_Iss_Bank_Code, Iss_Bank_Code, strlen(Iss_Bank_Code));
+
+    memset(T_Product_Code,  0, sizeof(T_Product_Code));
+    memcpy(T_Product_Code, Product_Code, strlen(Product_Code));
+
+    response = 909;
+
+    EXEC SQL WHENEVER SQLERROR GOTO cvr_iad_exception;
+    EXEC SQL EXECUTE
+    BEGIN
+/*insert into pcard_traces(user_message) values ('***');
+        commit;*/
+
+        /*:response := PCRD_EMV_TOOLS.GET_EMV_IAD_CVR(    :T_Iss_Bank_Code,*/
+		:response := PCRD_P7_CTRL_EMV_SECURITY.GET_EMV_IAD_CVR(    :T_Iss_Bank_Code,
+                            :T_Product_Code,/*ICH2019*/
+							:T_Iss_App_Data, 
+							:T_Icc_App_Index,
+							:T_Cvr);
+    END;
+    END-EXEC;
+
+sprintf(sLine, "MAX_SEND_COMMAND d=[%s]", T_Cvr.arr);
+                trace_event(sLine, PROCESSING);
+
+    if (response == OK)
+    {
+        memcpy(Cvr, T_Cvr.arr, T_Cvr.len );
+        sprintf(sLine, "End   GetCVRFromIAD (%s)", Cvr);
+        trace_event(sLine, PROCESSING);
+        return(OK);
+    }
+
+    trace_event("End   GetCVRFromIAD (NOK)", PROCESSING);
+    return(NOK);
+
+    cvr_iad_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetCVRFromIAD(MALFUNCTION)", PROCESSING);
+
+    return(HSM_MALFUNCTION);
+
+}
+
+
+/** **/
+
+int Get_EMV_Key( int nIndexCtx, char *sPan, char *sKeyCode, char *sEmvKey, int nDki)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_Pan         [ 22 + 1];
+        VARCHAR          T_KeyCode     [ 4 + 1];
+        VARCHAR          T_EmvKey      [256 + 1];
+		int          	 T_Dki;
+        EXEC SQL END DECLARE SECTION;
+
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	/*MKB060309 PCI Norme Integration */
+	if (debug_option == 1)
+        	sprintf(sLine, "Start Get_EMV_Key(%s,%s)", sPan, sKeyCode);
+        else
+        	sprintf(sLine, "Start Get_EMV_Key(%s)", sKeyCode);
+       	trace_event(sLine, PROCESSING);        	
+        
+        memset( T_Pan.arr,              0, sizeof(T_Pan.arr));
+        T_Pan.len = 22;/*AER*/
+
+        memset( T_KeyCode.arr,              0, sizeof(T_KeyCode.arr));
+        T_KeyCode.len = 4;/*AER*/
+
+        memset( T_EmvKey.arr,           0, sizeof(T_EmvKey.arr));
+        T_EmvKey.len = 256;/*AER*/
+		
+        memcpy( T_Pan.arr, sPan, strlen(sPan) );
+        T_Pan.len = strlen(sPan);
+		
+		T_Dki = nDki;
+		
+		/*MKB060309 PCI Norme Integration */
+		if (debug_option == 1)
+		{
+        	sprintf(sLine, "T_Pan     .len=[%d] .arr=[%s]", T_Pan.len, T_Pan.arr);
+        	trace_event(sLine, PROCESSING);
+        }
+        memcpy( T_KeyCode.arr, sKeyCode, strlen(sKeyCode) );
+        T_KeyCode.len = strlen(sKeyCode);
+
+        sprintf(sLine, "1T_KeyCode .len=[%d] .arr=[%s]", T_KeyCode.len, T_KeyCode.arr);
+        trace_event(sLine, PROCESSING);
+
+		sprintf(sLine, "T_Dki %d", T_Dki);
+        trace_event(sLine, PROCESSING);
+		
+        response = 909;
+        EXEC SQL WHENEVER SQLERROR GOTO sql_exception_tag;
+        EXEC SQL EXECUTE
+        BEGIN
+/*
+	insert into pcard_traces(user_message) values ('TEST');
+	commit;
+	insert into pcard_traces(user_message) values ( :T_Pan);
+	commit;
+	insert into pcard_traces(user_message) values ( :T_KeyCode );
+	commit;
+*/
+
+        :response := PCRD_GET_HSM_KEY_2.GET_EMV_KEY (
+                                                          :T_Pan   ,
+                                                          :T_KeyCode   ,
+                                                          :T_EmvKey,
+														  :T_Dki
+                                                   );
+        END;
+        END-EXEC;
+
+        sprintf(sLine, "response : %d", response);
+        trace_event(sLine, PROCESSING);
+
+
+       /*trace_event("Test apres get_emv_key", PROCESSING);*/
+
+        if (response == OK)
+        {
+           	memcpy(sEmvKey, T_EmvKey.arr, T_EmvKey.len);
+		/*MKB060309 PCI Norme Integration */
+		if (debug_option == 1)
+		{
+           		sprintf(sLine, "End   Get_EMV_Key(OK). sEmvKey=[%s]", sEmvKey);
+           		trace_event(sLine, PROCESSING);
+        }
+		else{
+          		sprintf(sLine, "End   Get_EMV_Key(OK)");
+           		trace_event(sLine, PROCESSING);          
+		}
+           	return(OK);
+        }
+
+        trace_event("End   Get_EMV_Key(NOK)", PROCESSING);
+        return(NOK);
+
+    sql_exception_tag :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "[%.100s]",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  Get_EMV_Key(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+int Get_IssScriptData(int nIndexCtx, char *sPan, char *sIssScriptData, int *pSequence, char *pAuthDeclineFlag, char *pTransDate, char *pRefNbr, char* pScriptType ) 
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        int              T_Sequence;
+        VARCHAR          T_Pan    [ 22 + 1];
+        VARCHAR          T_RRN    [ 16 + 1];
+        VARCHAR          T_TRANDTIME    [ 16 + 1];
+        VARCHAR          T_IssScriptData [256 + 1];
+        short            pl_null_IssScriptData_ind; /** To Overcome the "Fetch Column is Null" Error **/
+        VARCHAR          T_auth_decline_flag [1 + 1];
+		VARCHAR          T_SCRIPT_TYPE    [ 2 + 1];
+        EXEC SQL END DECLARE SECTION;
+
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	
+	if (debug_option == 1)
+	{
+        	sprintf(sLine, "Start Get_IssScriptData(%s,%s)", sPan,pAuthDeclineFlag);
+        	trace_event(sLine, PROCESSING);
+        }
+	else{
+          	sprintf(sLine, "Start Get_IssScriptData()");
+        	trace_event(sLine, PROCESSING);
+        }
+
+        memset( T_Pan.arr,                     0, sizeof(T_Pan.arr));
+        T_Pan.len = 0;
+
+        memset( T_RRN.arr,                     0, sizeof(T_RRN.arr));
+        T_RRN.len = 0;
+        
+        memset( T_TRANDTIME.arr,                     0, sizeof(T_TRANDTIME.arr));
+        T_TRANDTIME.len = 0;
+        
+        memset( T_IssScriptData.arr,           0, sizeof(T_IssScriptData.arr));
+        T_IssScriptData.len = 0;
+
+        memset( T_auth_decline_flag.arr,       0, sizeof(T_auth_decline_flag.arr));
+        T_auth_decline_flag.len = 0;
+
+        memset( T_SCRIPT_TYPE.arr,                     0, sizeof(T_SCRIPT_TYPE.arr));
+        T_SCRIPT_TYPE.len = 0;
+
+
+        memcpy( T_Pan.arr, sPan, strlen(sPan) );
+        T_Pan.len = strlen(sPan);
+
+        memcpy( T_RRN.arr, pRefNbr, strlen(pRefNbr) );
+        T_RRN.len = strlen(pRefNbr);
+        
+        memcpy( T_TRANDTIME.arr, pTransDate, strlen(pTransDate) );
+        T_TRANDTIME.len = strlen(pTransDate);
+        
+		T_auth_decline_flag.arr[0] = pAuthDeclineFlag[0];
+		T_auth_decline_flag.len = 1;
+
+        T_Sequence = *pSequence; 
+
+        response = 909;
+        EXEC SQL WHENEVER SQLERROR GOTO sql_exception_tag;
+        EXEC SQL EXECUTE
+        BEGIN
+        :response := PCRD_GET_HSM_KEY_2.GET_ISS_SCRIPT_DATA (
+                                                          :T_Pan   ,
+                                                          :T_IssScriptData:pl_null_IssScriptData_ind,
+                                                          :T_Sequence,
+                                                          :T_TRANDTIME,
+                                                          :T_RRN,                                                          
+                                                          :T_auth_decline_flag,
+														  :T_SCRIPT_TYPE
+                                                   );
+        END;
+        END-EXEC;
+
+        if (response == OK)
+        {
+           memcpy(sIssScriptData, T_IssScriptData.arr, T_IssScriptData.len);
+           *pSequence = T_Sequence; 
+		   memcpy(pScriptType , T_SCRIPT_TYPE.arr, T_SCRIPT_TYPE.len);
+           /*memcpy(pAuthDeclineFlag , T_auth_decline_flag.arr, T_auth_decline_flag.len);*/
+           sprintf(sLine, "End   Get_IssScriptData(OK). pSeq=[%d], sScript=[%s], pFlag=[%s]", 
+                         *pSequence, sIssScriptData, pAuthDeclineFlag); 
+           trace_event(sLine, PROCESSING);
+           
+           return(OK);
+        }
+
+        else if (-1 == pl_null_IssScriptData_ind ) /** NULL Output Data **/
+        {
+           trace_event("End   Get_IssScriptData(NOK) <NO ISSUER SCRIPT TO SEND>", PROCESSING);
+           return(NOK);
+        }
+
+        trace_event("End   Get_IssScriptData(NOK)", PROCESSING);
+        return(NOK);
+
+    sql_exception_tag :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "[%.100s]",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  Get_IssScriptData(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+
+int Update_SentIssScripts(int nIndexCtx, char *sPan, char *sCVR,char *sAppCode )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        int              T_Sequence;
+        VARCHAR          T_Pan    [ 22 + 1];
+        VARCHAR          T_CVR    [ 32 + 1];
+        VARCHAR          T_APP_CODE    [ 4 + 1];
+
+        VARCHAR          T_err_msg [1024 + 1];
+        short            pl_null_err_msg_ind;
+        EXEC SQL END DECLARE SECTION;
+
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	
+	if (debug_option == 1)
+	{
+		sprintf(sLine, "Start Update_SentIssScripts(%s,%s)", sPan,sAppCode);
+	}
+	else
+	{
+		sprintf(sLine, "Start Update_SentIssScripts(%s)",sAppCode);
+	}
+
+	trace_event(sLine, PROCESSING);
+    memset( T_Pan.arr,                     0, sizeof(T_Pan.arr));
+    T_Pan.len = 0;
+
+    memset( T_CVR.arr,                     0, sizeof(T_CVR.arr));
+    T_CVR.len = 0;
+
+    memset( T_APP_CODE.arr,                     0, sizeof(T_APP_CODE.arr));
+    T_APP_CODE.len = 0;
+
+    memset( T_err_msg.arr,                 0, sizeof(T_err_msg.arr));
+    T_err_msg.len = 0;
+
+    memcpy( T_Pan.arr, sPan, strlen(sPan) );
+    T_Pan.len = strlen(sPan);
+	
+    memcpy( T_CVR.arr, sCVR, strlen(sCVR) );
+    T_CVR.len = strlen(sCVR);
+
+    memcpy( T_APP_CODE.arr, sAppCode, 4 );
+    T_APP_CODE.len = 4;
+
+
+        response = 909;
+
+        EXEC SQL WHENEVER SQLERROR GOTO sql_exception_tag;
+        EXEC SQL EXECUTE
+        BEGIN
+        :response := PCRD_GET_HSM_KEY_2.UPDATE_SENT_ISS_SCRIPTS (
+                                                          :T_Pan   ,
+                                                          :T_CVR,
+														:T_APP_CODE,
+                                                          :T_err_msg:pl_null_err_msg_ind
+                                                   );
+        END;
+        END-EXEC;
+
+        sprintf(sLine, "End   Update_SentIssScripts(%d)", response);
+        trace_event(sLine, PROCESSING);
+        return(response);
+
+    sql_exception_tag :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "[%.100s]",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  Update_SentIssScripts(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+int GenPC_IssScript(int nIndexCtx, char *sPan, char *sAppCode )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        int              T_Sequence;
+        VARCHAR          T_Pan    [ 22 + 1];
+        VARCHAR          T_APP_CODE    [ 4 + 1];
+
+        VARCHAR          T_err_msg [1024 + 1];
+        EXEC SQL END DECLARE SECTION;
+
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+	if (debug_option == 1)
+	{
+        sprintf(sLine, "Start GenPC_IssScript(%s,%s)", sPan,sAppCode);
+	}
+	else
+	{
+		sprintf(sLine, "Start GenPC_IssScript (%s)", sAppCode);
+	}
+
+	trace_event(sLine, PROCESSING);	
+
+    memset( T_Pan.arr,                     0, sizeof(T_Pan.arr));
+    T_Pan.len = 0;
+
+	memset( T_APP_CODE.arr,                     0, sizeof(T_APP_CODE.arr));
+	T_APP_CODE.len = 0;
+
+    memset( T_err_msg.arr,                 0, sizeof(T_err_msg.arr));
+    T_err_msg.len = 0;
+
+    memcpy( T_Pan.arr, sPan, strlen(sPan) );
+    T_Pan.len = strlen(sPan);
+
+
+	memcpy( T_APP_CODE.arr, sAppCode, 4 );
+	T_APP_CODE.len = 4;
+
+
+        response = 909;
+
+        EXEC SQL WHENEVER SQLERROR GOTO sql_exception_tag;
+        EXEC SQL EXECUTE
+        BEGIN
+        :response := PCRD_P7_CTRL_EMV_SECURITY.GEN_CRD_EMV_SCRIPT_PC (
+																		:T_Pan   ,
+																		:T_APP_CODE,
+																		:T_err_msg
+																	);
+        END;
+        END-EXEC;
+
+        sprintf(sLine, "End   GenPC_IssScript(%d:%s)", response,T_err_msg.arr);
+        trace_event(sLine, PROCESSING);
+        return(response);
+
+    sql_exception_tag :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "[%.100s]",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GenPC_IssScript(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+int GenPU_IssScript(int nIndexCtx, char *sTlvBuffer  )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+        int         response;
+	    VARCHAR   	T_tlv_bal	  [ LG_MAX + 1];
+
+    EXEC SQL END DECLARE SECTION;
+
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+	trace_event("Start GenPU_IssScript()", PROCESSING);	
+
+    /****************************************************************************/
+	/*      INITIALISATION                                                      */
+	/****************************************************************************/
+
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  );
+	T_tlv_bal.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+    memcpy ( T_tlv_bal.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_bal.len = strlen(sTlvBuffer );
+
+    
+	/****************************************************************************/
+	/*      Appel PL/SQL                                                       */
+	/****************************************************************************/
+    response = SYSTEM_MALFUNCTION;
+
+    EXEC SQL WHENEVER SQLERROR GOTO sql_exception_tag;
+    EXEC SQL EXECUTE
+    BEGIN
+    :response := PCRD_P7_CTRL_EMV_SECURITY.GEN_EMV_SCRIPT_PU ( :T_tlv_bal );
+    END;
+    END-EXEC;
+
+    tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  );
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+    sprintf(sLine, "End   GenPU_IssScript(%d)", response);
+    trace_event(sLine, PROCESSING);
+    return(response);
+
+    sql_exception_tag :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+
+    tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+    sprintf(sLine, "[%.100s]",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GenPU_IssScript(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+}
+
+/* MYJ231007 Mehdi Elyajizi Emv Control verification flag **/
+/* Mehdi Elyajizi veification DAC ignor� fonctionnalit� MasterCard et DAC non envoy� syst�matiquement */
+/*****************************************************************************/
+/* Get_IM_Key                                                                */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere la cle IWK-DAC.												 */
+/*	Author	 : Loubna Hidraoui											                         */
+/*  Entree   : L'identificateur du resource.                                 */
+/*  Sortie   : La cle IWK-DAC.                                               */
+/*****************************************************************************/
+int Get_IM_Key( int nIndiceCtx, char *sPan, char *sIW_Key,char *type)
+{
+     struct sqlca sqlca;
+     char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+		int		 	response;
+    VARCHAR T_Pan    [ 22 + 1];
+    varchar T_IwK    [256 + 1]; /* TDES */
+    varchar T_Type   [3 + 1 ];
+	EXEC SQL END DECLARE SECTION;
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start Get_IM_Key(%.6s)", sPan);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_IwK.arr    ,       0, sizeof(T_IwK.arr ));
+	T_IwK.len = 0;
+
+	memset(T_Type.arr    ,       0, sizeof(T_Type.arr ));
+	T_Type.len = 0;
+	
+	memcpy( T_Type.arr, type, strlen(type) );
+  T_Type.len = strlen(type);
+  sprintf(sLine, "T_Type.arr=[%s], T_Type.len=[%d])", T_Type.arr, T_Type.len);
+  trace_event(sLine, PROCESSING);
+  
+	memset( T_Pan.arr,              0, sizeof(T_Pan.arr));
+  T_Pan.len = 0;
+
+
+	memcpy( T_Pan.arr, sPan, strlen(sPan) );
+  T_Pan.len = strlen(sPan);
+  sprintf(sLine, "T_Pan.arr=[%s], T_Pan.len=[%d])", T_Pan.arr, T_Pan.len);
+  trace_event(sLine, PROCESSING);
+  
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO iwk_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+		:response := PCRD_GET_HSM_KEY_2.GET_EMV_KEY  (
+                           :T_Pan,
+                           :T_Type,
+                           :T_IwK );
+                        
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(sIW_Key    , T_IwK.arr  , T_IwK.len );
+        sprintf(sLine, "End   GetAwkZmk(%.16s)", sIW_Key    );
+        trace_event(sLine, PROCESSING);
+        return(OK);
+	}
+
+	trace_event("End   Get_IM_Key(NOK)", PROCESSING);
+	return(NOK);
+
+
+	iwk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;                                                                                           
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  Get_IM_Key (MALFUNCTION)", PROCESSING);                                                                       
+
+    return(HSM_MALFUNCTION);
+
+}
+
+
+int Get_DKI_FROM_IAD( int nIndexCtx, char *sChipIAD, char *sCardInfo, int *nDki)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_ChipIAD    [64 + 1];
+        VARCHAR          T_CardInfo   [30 + 1];	
+		int          	 T_Dki;
+        EXEC SQL END DECLARE SECTION;
+
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+		
+		trace_event("Start   Get_DKI_FROM_IAD", PROCESSING);
+		
+        memset( T_ChipIAD.arr,              0, sizeof(T_ChipIAD.arr));
+        T_ChipIAD.len = 0;
+
+        memset( T_CardInfo.arr,              0, sizeof(T_CardInfo.arr));
+        T_CardInfo.len = 0;
+        
+        T_Dki = 0; /*IBO20220803 PLUTONL-5012*/
+		
+        memcpy( T_ChipIAD.arr, sChipIAD, strlen(sChipIAD) );
+        T_ChipIAD.len = strlen(sChipIAD);
+		
+        memcpy( T_CardInfo.arr, sCardInfo, strlen(sCardInfo) );
+        T_CardInfo.len = strlen(sCardInfo);
+		
+		sprintf(sLine, "T_ChipIAD.arr (%s), T_CardInfo.arr (%s)", T_ChipIAD.arr, T_CardInfo.arr);
+		trace_event(sLine, PROCESSING);	
+
+        response = 909;
+        EXEC SQL WHENEVER SQLERROR GOTO sql_exception_tag;
+        EXEC SQL EXECUTE
+        BEGIN
+
+        :response := PCRD_P7_CTRL_EMV_SECURITY.GET_DKI_FROM_IAD (
+																  :T_ChipIAD   ,
+																  :T_CardInfo   ,
+																  :T_Dki
+																 );     
+        END;
+		END-EXEC;
+		
+		sprintf(sLine, "nDki : %d", *nDki);
+		trace_event(sLine, PROCESSING);
+		
+        if (response == OK)
+        {
+			*nDki = T_Dki;
+
+			trace_event("End   Get_DKI_FROM_IAD(OK)", PROCESSING);
+           	return(OK);
+        }
+		
+
+        trace_event("End   Get_DKI_FROM_IAD(NOK)", PROCESSING);
+        return(NOK);
+
+    sql_exception_tag :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "[%.100s]",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  Get_DKI_FROM_IAD(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}

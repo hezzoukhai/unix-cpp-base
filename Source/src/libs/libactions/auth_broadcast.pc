@@ -1,0 +1,92 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <tlv_autho.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int AuthBroadcast  ( int nIndiceCtx , char *sTlvBuffer, char *sSrcDBServId )
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+	int				nRetCode;
+	char			sMsgType [4 + 1];
+	int				nLength;
+
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+ 	char   		T_src_dbserv_id [ 4 + 1];
+ 	VARCHAR   	T_tlv_warning [ 6 + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+    sprintf (sLine, "Start AuthBroadcast (%s) ", sSrcDBServId);
+	trace_event(sLine,PROCESSING);
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	memset ( T_tlv_warning.arr         ,  0  ,   sizeof(T_tlv_warning.arr )  );
+	T_tlv_warning.len = 0;
+
+	memset ( T_src_dbserv_id         ,  0  ,   sizeof(T_src_dbserv_id )  );
+	
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+    
+	memcpy ( T_src_dbserv_id         ,  sSrcDBServId  ,   4);
+	
+	
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_auth_broadcast;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response_code := PCRD_SAF_BRS_MANAGE.AUTH_BROADCAST( :T_tlv_auth,
+														  :T_src_dbserv_id,
+														  :T_tlv_warning); 
+	END;
+	END-EXEC;
+	
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+
+	sprintf(sLine,"End AuthBroadcast (%d,%.6s)", response_code, T_tlv_warning.arr);
+	trace_event(sLine,PROCESSING);
+
+	
+	return(response_code);
+
+err_auth_broadcast :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	trace_event("End AuthBroadcast (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

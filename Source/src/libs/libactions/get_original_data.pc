@@ -1,0 +1,270 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int   GetOriginalDataElements( int   nIndiceCtx	,
+			 			       char *sRoutCaptureMode,
+			                   char *sTlvBuffer ,
+			                   char *sRoutingCode	
+					  			)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+ 	char       	T_auth_flag;
+	int		    response_code;
+ 	char        T_rout_capture_mode [ 1 + 1];
+	char        T_ROUTING_CODE  [ 6 + 1 ];
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetOriginalDataElements() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+ 	memset ( T_rout_capture_mode , 0, sizeof ( T_rout_capture_mode ));
+ 	memcpy ( T_rout_capture_mode , sRoutCaptureMode ,  1 );
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof (T_tlv_auth.arr ));
+	T_tlv_auth.len = 0;
+	T_auth_flag  =  0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_dest;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_REVERSAL_PROCESSING.GET_ORIGINAL_DATA ( 
+ 																	:T_rout_capture_mode,
+																	:T_tlv_auth , 
+																	:T_auth_flag );
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memcpy( sRoutingCode , T_ROUTING_CODE , 6 );
+
+	
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr )); /**PA DSS*/
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+    if (  T_auth_flag == 'R' )
+    {
+	    
+	  	sprintf(sLine,"End GetOriginalDataElements(%d)", response_code);
+	  	trace_event(sLine,PROCESSING);
+	 	return(NOK);
+     }
+
+	 
+	 sprintf(sLine,"End GetOriginalDataElements(%d)", response_code);
+	 trace_event(sLine,PROCESSING);
+	 return ( response_code );
+
+err_get_dest :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof (T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End GetOriginalDataElements(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+int   GetOriginalAuthData(	   int   nIndiceCtx	,
+			                   char *sTlvBuffer ,
+			                   char *sAuthFlag,
+							   char	*sResultFlag
+					  			)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX ];
+ 	char       	T_auth_flag;
+	char		T_result_flag;
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetOriginalAuthData() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof (T_tlv_auth.arr ));
+	T_tlv_auth.len = 0;
+	T_auth_flag  =  0;
+	T_result_flag = 0;
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	strncpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   sizeof(T_tlv_auth.arr)  );
+	T_tlv_auth.len = strlen(T_tlv_auth.arr );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_org_auth;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_REVERSAL_PROCESSING.GET_ORIGINAL_AUTH ( 
+																	:T_tlv_auth , 
+																	:T_auth_flag,
+																	:T_result_flag);
+
+	END;
+	END-EXEC;
+
+	sResultFlag[0]=T_result_flag;
+	sAuthFlag[0] = T_auth_flag;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+	
+
+	/*Repeat */
+    if (  T_result_flag == 'R' )
+    {
+	  	sprintf(sLine,"End GetOriginalAuthData(%d,Auth(%c),Result(%c): Repeat)", response_code,sAuthFlag[0],sResultFlag[0]);
+	  	trace_event(sLine,PROCESSING);
+		return OK;
+		
+	}
+
+	/*Duplicate */
+    if (  T_result_flag == 'D')
+    {
+	  	sprintf(sLine,"End GetOriginalAuthData(%d,Auth(%c),Result(%c)): Duplicate", response_code,sAuthFlag[0],sResultFlag[0]);
+	  	trace_event(sLine,PROCESSING);
+	 	return(OK);
+     }
+	
+
+	sprintf(sLine,"End GetOriginalAuthData(%d,Auth(%c),Result(%c))", response_code,sAuthFlag[0],sResultFlag[0]);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_get_org_auth :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof (T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End GetOriginalAuthData(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+
+}
+
+
+/*ICH20180710 check  auth in destination DB in case of bride advice */
+int   GetRepeatAuthData(	   int   nIndiceCtx	,
+			                   char *sTlvBuffer 
+					  			)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX ];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetRepeatAuthData() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof (T_tlv_auth.arr ));
+	T_tlv_auth.len = 0;
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	strncpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   sizeof(T_tlv_auth.arr)  );
+	T_tlv_auth.len = strlen(T_tlv_auth.arr );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_GetRepeatAuthData;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_REVERSAL_PROCESSING.GET_REPEAT_AUTH_DATA ( :T_tlv_auth );
+
+	END;
+	END-EXEC;
+
+
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+	
+
+	sprintf(sLine,"End GetRepeatAuthData(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_get_GetRepeatAuthData :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof (T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End GetRepeatAuthData(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

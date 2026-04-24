@@ -1,0 +1,79 @@
+#include <stdio.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <define.h>
+#include <pwrmacros.h>
+#include <param_ctx.h>
+
+
+int GetStatementLabel(int nIndexCtx, char * trx_sign, char * e_text, char * a_text)
+{
+   struct sqlca   sqlca;
+   char sLine[MAX_LINE_TRC];
+   char szFuncName[] = "GetStatementLabel";
+
+   EXEC SQL BEGIN DECLARE SECTION;
+      char	T_TRX_SIGN		[1 + 1];
+      VARCHAR	T_E_TEXT  		[   30];
+      VARCHAR	T_A_TEXT  		[   30];
+      VARCHAR	T_ERR_MSG  		[ 2048];
+      int	nStatus;
+   EXEC SQL END DECLARE SECTION;
+
+   START_TRACE_PAR3(szFuncName, "%d, %.1s, %.20s", nIndexCtx, trx_sign , e_text);
+
+   /* initialisation des variables PL/SQL */
+   memset (T_TRX_SIGN,    0, sizeof(T_TRX_SIGN)   );
+   memset (T_E_TEXT.arr,  0, sizeof(T_E_TEXT.arr) );
+   memset (T_A_TEXT.arr,  0, sizeof(T_A_TEXT.arr) );
+   memset (T_ERR_MSG.arr, 0, sizeof(T_ERR_MSG.arr));
+   T_E_TEXT.len  = sizeof(T_E_TEXT.arr);
+   T_A_TEXT.len  = sizeof(T_A_TEXT.arr);
+   T_ERR_MSG.len = sizeof(T_ERR_MSG.arr);
+
+   /* affectation */
+   memcpy (T_TRX_SIGN,   trx_sign,  sizeof(T_TRX_SIGN) - 1);
+   memcpy (T_E_TEXT.arr, e_text,    strlen(e_text)        );
+   T_E_TEXT.len = strlen(e_text);
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO GetStatementLabel_err;
+
+   START_PLSQL_CALL(szFuncName, "PCRD_ATM_TOOLS_2.GET_STATEMENT_LABELS");
+   TRACE_IN_PAR("T_TRX_SIGN", "%.1s",  T_TRX_SIGN  );
+   TRACE_IN_PAR("T_E_TEXT",   "%.20s", T_E_TEXT.arr);
+
+   EXEC SQL EXECUTE
+   DECLARE
+      v_a_text  atm_statement_label.arabic_text%type;
+      v_err_msg varchar2(2048);
+   BEGIN
+      /*:nStatus := PCRD_ATM_TOOLS_2.GET_STATEMENT_LABELS(:T_TRX_SIGN, :T_E_TEXT, v_a_text, v_err_msg);*/
+      :nStatus := PCRD_ATM_TOOLS_2.GET_STATEMENT_LABELS(:T_E_TEXT, :T_TRX_SIGN, v_a_text, v_err_msg);
+      if v_a_text  is not null then :T_A_TEXT  := v_a_text;  end if;
+      if v_err_msg is not null then :T_ERR_MSG := v_err_msg; end if;
+   END;
+   END-EXEC;
+
+   TRACE_OUT_PAR("nStatus", "%d", nStatus);
+
+   if (nStatus == NOK)
+   {
+      TRACE_ERR_MSG("T_ERR_MSG", T_ERR_MSG.arr, T_ERR_MSG.len);
+      END_PLSQL_CALL(szFuncName, "PCRD_ATM_TOOLS_2.GET_STATEMENT_LABELS");
+      return_INT(szFuncName, NOK);
+   }
+
+   TRACE_OUT_PAR("T_A_TEXT",   "%.20s", T_A_TEXT.arr);
+   END_PLSQL_CALL(szFuncName, "PCRD_ATM_TOOLS_2.GET_STATEMENT_LABELS");
+
+   memcpy(a_text, T_A_TEXT.arr, T_A_TEXT.len);
+
+   return_INT_PAR1(szFuncName, OK, "%.20s", a_text);
+
+GetStatementLabel_err :
+   return_FAILURE_STR(szFuncName, sqlca.sqlerrm.sqlerrmc, ERROR);
+}
+

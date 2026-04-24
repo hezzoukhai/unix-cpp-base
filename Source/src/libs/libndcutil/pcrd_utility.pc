@@ -1,0 +1,266 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      pcrd_utility.pc                                                        */
+/*                                                                             */
+/* Description                                                                 */
+/*      Utility Tools Management                                               */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+
+#include <stdio.h>
+#include <define.h>
+#include <langue.h>
+#include <utility.h>
+#include <paramdef.h>
+#include <iso_hps.h>
+#include <param_ctx.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/***********************************************************************
+**  nom	: GetUtilityList()											**
+**  desc	: chargement des comptes d'un porteur					**
+**  entree	: P7IsoInfo	-> tampon PowerSEVEN					**
+**		  	firstutilitySeq-> sequence du premier compte			**
+**  sortie	: utilityList	-> liste de six comptes				**
+**		  utilityListSize-> nombre de comptes charge			**
+**  retour	: OK	-> chargement reussi						**
+**		  NOK	-> chargement de 1 compte						**
+**		  ERROR	-> erreur fatal									**
+***********************************************************************/
+int GetUtilityList(
+		int			nIndexCtx,
+		TSIsoInfo   *P7IsoInfo,
+		int			firstutilitySeq,
+		char		pTransCode,
+		struct utility_t utilityList	[ ],
+		int			*utilityListSize)
+{
+	struct sqlca sqlca;
+	char 	sLine	[MAX_LINE_TRC];
+	char 	tmpField[LG_MAX];
+	int		cpt;
+	int 	lgField;
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	varchar		plAccountNumber         [24];
+	char		plTransCode			[ 5];
+	varchar		plutilityNumber1	[24+1];
+	varchar		plutilityWording1	[30];
+
+	varchar		plutilityNumber2	[24];
+	varchar		plutilityWording2	[32];
+
+	varchar		plutilityNumber3	[24];
+	varchar		plutilityWording3	[32];
+
+	varchar		plutilityNumber4	[24];
+	varchar		plutilityWording4	[32];
+
+	varchar		plutilityNumber5	[24];
+	varchar		plutilityWording5	[32];
+
+	varchar		plutilityNumber6	[24];
+	varchar		plutilityWording6	[32];
+
+	int			plStartPosition;
+	int			plutilitysNumber;
+	int			plRetour;
+	EXEC SQL END DECLARE SECTION;
+
+	trace_event("Start GetUtilityList() ", PROCESSING);
+
+	/* Initialisation des variables C */
+	for(cpt = 0; cpt < MAX_UTILITY; cpt++)
+	{
+		memset(utilityList[cpt].utilityNumber,	0,	25);
+		memset(utilityList[cpt].utilityWording,	0,	31);
+		utilityList[cpt].utilityAvailable	= NO;
+	}
+	*utilityListSize = 0;
+
+	memset(plutilityNumber1.arr,		0, sizeof(plutilityNumber1.arr));
+	memset(plutilityWording1.arr,		0, sizeof(plutilityWording1.arr));
+	plutilityNumber1.len	= 2;
+	plutilityWording1.len	= 2;
+
+	memset(plutilityNumber2.arr,		0, sizeof(plutilityNumber2.arr));
+	memset(plutilityWording2.arr,		0, sizeof(plutilityWording2.arr));
+	plutilityNumber2.len	= 2;
+	plutilityWording2.len	= 2;
+
+	memset(plutilityNumber3.arr,		0, sizeof(plutilityNumber3.arr));
+	memset(plutilityWording3.arr,		0, sizeof(plutilityWording3.arr));
+	plutilityNumber3.len	= 2;
+	plutilityWording3.len	= 2;
+
+	memset(plutilityNumber4.arr,		0, sizeof(plutilityNumber4.arr));
+	memset(plutilityWording4.arr,		0, sizeof(plutilityWording4.arr));
+	plutilityNumber4.len	= 2;
+	plutilityWording4.len	= 2;
+
+	memset(plutilityNumber5.arr,		0,sizeof(plutilityNumber5.arr));
+	memset(plutilityWording5.arr,		0,sizeof(plutilityWording5.arr));
+	plutilityNumber5.len	= 2;
+	plutilityWording5.len	= 2;
+
+	memset(plutilityNumber6.arr,		0, sizeof(plutilityNumber6.arr));
+	memset(plutilityWording6.arr,		0, sizeof(plutilityWording6.arr));
+	plutilityNumber6.len	= 2;
+	plutilityWording6.len	= 2;
+
+	/* initialisation des variables PL/SQL */
+	if (GetIsoField( ISO_ACCOUNT_ID1, P7IsoInfo, tmpField, &lgField) == SUCCES)
+	{
+		memcpy(plAccountNumber.arr,tmpField,lgField);
+		plAccountNumber.len     = lgField;
+	}
+	GetTransCode(pTransCode,plTransCode);
+	plStartPosition = firstutilitySeq;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO get_utility_list_err;
+	EXEC SQL EXECUTE
+		DECLARE
+		v_enr_utility1		PCRD_ATM_SERVICES_1.UTILITY_ROW;
+	v_enr_utility2		PCRD_ATM_SERVICES_1.UTILITY_ROW;
+	v_enr_utility3		PCRD_ATM_SERVICES_1.UTILITY_ROW;
+	v_enr_utility4		PCRD_ATM_SERVICES_1.UTILITY_ROW;
+	v_enr_utility5		PCRD_ATM_SERVICES_1.UTILITY_ROW;
+	v_enr_utility6		PCRD_ATM_SERVICES_1.UTILITY_ROW;
+	v_enr_utility7		PCRD_ATM_SERVICES_1.UTILITY_ROW;
+	v_enr_utility8		PCRD_ATM_SERVICES_1.UTILITY_ROW;
+	BEGIN
+
+		:plRetour := PCRD_ATM_SERVICES_1.GET_UTILITIES(
+		:plAccountNumber,
+		:plStartPosition,
+		TRUE,
+		:plTransCode,
+		v_enr_utility1,
+		v_enr_utility2,
+		v_enr_utility3,
+		v_enr_utility4,
+		v_enr_utility5,
+		v_enr_utility6,
+		v_enr_utility7,
+		v_enr_utility8,
+		:plutilitysNumber);
+
+IF :plRetour = DECLARATION_CST.OK THEN
+		:plutilityNumber1	:= v_enr_utility1.utility_code;
+	:plutilityWording1	:= v_enr_utility1.utility_wording;
+IF :plutilitysNumber > 1 THEN
+		:plutilityNumber2		:= v_enr_utility2.utility_code;
+	:plutilityWording2	:= v_enr_utility2.utility_wording;
+	END IF;
+IF :plutilitysNumber > 2 THEN
+		:plutilityNumber3		:= v_enr_utility3.utility_code;
+	:plutilityWording3	:= v_enr_utility3.utility_wording;
+	END IF;
+IF :plutilitysNumber > 3 THEN
+		:plutilityNumber4		:= v_enr_utility4.utility_code;
+	:plutilityWording4	:= v_enr_utility4.utility_wording;
+	END IF;
+IF :plutilitysNumber > 4 THEN
+		:plutilityNumber5		:= v_enr_utility5.utility_code;
+	:plutilityWording5	:= v_enr_utility5.utility_wording;
+	END IF;
+IF :plutilitysNumber > 5 THEN
+		:plutilityNumber6		:= v_enr_utility6.utility_code;
+	:plutilityWording6	:= v_enr_utility6.utility_wording;
+	END IF;
+	END IF;
+	END;
+	END-EXEC;
+
+	if(plRetour != OK)
+	{
+		sprintf(sLine, "End   GetUtilityList(%d)", plRetour);
+		trace_event(sLine, ERROR);
+		return (plRetour);
+	}
+	/* recuperation du contenu des variable PL/SQL */
+	*utilityListSize = plutilitysNumber;
+
+	memcpy(utilityList[0].utilityNumber,plutilityNumber1.arr, plutilityNumber1.len);
+	memcpy(utilityList[0].utilityWording,plutilityWording1.arr, plutilityWording1.len);
+	utilityList[0].utilityAvailable	= YES;
+
+	if(*utilityListSize > 1)
+	{
+		memcpy(utilityList[1].utilityNumber,plutilityNumber2.arr, plutilityNumber2.len);
+		memcpy(utilityList[1].utilityWording,plutilityWording2.arr, plutilityWording2.len);
+		utilityList[1].utilityAvailable	= YES;
+	}
+
+	if(*utilityListSize > 2)
+	{
+		memcpy(utilityList[2].utilityNumber,plutilityNumber3.arr, plutilityNumber3.len);
+		memcpy(utilityList[2].utilityWording,plutilityWording3.arr, plutilityWording3.len);
+		utilityList[2].utilityAvailable	= YES;
+	}
+
+	if(*utilityListSize > 3)
+	{
+		memcpy(utilityList[3].utilityNumber,plutilityNumber4.arr, plutilityNumber4.len);
+		memcpy(utilityList[3].utilityWording,plutilityWording4.arr, plutilityWording4.len);
+		utilityList[3].utilityAvailable	= YES;
+	}
+
+	if(*utilityListSize > 4)
+	{
+		memcpy(utilityList[4].utilityNumber,plutilityNumber5.arr, plutilityNumber5.len);
+		memcpy(utilityList[4].utilityWording,plutilityWording5.arr, plutilityWording5.len);
+		utilityList[4].utilityAvailable	= YES;
+	}
+
+	if(*utilityListSize > 5)
+	{
+		memcpy(utilityList[5].utilityNumber,plutilityNumber6.arr, plutilityNumber6.len);
+		memcpy(utilityList[5].utilityWording,plutilityWording6.arr, plutilityWording6.len);
+		utilityList[5].utilityAvailable	= YES;
+	}
+
+	PutIsoField(ISO_RESPONSE_CODE, P7IsoInfo, "085", 3);
+
+	sprintf(sLine, "utility 1 number : %.24s", utilityList[0].utilityNumber);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "utility 1 wording e : %.20s",utilityList[0].utilityWording);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "utility 2 number : %.24s", utilityList[1].utilityNumber);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "utility 2 wording e : %.20s",utilityList[1].utilityWording);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "utility 3 number : %.24s", utilityList[2].utilityNumber);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "utility 3 wording e : %.20s",utilityList[2].utilityWording);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "utility 4 number : %.24s", utilityList[3].utilityNumber);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "utility 4 wording e : %.20s",utilityList[3].utilityWording);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "utility 5 number : %.24s", utilityList[4].utilityNumber);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "utility 5 wording e : %.20s",utilityList[4].utilityWording);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "utility 6 number : %.24s", utilityList[5].utilityNumber);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "utility 6 wording e : %.20s",utilityList[5].utilityWording);
+	trace_event(sLine, PROCESSING);
+
+	sprintf(sLine, "End   GetUtilityList(OK %d)", *utilityListSize);
+	trace_event(sLine, PROCESSING);
+	return (OK);
+get_utility_list_err :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   GetUtilityList(ERROR)", ERROR);
+    return (ERROR);
+}
+

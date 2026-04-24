@@ -1,0 +1,130 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <tlv_fields.h>
+#include <resources.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int LoadIssuerData (    int   nIndiceCtx          ,
+                        char *sTlvBuffer          ,
+			   	        char *sInternationalCheck ,
+                        char *sPrimaryResource    ,
+                        char *sSecondaryResource
+                   )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+ 	char       	T_international_check;
+ 	char       	T_primary_resource	 [ 6 + 1];
+ 	char       	T_secondary_resource [ 6 + 1];
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start LoadIssuerData() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+ 	T_international_check = sInternationalCheck [ 0 ];
+ 	memset( T_primary_resource	 ,0, sizeof(T_primary_resource));
+ 	memset( T_secondary_resource ,0, sizeof(T_secondary_resource));
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_LoadIssuerData;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_ROUTING.LOAD_ISSUER_DATA_ELEMENTS( 	
+								:T_tlv_auth,
+								:T_international_check,
+								:T_primary_resource,
+								:T_secondary_resource 
+							 );
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI*/
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		char sEventCode [ 3 + 1 ];
+		char sTmpData [ BUF_LG_MAX ];
+		int  nTmpLen;
+		
+
+		trace_event("AFTER LOAD ISSUE",PROCESSING);
+        memcpy(sPrimaryResource    , T_primary_resource, 	6);
+        memcpy(sSecondaryResource  , T_secondary_resource, 	6);
+
+		memset(sTmpData, 0, sizeof(sTmpData));
+		memset(sEventCode, 0, sizeof(sEventCode));
+		if( 		
+			( memcmp(sPrimaryResource, STAND_IN_RESOURCE, 6) == 0
+			|| (	GetTlvBuffer(AUTO_EVENT_CODE,sTlvBuffer,sEventCode,&nTmpLen)==SUCCES 
+					&& memcmp(sEventCode,INTERNATIONAL_ROUTING_EVENT,3) != 0 
+				)
+			)
+			&& GetTlvBuffer (  AUTO_ICC_DATA, sTlvBuffer, sTmpData, &nTmpLen ) == SUCCESS
+		)
+		{
+			memset(sTmpData, 0, sizeof(sTmpData));
+			response_code = gen_iss_script_data ( nIndiceCtx, sTlvBuffer, sTmpData);
+		}
+
+		
+		trace_event ( "End   LoadIssuerData() ", PROCESSING );
+		return(OK);
+	}	
+
+    dump_buffer(sTlvBuffer,strlen(sTlvBuffer),'A','X','X');
+
+	sprintf(sLine,"End LoadIssuerData(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_LoadIssuerData :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI*/
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End LoadIssuerData(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

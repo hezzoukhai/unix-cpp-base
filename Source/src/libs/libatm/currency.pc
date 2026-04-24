@@ -1,0 +1,94 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      currency.pc                                                                 */
+/*                                                                             */
+/* Description                                                                 */
+/*      Currency Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <define.h>
+#include <param_ctx.h>
+
+  /*--------------------------------------------------------------------**
+  **  nom		: GetCurrecyAlpha()				**
+  **  desc	: chargement du code alpha de la monnaie en parametre	**
+  **  entree	: code	-> code monnaie					**
+  **  sortie	: alpha -> code alpha de la monnaie			**
+  **  retour	: OK	-> si c'est OK					**
+  **		  ERROR	-> si erreur ORACLE				**
+  **  auteur	: Younes OUADI le 04 Dec 1998				**
+  **--------------------------------------------------------------------*/
+int	GetCurrencyAlpha(nIndexCtx,code, alpha)
+int 		nIndexCtx  ;
+char		code	[4];
+char		alpha	[4];
+{
+struct sqlca sqlca; /**Linux ***/
+char		detail[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    char		h_code	[3+1];
+    char		h_alpha	[3+1];
+	int		    hResponseCode;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(detail, "Start GetCurrencyAlpha(%.3s)", code);
+trace_event(detail, PROCESSING);
+
+    /*
+	- initialisation des variables -------------------------------
+    */
+    memset(alpha,	0, sizeof(alpha)	);
+    memset(h_alpha,	0, sizeof(h_alpha)	);
+    memset(h_code,	0, sizeof(h_code)	);
+    memcpy(h_code,	code, 3);
+
+    /*
+	- caplture des exceptions ------------------------------------
+    */
+    EXEC SQL WHENEVER SQLERROR GOTO getCurrencyAlphaErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+
+    /* - execution de la fonction PL/SQL ------------------------------------ */
+    EXEC SQL EXECUTE
+    DECLARE
+        enr_currency_table	CURRENCY_TABLE%ROWTYPE;
+    BEGIN
+      :hResponseCode := PCRD_GET_PARAM_GENERAL_ROWS.GET_CURRENCY_TABLE(:h_code,
+																	enr_currency_table);
+
+	IF :hResponseCode = declaration_cst.OK THEN
+		:h_alpha := enr_currency_table.currency_code_alpha;
+      END IF;
+    END;
+    END-EXEC;
+
+
+    /* - examen du retour de la fonction PL/SQL ----------------------------- */
+    if(hResponseCode != OK)
+    {
+        trace_event("End   GetConfigFlags(NOK)", PROCESSING);
+        return (hResponseCode);
+    }
+		
+    memcpy(alpha, h_alpha, 3);
+	sprintf(detail, "End   GetCurrencyAlpha(%.3s)", alpha);
+	trace_event(detail, PROCESSING);
+	return (OK);
+
+getCurrencyAlphaErr :
+    sprintf(detail, "%.60s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(detail, ERROR);
+    trace_event("End   GetCurrencyAlpha(ERROR)", ERROR);
+    return (ERROR);
+}
+

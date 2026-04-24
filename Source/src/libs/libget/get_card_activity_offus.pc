@@ -1,0 +1,291 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetCardActivityOffus(int nIndiceCtx,TSCardActivityOffus  *card_activity_off_us )
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   CARD_NUMBER [ 22 ];
+ 	char   BANK_CODE [ 6 ];
+ 	char   SERVICE_CODE [ 3 ];
+ 	int    PIN_VERIFICATION_NUMBER;
+ 	int    PIN_ERROR_CUM;
+ 	VARCHAR   LAST_OUTLET_NUMBER [ 15 ];
+ 	char   LAST_CARD_ACCEPTOR_MCC [ 4 ];
+        VARCHAR   LAST_CARD_ACCEPTOR_TERM_ID [ 15 ];
+ 	char   LAST_COUNTRY_CODE [ 3 ];
+ 	double CYCLE_AMOUNT;
+ 	int    CYCLE_START;
+ 	int    LAST_USAGE_DATE; 
+        char   START_VALIDITY_DATE [ 4];  /* YYMM */
+ 	char   END_VALIDITY_DATE [ 4];  /* YYMM */
+ 	char   LAST_ACTIVITY_DATE [ 8]; /* YYYYMMDD */
+ 	char   LAST_APP_AUTH_DATE [ 8]; /* YYYYMMDD */
+ 	double LAST_APP_AUTH_AMOUNT;
+ 	char   LAST_DEC_AUTH_DATE [ 8]; /* YYYYMMDD */
+ 	double LAST_DEC_AUTH_AMOUNT;
+ 	char   LAST_CAN_AUTH_DATE [ 8]; /* YYYYMMDD */
+ 	double LAST_CAN_AUTH_AMOUNT;
+ 	char   LAST_CODE_ACTION [ 3 ];
+ 	char   LAST_CODE_EVENT [ 3 ];
+ 	VARCHAR   LAST_SERVICE [ 13 ];
+ 	int    DAILY_NUMBER ; 
+ 	double DAILY_AMOUNT ; 
+ 	int    PERIODIC_NUMBER ; 
+ 	double PERIODIC_AMNT   ; 
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetCardActivityOffus() ", PROCESSING );
+ 	memset ( CARD_NUMBER.arr , 0 , sizeof ( CARD_NUMBER.arr ));
+ 	memset ( BANK_CODE       , 0 ,  6  );
+ 	memset ( SERVICE_CODE    , 0 ,  3  );
+ 	PIN_VERIFICATION_NUMBER = 0;
+ 	PIN_ERROR_CUM = 0;
+ 	memset ( LAST_OUTLET_NUMBER.arr , 0 ,sizeof(LAST_OUTLET_NUMBER.arr) );
+ 	memset ( LAST_CARD_ACCEPTOR_MCC , 0 ,   4  );
+        memset ( LAST_CARD_ACCEPTOR_TERM_ID.arr , 0 , 
+				      sizeof( LAST_CARD_ACCEPTOR_TERM_ID.arr));
+ 	memset ( LAST_COUNTRY_CODE , 0,  3 );
+ 	CYCLE_AMOUNT = 0.0;
+ 	CYCLE_START = 0;
+ 	LAST_USAGE_DATE  = 0;
+        memset ( START_VALIDITY_DATE , 0,  4 );  /* YYMM */
+ 	memset ( END_VALIDITY_DATE , 0,  4 );  /* YYMM */
+ 	memset ( LAST_ACTIVITY_DATE , 0,  8 ); /* YYYYMMDD */
+ 	memset ( LAST_APP_AUTH_DATE , 0,  8 ); /* YYYYMMDD */
+ 	LAST_APP_AUTH_AMOUNT = 0.0;
+ 	memset ( LAST_DEC_AUTH_DATE , 0,  8 ); /* YYYYMMDD */
+ 	LAST_DEC_AUTH_AMOUNT = 0.0;
+ 	memset ( LAST_CAN_AUTH_DATE , 0,  8 ); /* YYYYMMDD */
+ 	LAST_CAN_AUTH_AMOUNT = 0.0;
+ 	memset ( LAST_CODE_ACTION , 0,  3 );
+ 	memset ( LAST_CODE_EVENT ,  0,  3 );
+ 	memset ( LAST_SERVICE.arr , 0 , sizeof ( LAST_SERVICE.arr ));
+ 	DAILY_NUMBER   = 0; 
+ 	DAILY_AMOUNT   = 0; 
+ 	PERIODIC_NUMBER   = 0; 
+ 	PERIODIC_AMNT     = 0; 
+
+/***********************************************************************/
+/*      CHAMP CLE                                                      */
+/***********************************************************************/
+
+	memcpy ( CARD_NUMBER.arr, card_activity_off_us->card_number, 
+	         strlen ( card_activity_off_us->card_number ));
+        CARD_NUMBER.len = strlen ( card_activity_off_us->card_number );
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_card_activity_off_us;
+	EXEC SQL EXECUTE
+	    DECLARE T_CARD_ACTIVITY   CARD_ACTIVITY_OFF_US%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_DATA_AUTHO_ROWS.GET_CARD_ACTIVITY_OFF_US
+						(   :CARD_NUMBER, 
+	                                            T_CARD_ACTIVITY
+	                                        );
+	 IF :response_code = 0 THEN
+
+ 	  :CARD_NUMBER                := T_CARD_ACTIVITY.CARD_NUMBER;
+ 	  :BANK_CODE                  := T_CARD_ACTIVITY.BANK_CODE;
+ 	  :SERVICE_CODE               := T_CARD_ACTIVITY.SERVICE_CODE;
+ 	  :PIN_VERIFICATION_NUMBER    := T_CARD_ACTIVITY.PIN_VERIFICATION_NUMBER;
+ 	  :PIN_ERROR_CUM              := T_CARD_ACTIVITY.PIN_ERROR_CUM;
+ 	  :LAST_OUTLET_NUMBER         := T_CARD_ACTIVITY.LAST_OUTLET_NUMBER;
+ 	  :LAST_CARD_ACCEPTOR_MCC     := T_CARD_ACTIVITY.LAST_CARD_ACCEPTOR_MCC;
+          :LAST_CARD_ACCEPTOR_TERM_ID :=T_CARD_ACTIVITY.LAST_CARD_ACCEPTOR_TERM_ID;
+ 	  :LAST_COUNTRY_CODE          := T_CARD_ACTIVITY.LAST_COUNTRY_CODE;
+ 	  :CYCLE_AMOUNT               := T_CARD_ACTIVITY.CYCLE_AMOUNT;
+ 	  :CYCLE_START                := T_CARD_ACTIVITY.CYCLE_START;
+ 	  :LAST_USAGE_DATE            := T_CARD_ACTIVITY.LAST_USAGE_DATE;
+          :START_VALIDITY_DATE        := T_CARD_ACTIVITY.START_VALIDITY_DATE;
+ 	  :END_VALIDITY_DATE    := T_CARD_ACTIVITY.END_VALIDITY_DATE;
+ 	  :LAST_ACTIVITY_DATE   := T_CARD_ACTIVITY.LAST_ACTIVITY_DATE;
+ 	  :LAST_APP_AUTH_DATE   := T_CARD_ACTIVITY.LAST_APP_AUTH_DATE;
+ 	  :LAST_APP_AUTH_AMOUNT := T_CARD_ACTIVITY.LAST_APP_AUTH_AMOUNT;
+ 	  :LAST_DEC_AUTH_DATE   := T_CARD_ACTIVITY.LAST_DEC_AUTH_DATE;
+ 	  :LAST_DEC_AUTH_AMOUNT := T_CARD_ACTIVITY.LAST_DEC_AUTH_AMOUNT;
+ 	  :LAST_CAN_AUTH_DATE   := T_CARD_ACTIVITY.LAST_CAN_AUTH_DATE;
+          :LAST_CAN_AUTH_AMOUNT := T_CARD_ACTIVITY.LAST_CAN_AUTH_AMOUNT;
+ 	  :LAST_CODE_ACTION     := T_CARD_ACTIVITY.LAST_CODE_ACTION;
+ 	  :LAST_CODE_EVENT      := T_CARD_ACTIVITY.LAST_CODE_EVENT;
+ 	  :LAST_SERVICE         := T_CARD_ACTIVITY.LAST_SERVICE;
+ 	  :DAILY_AMOUNT         := T_CARD_ACTIVITY.DAILY_AMOUNT;
+ 	  :DAILY_NUMBER         := T_CARD_ACTIVITY.DAILY_NUMBER;
+ 	  :PERIODIC_AMNT        := T_CARD_ACTIVITY.PERIODIC_AMNT;
+ 	  :PERIODIC_NUMBER      := T_CARD_ACTIVITY.PERIODIC_NUMBER;
+
+	  END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+
+ 	  memcpy ( card_activity_off_us->card_number,CARD_NUMBER.arr , 
+							CARD_NUMBER.len );
+ 	  card_activity_off_us->card_number [ CARD_NUMBER.len ] = 0;
+
+ 	  memcpy ( card_activity_off_us->bank_code ,  BANK_CODE  , 6 );
+ 	  memcpy ( card_activity_off_us->service_code, SERVICE_CODE ,3);
+          card_activity_off_us->pin_verification_number=PIN_VERIFICATION_NUMBER;
+ 	  card_activity_off_us->pin_error_cum=PIN_ERROR_CUM;
+ 	  memcpy ( card_activity_off_us->last_outlet_number ,  
+							LAST_OUTLET_NUMBER.arr,
+					  	       LAST_OUTLET_NUMBER.len );
+          card_activity_off_us->last_outlet_number[LAST_OUTLET_NUMBER.len]= 0;
+ 	  memcpy ( card_activity_off_us->last_card_acceptor_mcc,
+						LAST_CARD_ACCEPTOR_MCC , 4 );
+          memcpy ( card_activity_off_us->last_card_acceptor_term_id,  
+						LAST_CARD_ACCEPTOR_TERM_ID.arr,
+					 	LAST_CARD_ACCEPTOR_TERM_ID.len);
+
+         card_activity_off_us->last_card_acceptor_term_id [ LAST_CARD_ACCEPTOR_TERM_ID.len ] = 0;
+
+ 	memcpy ( card_activity_off_us->last_country_code , 
+							LAST_COUNTRY_CODE, 3);
+
+ 	card_activity_off_us->cycle_amount =  CYCLE_AMOUNT;
+ 	card_activity_off_us->cycle_start  =  CYCLE_START;
+ 	card_activity_off_us->last_usage_date =  LAST_USAGE_DATE;
+
+        memcpy ( card_activity_off_us->start_validity_date , 
+						  START_VALIDITY_DATE, 4); 
+ 	memcpy ( card_activity_off_us->end_validity_date ,
+						END_VALIDITY_DATE ,  4 );  
+
+ 	memcpy ( card_activity_off_us->last_activity_date ,  
+						LAST_ACTIVITY_DATE , 8 );
+
+ 	memcpy ( card_activity_off_us->last_app_auth_date ,   
+						LAST_APP_AUTH_DATE , 8 );
+
+ 	card_activity_off_us->last_app_auth_amount =   
+						LAST_APP_AUTH_AMOUNT;
+
+ 	memcpy ( card_activity_off_us->last_dec_auth_date , 
+						LAST_DEC_AUTH_DATE , 8 );
+
+ 	card_activity_off_us->last_dec_auth_amount =  LAST_DEC_AUTH_AMOUNT;
+ 	memcpy ( card_activity_off_us->last_can_auth_date , LAST_CAN_AUTH_DATE , 8 ); 
+
+ 	card_activity_off_us->last_can_auth_amount =  LAST_CAN_AUTH_AMOUNT = 0.0;
+ 	memcpy ( card_activity_off_us->last_code_action,  
+						   LAST_CODE_ACTION , 3);
+ 	memcpy ( card_activity_off_us->last_code_event ,  
+							LAST_CODE_EVENT , 3);
+
+ 	memcpy ( card_activity_off_us->last_service , LAST_SERVICE.arr , LAST_SERVICE.len );
+ 	card_activity_off_us->last_service[ LAST_SERVICE.len ] = 0;
+
+ 	card_activity_off_us->daily_amount  =  DAILY_AMOUNT;
+ 	card_activity_off_us->daily_number  =  DAILY_NUMBER;
+
+ 	card_activity_off_us->periodic_amnt    =  PERIODIC_AMNT;
+ 	card_activity_off_us->periodic_number  =  PERIODIC_NUMBER;
+
+
+	        trace_event ( "End GetCardActivityOffus( OK ) ", PROCESSING );
+		return(OK);
+	}
+	trace_event ( "End GetCardActivityOffus( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_card_activity_off_us:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+
+ 	  memcpy ( card_activity_off_us->card_number,CARD_NUMBER.arr , 
+							CARD_NUMBER.len );
+ 	  card_activity_off_us->card_number [ CARD_NUMBER.len ] = 0;
+
+ 	  memcpy ( card_activity_off_us->bank_code ,  BANK_CODE  , 6 );
+ 	  memcpy ( card_activity_off_us->service_code, SERVICE_CODE ,3);
+   card_activity_off_us->pin_verification_number=PIN_VERIFICATION_NUMBER;
+ 	  card_activity_off_us->pin_error_cum=PIN_ERROR_CUM;
+
+ 	memcpy ( card_activity_off_us->last_outlet_number ,  
+							LAST_OUTLET_NUMBER.arr,
+					  	       LAST_OUTLET_NUMBER.len );
+     card_activity_off_us->last_outlet_number[LAST_OUTLET_NUMBER.len]= 0;
+
+ 	memcpy ( card_activity_off_us->last_card_acceptor_mcc,
+						LAST_CARD_ACCEPTOR_MCC , 4 );
+
+        memcpy ( card_activity_off_us->last_card_acceptor_term_id,  
+						LAST_CARD_ACCEPTOR_TERM_ID.arr,
+					 	LAST_CARD_ACCEPTOR_TERM_ID.len);
+
+        card_activity_off_us->last_card_acceptor_term_id [ LAST_CARD_ACCEPTOR_TERM_ID.len ] = 0;
+
+ 	memcpy ( card_activity_off_us->last_country_code , 
+							LAST_COUNTRY_CODE, 3);
+
+ 	card_activity_off_us->cycle_amount =  CYCLE_AMOUNT;
+ 	card_activity_off_us->cycle_start  =  CYCLE_START;
+ 	card_activity_off_us->last_usage_date =  LAST_USAGE_DATE;
+
+        memcpy ( card_activity_off_us->start_validity_date , 
+						  START_VALIDITY_DATE, 4); 
+ 	memcpy ( card_activity_off_us->end_validity_date ,
+						END_VALIDITY_DATE ,  4 );  
+
+ 	memcpy ( card_activity_off_us->last_activity_date ,  
+						LAST_ACTIVITY_DATE , 8 );
+
+ 	memcpy ( card_activity_off_us->last_app_auth_date ,   
+						LAST_APP_AUTH_DATE , 8 );
+
+ 	card_activity_off_us->last_app_auth_amount =   
+						LAST_APP_AUTH_AMOUNT;
+
+ 	memcpy ( card_activity_off_us->last_dec_auth_date , 
+						LAST_DEC_AUTH_DATE , 8 );
+
+ 	card_activity_off_us->last_dec_auth_amount =  LAST_DEC_AUTH_AMOUNT;
+ 	memcpy ( card_activity_off_us->last_can_auth_date , LAST_CAN_AUTH_DATE , 8 ); 
+
+ 	card_activity_off_us->last_can_auth_amount =  LAST_CAN_AUTH_AMOUNT = 0.0;
+ 	memcpy ( card_activity_off_us->last_code_action,  
+						   LAST_CODE_ACTION , 3);
+ 	memcpy ( card_activity_off_us->last_code_event ,  
+							LAST_CODE_EVENT , 3);
+
+ 	memcpy ( card_activity_off_us->last_service ,  LAST_SERVICE.arr , LAST_SERVICE.len );
+ 	card_activity_off_us->last_service[ LAST_SERVICE.len ] = 0;
+
+
+ 	card_activity_off_us->daily_amount  =  DAILY_AMOUNT;
+ 	card_activity_off_us->daily_number  =  DAILY_NUMBER;
+
+ 	card_activity_off_us->periodic_amnt    =  PERIODIC_AMNT;
+ 	card_activity_off_us->periodic_number  =  PERIODIC_NUMBER;
+
+
+	        trace_event ( "End GetCardActivityOffus( OK ) ", PROCESSING );
+		return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetCardActivityOffus( NOK ) ", PROCESSING );
+	return( NOK );
+}

@@ -1,0 +1,993 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <hsm_inc.h>
+/*
+#include <sqlca.h>
+#include <sqlcpr.h>
+*/
+
+
+/*****************************************************************************/
+/* GetCVK                                                                    */
+/*------------                                                               */
+/*  Fonction : fonction qui recupere les cles CVKA CVKB.                     */
+/*  Entree   : Le numero de la carte & index de cles                         */
+/*  Sortie   : La cle CVKA.                                              	 */
+/*             La cle CVKB.                                              	 */
+/*****************************************************************************/
+
+int GetCVK( int nIndiceCtx, char *sPan, char *CVKA ,char *CVKB )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    	int      response;
+    	VARCHAR          T_Pan  [22 + 1];
+    	varchar             T_CVKA [256 + 1];
+    	varchar             T_CVKB [256 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	/*sprintf(sLine, "Start GetCVK(%d,%s,%d)", nIndiceCtx ,sPan , strlen ( sPan ));
+	trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+	trace_event("Start GetCVK()", PROCESSING);
+
+	memset(T_CVKA.arr,    	0, sizeof(T_CVKA.arr));
+        T_CVKA.len = 0;/*YK011003*/
+	memset(T_CVKB.arr,    	0, sizeof(T_CVKB.arr));
+	T_CVKB.len = 0;/*YK011003*/
+	memset(T_Pan.arr , 0, sizeof(T_Pan.arr));
+	T_Pan.len = 22;
+
+	memcpy(T_Pan.arr, sPan, strlen(sPan));
+	T_Pan.len = strlen(sPan);
+ 
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO cvk_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+    	:response := PCRD_GET_HSM_KEY.GET_CVK_KEY(	:T_Pan   ,
+         	                 						:T_CVKA  ,
+       		                  						:T_CVKB
+           		              					 );
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(CVKA, T_CVKA.arr, T_CVKA.len);
+        memcpy(CVKB, T_CVKB.arr, T_CVKB.len);
+        /*sprintf(sLine, "End   GetCVK(%.32s,%.32s)", CVKA, CVKB);
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("End   GetCVK(OK)", PROCESSING);
+        return(OK);
+	}
+
+	trace_event("End   GetCVK(NOK)", PROCESSING);
+	return(NOK);
+
+    cvk_key_exception :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End  GetCVK(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+}
+
+
+/*****************************************************************************/
+/* GetPVK                                                                    */
+/*------------                                                               */
+/*  Fonction : fonction qui recupere les cles PVKA PVKB.                     */
+/*  Entree   : Le numero de la carte & index                                 */
+/*  Sortie   : La cle PVKA.                                              	 */
+/*             La cle PVKB.                                              	 */
+/*****************************************************************************/
+
+int GetPVK( int nIndiceCtx, char *sPan, char pvki, char *PVKA ,char *PVKB )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    	int      response;
+    	VARCHAR          T_Pan  [22 + 1];
+    	varchar             T_PVKA [256 + 1];
+    	varchar             T_PVKB [256 + 1];
+        int              T_PVKI;
+	EXEC SQL END DECLARE SECTION;
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	/*sprintf(sLine, "Start GetPVK(%.16s,%c)", sPan,pvki);
+	trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+	trace_event("Start GetPVK()", PROCESSING);
+
+	memset( T_PVKA.arr,        	0, sizeof(T_PVKA.arr));
+	T_PVKA.len = 0;/*YK011003*/
+	memset( T_PVKB.arr,        	0, sizeof(T_PVKB.arr));
+	T_PVKB.len = 0;/*YK011003*/
+	memset( T_Pan.arr, 		0, sizeof(T_Pan.arr));
+	T_Pan.len = 22;
+    T_PVKI = 0;
+
+	memcpy( T_Pan.arr, sPan, strlen(sPan) );
+	T_Pan.len = strlen(sPan);
+    T_PVKI = atoi(&pvki);
+	/*sprintf(sLine, "PVKI               %d)", T_PVKI);
+	trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+ 
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO pvk_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+    	:response := PCRD_GET_HSM_KEY.GET_PVK_KEY_VERIF (	:T_Pan   ,
+         	                 						 		:T_PVKI  ,
+         	                 								:T_PVKA  ,
+       		                  								:T_PVKB
+           		              					 		);
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(PVKA, T_PVKA.arr, T_PVKA.len );
+        memcpy(PVKB, T_PVKB.arr, T_PVKB.len );
+        /*sprintf(sLine, "End   GetPVK(%.16s,%.16s)", PVKA, PVKB);
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("End   GetPVK(OK)", PROCESSING);
+        return(OK);
+	}
+
+	trace_event("End   GetPVK(NOK)", PROCESSING);
+	return(NOK);
+
+    pvk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);                                                                                                     
+    trace_event("End  GetPVK(MALFUNCTION)", PROCESSING);                                                                           
+    return(HSM_MALFUNCTION);         
+
+}
+
+
+
+/*****************************************************************************/
+/* GetZMK                                                        	         */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere la cle ZMK.                             */
+/*  Entree   : L'identificateur du resource.                                */
+/*  Sortie   : La cle ZMK.                                      	         */
+/*****************************************************************************/
+
+int     GetZMK ( int nIndiceCtx , char *resource_id, char *ZmK)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+		int		 response;
+        char     T_resource_id		[ 6 + 1 ];
+        VARCHAR     T_ZmK    			[256 + 1 ]; /* TDES  04/24/03 */
+	EXEC SQL END DECLARE SECTION;
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start GetZMK (%.6s)", resource_id); /** HM - 09022010 - PA_DSS **/
+	trace_event(sLine, PROCESSING);
+
+	memset(T_ZmK.arr    ,       0, sizeof(T_ZmK.arr));
+        /*trace_event("==> Zzzzzz <==", PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        T_ZmK.len = 0;
+	memset(T_resource_id,  0, sizeof(T_resource_id));
+
+	memcpy(T_resource_id, resource_id, 6); 
+
+	sprintf(sLine, "Start TDES 5.25 .GET_ZMK_KEY (%.6s)", T_resource_id);
+	trace_event(sLine, PROCESSING);
+	
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO zmk_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+		:response := PCRD_GET_HSM_KEY.GET_ZMK_KEY(:T_resource_id,
+						 	:T_ZmK
+							);
+	END;
+	END-EXEC;
+
+	sprintf(sLine, "response :  (%d)", response);
+	trace_event(sLine, PROCESSING);
+
+	if (response == OK)
+	{
+        memcpy(ZmK, T_ZmK.arr, T_ZmK.len );
+        /*sprintf(sLine, "End   GetZMK (%.256s)", ZmK);
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("End   GetZMK (OK)", PROCESSING);
+        return(OK);
+	}
+
+	trace_event("End   GetZMK (NOK)", PROCESSING);
+	return(NOK);
+
+	zmk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);                                                                                                     
+    trace_event("End  GetZMK(MALFUNCTION)", PROCESSING);                                                                           
+    return(HSM_MALFUNCTION);
+
+}
+
+
+/*****************************************************************************/
+/* SetAWK                                                        	         */
+/*----------------                                                           */
+/*  Fonction : fonction qui fait la mise a jour d'une valeur AwK.            */
+/*  Entree   : L'identificateur du resource.                                */
+/*  Sortie   : La cle AwK.                                      	         */
+/*****************************************************************************/
+
+int SetAWK( int nIndiceCtx, char *resource_id, char *AwK, char *Check_value )
+{
+
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+		int		 		response;
+        char             T_resource_id		[ 6 +  1];
+        varchar             T_AwK		[256 +  1];  /* TDES */
+        VARCHAR          T_check_value		[16 +  1];
+	EXEC SQL END DECLARE SECTION;
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	/*sprintf(sLine, "Start SetAWK(%.6s, %.48s, %.16s)", resource_id, 	
+														AwK, 
+														Check_value);
+	trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+	trace_event("Start SetAWK()", PROCESSING);
+
+	memset(T_AwK.arr,             0, sizeof(T_AwK.arr));
+	T_AwK.len = 0;
+	memset(T_resource_id,    0, sizeof(T_resource_id));
+	memset(T_check_value.arr, 0, sizeof(T_check_value.arr));
+	T_check_value.len = 16;
+
+	memcpy(T_resource_id, resource_id, 6); 
+	memcpy(T_AwK.arr,      AwK,   strlen(AwK)); 
+	T_AwK.len = strlen(AwK);
+	memcpy ( T_check_value.arr,  Check_value,  strlen (Check_value) ); 
+	T_check_value.len = strlen(Check_value);
+
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO set_awk_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+		:response := PCRD_GET_HSM_KEY.SET_AWK_KEY(	:T_resource_id,
+						 							:T_AwK,
+						 							:T_check_value
+												);
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+		trace_event("End   SetAWK(OK)", PROCESSING);
+        return(OK);
+	}
+
+	trace_event("End   SetAWK(NOK)", PROCESSING);
+	return(NOK);
+
+	set_awk_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);                                                                                                     
+    trace_event("End  SetAWK (MALFUNCTION)", PROCESSING);                                                                           
+    return(HSM_MALFUNCTION);
+
+}
+
+
+/*****************************************************************************/
+/* SetIWK                                                        	         */
+/*----------------                                                           */
+/*  Fonction : fonction qui fait la mise a jour d'une valeur IwK.            */
+/*  Entree   : L'identificateur du resource.                                 */
+/*  Sortie   : La cle IwK.                                      	         */
+/*****************************************************************************/
+
+int SetIWK( int nIndiceCtx, char *resource_id, char *IwK,  char *Check_value )
+{
+
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+		int		 		response;
+        char             T_resource_id		[ 6 + 1];
+        VARCHAR             T_IwK		[256 + 1];  /* TDES */
+        VARCHAR          T_check_value		[16 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	/*sprintf(sLine, "Start set_IwK(%.6s, \n %.256s, \n %.16s)", resource_id, 	
+														IwK, 
+														Check_value);
+	trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+	trace_event("Start set_IwK()", PROCESSING);
+
+	memset(T_IwK.arr,             0, sizeof(T_IwK.arr));
+	memset(T_resource_id,    0, sizeof(T_resource_id));
+	memset(T_check_value.arr, 0, sizeof(T_check_value.arr));
+	T_check_value.len = 16;
+
+	memcpy(T_resource_id, resource_id, 6); 
+	memcpy(T_IwK.arr,      IwK,      strlen(IwK)); 
+	T_IwK.len = strlen(IwK);	
+
+	memcpy ( T_check_value.arr,  Check_value,  strlen (Check_value) ); 
+	T_check_value.len = strlen(Check_value);
+
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO set_iwk_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+		:response := PCRD_GET_HSM_KEY.SET_IWK_KEY(	:T_resource_id,
+						 							:T_IwK,
+						 							:T_check_value
+												);
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+		trace_event("End   SetIWK(OK)", PROCESSING);
+        return(OK);
+	}
+
+	trace_event("End   SetIWK(NOK)", PROCESSING);
+	return(NOK);
+
+	set_iwk_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);                                                                                                     
+    trace_event("End  SetIWK (MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+
+
+/*****************************************************************************/
+/* GetAWK                                                        	         */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere les cles AwK.                           */
+/*  Entree   : L'identificateur du resource.                                */
+/*             La banque acquireur.                             	         */
+/*  Sortie   : La cle AwK.                                      	         */
+/*****************************************************************************/
+int  GetAWK( int nIndiceCtx, char *resource_id,  char *AwK )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+		int		 response;
+        char     T_resource_id		[ 6 + 1];
+        varchar     T_AwK  		[256 + 1];  /* TDES  */
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start GetAWK(%.6s)", resource_id);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_AwK.arr ,       0, sizeof(T_AwK.arr    ));
+	T_AwK.len = 0;
+	memset(T_resource_id,  0, sizeof(T_resource_id));
+	memcpy(T_resource_id, resource_id, 6);
+
+
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO awk_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+		:response := PCRD_GET_HSM_KEY.GET_AWK_KEY(	:T_resource_id,
+						 		:T_AwK    
+							 );
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(AwK    , T_AwK.arr    , T_AwK.len );
+        /*sprintf(sLine, "End   GetAWK(%.256s)", AwK    );
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("End   GetAWK(OK)", PROCESSING);
+        return(OK);
+	}
+
+	trace_event("End   GetAWK(NOK)", PROCESSING);
+	return(NOK);
+
+	awk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetAWK (MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+/*****************************************************************************/
+/* GetIWK                                                        	         */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere les cles IwK.                           */
+/*  Entree   : L'identificateur du resource.                                 */
+/*             La banque acquireur.                             	         */
+/*  Sortie   : La cle IwK.                                      	         */
+/*****************************************************************************/
+
+int     GetIWK( int nIndiceCtx, char *resource_id , char *IwK )
+{
+
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+		int		 response;
+        char     T_resource_id		[ 6 + 1 ];
+        varchar     T_IwK       	    [256 + 1 ]; /* TDES */
+	EXEC SQL END DECLARE SECTION;
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start GetIWK(%.6s)", resource_id);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_IwK.arr    ,       0, sizeof(T_IwK.arr));
+	memset(T_resource_id,  0, sizeof(T_resource_id));
+
+	memcpy(T_resource_id, resource_id, 6);
+
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO iwk_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+		:response := PCRD_GET_HSM_KEY.GET_IWK_KEY(:T_resource_id,
+						 						 :T_IwK
+												);
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(IwK, T_IwK.arr, T_IwK.len );
+        /*sprintf(sLine, "End   GetIWK(%.256s)", IwK);
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("End   GetIWK(OK)", PROCESSING);
+        return(OK);
+	}
+
+	trace_event("End   GetIWK(NOK)", PROCESSING);
+	return(NOK);
+
+
+ 	iwk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetIWK (MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+
+
+
+/*****************************************************************************/
+/* GetMAC                                                                    */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere la cle MAC.                             */
+/*  Entree   : Le numero de terminal.                                        */
+/*  Sortie   : La cle MAC.                                                   */
+/*****************************************************************************/
+
+int     GetMAC( int nIndiceCtx ,
+		char *terminal_number, 
+		char *V_AcqBank, /*ICH270715*/
+		char type[1],
+		char *MAC1,
+		char *MAC2 )
+{
+
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_terminal_number 	[15 + 1];
+        VARCHAR      			T_AcqBank  	 	[6+1];/*ICH270715*/ 
+        varchar             T_MAC1         	[256 + 1];
+        varchar             T_MAC2         	[256 + 1];
+        char             T_type         	[1 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine,"Debut GetMAC(%c,%s,%s)",type,terminal_number,V_AcqBank);
+	trace_event(sLine,PROCESSING);
+
+	memset(T_MAC1.arr,        0, sizeof(T_MAC1.arr)+1);/* Mehdi Elyajizi Linux */
+	memset(T_MAC2.arr,        0, sizeof(T_MAC2.arr)+1);/* Mehdi Elyajizi Linux */
+	memset(T_type, 0, sizeof(T_type));
+	memset(T_terminal_number.arr, 0, sizeof(terminal_number));
+	T_terminal_number.len = 15;
+	
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/ 
+	 
+        T_MAC1.len=0;
+        T_MAC2.len=0;
+	memcpy(T_terminal_number.arr, terminal_number, strlen(terminal_number));
+	T_terminal_number.len = strlen(terminal_number);
+	
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+	
+	T_type[0] = type[0];
+
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO mac_key_exception;
+ 	EXEC SQL EXECUTE
+	BEGIN
+#if defined(FO_ATM_ST_CORE) || defined(FO_ATM_SA_CORE)
+		IF :T_type IN ('T','R')
+		THEN
+			:response := PCRD_ATM_GET_HSM_KEY.GET_MAC_KEY(
+													:T_terminal_number,
+													:T_AcqBank,/*ICH270715*/  
+													:T_type,
+													:T_MAC1,
+													:T_MAC2
+													 );
+		ELSE
+			NULL;
+#endif
+#if defined(FO_POS_ST_CORE) || defined(FO_POS_SA_CORE)
+		IF :T_type IN ('P','R')
+		THEN
+			:response := PCRD_POS_GET_HSM_KEY.GET_MAC_KEY(
+													:T_terminal_number,
+													:T_type,
+													:T_MAC1,
+													:T_MAC2
+													 );
+		ELSE
+			NULL;
+#endif
+
+
+        :response := PCRD_GET_HSM_KEY.GET_MAC_KEY(
+						:T_terminal_number,
+                                                :T_MAC1,
+                                                :T_MAC2
+                                                 );
+#if defined(FO_POS_ST_CORE) || defined(FO_POS_SA_CORE)
+	END IF;
+#endif
+#if defined(FO_ATM_ST_CORE) || defined(FO_ATM_SA_CORE)
+	END IF;
+#endif
+
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(MAC1, T_MAC1.arr, T_MAC1.len );
+        memcpy(MAC2, T_MAC2.arr, T_MAC2.len );
+	/*sprintf(sLine,"-->MAC1 : %s,MAC2 : %s",MAC1,MAC2);
+	trace_event(sLine,PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("End   GetMAC(OK)", PROCESSING); /** HM - 09022010 - PA_DSS **/
+        return(OK);
+	}
+
+	trace_event("Fin   GetMAC(NOK)", PROCESSING);
+	return(NOK);
+
+	mac_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;                                                                                           
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetMAC (MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+/*****************************************************************************/
+/* GetPinKey                                                                 */
+/*------------                                                               */
+/*  Fonction : fonction qui recupere la cle TAK1 prise en tant que PVK_KEY   */
+/*              et la cle TAK2 en tant que cle PIN pour le GAB SNI.          */
+/*  Entree   : Le numero du terminal.                                        */
+/*****************************************************************************/
+
+int     GetPinKey  ( int nIndiceCtx , char *sPan, char *PinKey )
+{
+
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_Pan [22 + 1];
+        VARCHAR        T_PinKey [256 + 1]; /* TDES */
+	EXEC SQL END DECLARE SECTION;
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	trace_event("Debut GetPinKey  ",PROCESSING);
+
+	memset(T_PinKey.arr,        0, sizeof(T_PinKey.arr));
+	memset(T_Pan.arr, 		0, sizeof(T_Pan.arr));
+	T_Pan.len = 22;
+
+	memcpy(T_Pan.arr, sPan, strlen(sPan));
+	T_Pan.len = strlen(sPan);
+
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO pin_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response := PCRD_GET_HSM_KEY.GET_PIN_KEY(:T_Pan,
+                                                 :T_PinKey
+                                                 );
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(PinKey, T_PinKey.arr, T_PinKey.len );
+        trace_event("Fin   GetPinKey(OK)", PROCESSING);
+        return(OK);
+	}
+
+	trace_event("Fin   GetPinKey(NOK)", PROCESSING);
+	return(NOK);
+
+	pin_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetPinKey (MALFUNCTION)", PROCESSING);                                                                          
+    return(HSM_MALFUNCTION);
+
+}
+
+/*****************************************************************************/
+/* GetAwkZmk                                                	             */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere la cle AwK encrypte sous ZMK .          */
+/*  Entree   : L'identificateur du resource.                                 */
+/*             La banque acquireur.                             	         */
+/*  Sortie   : La cle AwK.                                      	         */
+/*****************************************************************************/
+
+int     GetAwkZmk  ( int nIndiceCtx , char *resource_id, char *AwK )
+{
+
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+		int		 response;
+        char             T_resource_id	[ 6 + 1];
+        varchar             T_AwK   	[256 + 1]; /* TDES */
+	EXEC SQL END DECLARE SECTION;
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start GetAwkZmk(%.6s)", resource_id);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_AwK.arr    ,       0, sizeof(T_AwK.arr ));
+	memset(T_resource_id,   0, sizeof(T_resource_id));
+
+	memcpy(T_resource_id, resource_id, 6);
+
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO awk_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+		:response := PCRD_GET_HSM_KEY.GET_AWK_KEY_UNDER_ZMK(	:T_resource_id,
+						 									:T_AwK    
+														   );
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(AwK    , T_AwK.arr  , T_AwK.len );
+        /*sprintf(sLine, "End   GetAwkZmk(%.16s)", AwK    );
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("End   GetAwkZmk(OK)", PROCESSING);
+        return(OK);
+	}
+
+	trace_event("End   GetAwkZmk(NOK)", PROCESSING);
+	return(NOK);
+
+
+	awk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;                                                                                           
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetAwkZmk (MALFUNCTION)", PROCESSING);                                                                       
+
+    return(HSM_MALFUNCTION);
+
+}
+
+/** START MAW20030525: For Take Other PVK for PVV Verif **/
+
+int GetPVKPinKey( int nIndiceCtx, char *sPan, char *PVKA ,char *PVKB )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_Pan  [22 + 1];
+        char             T_PVKA [16 + 1];
+        char             T_PVKB [16 + 1];
+        int              T_PVKI;
+        EXEC SQL END DECLARE SECTION;
+
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+        /*sprintf(sLine, "Start GetPVKPinKey(%.16s)", sPan);
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("Start GetPVKPinKey()", PROCESSING);
+
+        memset( T_PVKA,         0, sizeof(T_PVKA));
+       memset( T_PVKB,         0, sizeof(T_PVKB));
+        memset( T_Pan.arr,              0, sizeof(T_Pan.arr));
+        T_Pan.len = 22;
+    T_PVKI = 0;
+
+        memcpy( T_Pan.arr, sPan, strlen(sPan) );
+        T_Pan.len = strlen(sPan);
+        /*sprintf(sLine, "T_Pan.arr=[%s], T_Pan.len=[%d])", T_Pan.arr, T_Pan.len);
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+
+        response = 909;
+        EXEC SQL WHENEVER SQLERROR GOTO pvk_key_exception;
+        EXEC SQL EXECUTE
+        BEGIN
+        :response := PCRD_GET_HSM_KEY.GET_PVK_KEY (       :T_Pan   ,
+                                                                :T_PVKA  ,
+                                                                :T_PVKB
+                                                        );
+        END;
+        END-EXEC;
+
+        if (response == OK)
+        {
+ memcpy(PVKA, T_PVKA, SIZE_KEY );
+        memcpy(PVKB, T_PVKB, SIZE_KEY );
+        /*sprintf(sLine, "End   GetPVKPinKey(%.16s,%.16s)", PVKA, PVKB);
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("End   GetPVKPinKey(OK)", PROCESSING);
+        return(OK);
+        }
+
+        trace_event("End   GetPVKPinKey(NOK)", PROCESSING);
+        return(NOK);
+
+    pvk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetPVKPinKey(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+/** END   MAW20030525 **/
+
+
+/** START MAW20050916: Retrieving the AC Key for Cryptogram Verification **/
+
+int Get_AC_Key( int nIndiceCtx, char *sPan, char *sAC_Key)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_Pan    [ 22 + 1];
+        VARCHAR          T_AC_Key [256 + 1];
+        EXEC SQL END DECLARE SECTION;
+
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+        /*sprintf(sLine, "Start Get_AC_Key(%.16s)", sPan);
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("Start Get_AC_Key()", PROCESSING);
+
+        memset( T_Pan.arr,              0, sizeof(T_Pan.arr));
+        T_Pan.len = 0;
+    
+        memset( T_AC_Key.arr,           0, sizeof(T_AC_Key.arr));
+        T_AC_Key.len = 0;
+    
+
+        memcpy( T_Pan.arr, sPan, strlen(sPan) );
+        T_Pan.len = strlen(sPan);
+        /*sprintf(sLine, "T_Pan.arr=[%s], T_Pan.len=[%d])", T_Pan.arr, T_Pan.len);
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+
+        response = 909;
+        EXEC SQL WHENEVER SQLERROR GOTO sql_exception_tag;
+        EXEC SQL EXECUTE
+        BEGIN
+        :response := PCRD_GET_HSM_KEY_2.GET_AC_KEY (      
+                                                          :T_Pan   ,
+                                                          :T_AC_Key
+                                                   );
+        END;
+        END-EXEC;
+
+        if (response == OK)
+        {
+           memcpy(sAC_Key, T_AC_Key.arr, T_AC_Key.len);
+           /*sprintf(sLine, "End   Get_AC_Key(%s)", sAC_Key);
+           trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+           trace_event("End   Get_AC_Key(OK)", PROCESSING);
+           return(OK);
+        }
+
+        trace_event("End   Get_AC_Key(NOK)", PROCESSING);
+        return(NOK);
+
+    sql_exception_tag :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "[%.100s]",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  Get_AC_Key(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+/** END   MAW20050916 **/
+
+
+/** BEG YEL05022016: Retrieving the KV Key for Cryptogram Verification **/
+
+int GetKV( int nIndiceCtx, char *sPan, char *sKV)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	int              response;
+	VARCHAR          T_Pan    [ 22 + 1];
+	VARCHAR          T_KV [256 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event("Start GET_KV()", PROCESSING);
+
+	memset( T_Pan.arr,              0, sizeof(T_Pan.arr));
+	T_Pan.len = 0;
+
+	memset( T_KV.arr,           0, sizeof(T_KV.arr));
+	T_KV.len = 0;
+
+	memcpy( T_Pan.arr, sPan, strlen(sPan) );
+	T_Pan.len = strlen(sPan);
+
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO sql_exception_tag;
+	EXEC SQL EXECUTE
+	BEGIN
+	:response := PCRD_GET_HSM_KEY.GET_KV (      
+													  :T_Pan   ,
+													  :T_KV
+											   );
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+	   memcpy(sKV, T_KV.arr, T_KV.len);
+	   trace_event("End   GET_KV(OK)", PROCESSING);
+	   return(OK);
+	}
+
+	trace_event("End   GET_KV(NOK)", PROCESSING);
+	return(NOK);
+
+    sql_exception_tag :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "[%.100s]",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GET_KV(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+int GetKMA( int nIndiceCtx, char *sPan, char *sKMA)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	int              response;
+	VARCHAR          T_Pan    [ 22 + 1];
+	VARCHAR          T_KMA [256 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event("Start GET_KMA()", PROCESSING);
+
+	memset( T_Pan.arr,              0, sizeof(T_Pan.arr));
+	T_Pan.len = 0;
+
+	memset( T_KMA.arr,           0, sizeof(T_KMA.arr));
+	T_KMA.len = 0;
+
+	memcpy( T_Pan.arr, sPan, strlen(sPan) );
+	T_Pan.len = strlen(sPan);
+
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO sql_exception_tag;
+	EXEC SQL EXECUTE
+	BEGIN
+	:response := PCRD_GET_HSM_KEY.GET_KMA (      
+													  :T_Pan   ,
+													  :T_KMA
+											   );
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+	   memcpy(sKMA, T_KMA.arr, T_KMA.len);
+	   trace_event("End   GET_KMA(OK)", PROCESSING);
+	   return(OK);
+	}
+
+	trace_event("End   GET_KMA(NOK)", PROCESSING);
+	return(NOK);
+
+    sql_exception_tag :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "[%.100s]",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GET_KMA(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+/** END   YEL05022016 **/
+

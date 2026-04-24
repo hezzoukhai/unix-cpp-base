@@ -1,0 +1,267 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      pcrd_services.pc                                                        */
+/*                                                                             */
+/* Description                                                                 */
+/*      Utility Tools Management                                               */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+RJE     		13-02-2014   		Radouane jeha    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+
+#include <stdio.h>
+#include <define.h>
+#include <langue.h>
+#include <utility.h>
+#include <paramdef.h>
+#include <iso_hps.h>
+#include <param_ctx.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/***********************************************************************
+**  nom	: GetServicesList()											**
+**  desc	: chargement des comptes d'un porteur					**
+**  entree	: P7IsoInfo	-> tampon PowerSEVEN					**
+**		  	firstutilitySeq-> sequence du premier compte			**
+**  sortie	: utilityList	-> liste de six comptes				**
+**		  utilityListSize-> nombre de comptes charge			**
+**  retour	: OK	-> chargement reussi						**
+**		  NOK	-> chargement de 1 compte						**
+**		  ERROR	-> erreur fatal									**
+***********************************************************************/
+int GetServicesList(
+					int			nIndexCtx,
+					TSIsoInfo   *P7IsoInfo,
+					int			firstutilitySeq,
+					char		pTransCode,
+					struct utility_t serviceList	[  6],
+					int			*serviceListSize)
+{
+	struct sqlca sqlca;
+	char 	sLine	[MAX_LINE_TRC];
+	char 	tmpField[LG_MAX];
+	int		cpt;
+	int 	lgField;
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	varchar		plAccountNumber         [24];
+	char		plTransCode			[ 5];
+	varchar		plserviceNumber1	[24+1];
+	varchar		plserviceWording1	[30];
+
+	varchar		plserviceNumber2	[24];
+	varchar		plserviceWording2	[32];
+
+	varchar		plserviceNumber3	[24];
+	varchar		plserviceWording3	[32];
+
+	varchar		plserviceNumber4	[24];
+	varchar		plserviceWording4	[32];
+
+	varchar		plserviceNumber5	[24];
+	varchar		plserviceWording5	[32];
+
+	varchar		plserviceNumber6	[24];
+	varchar		plserviceWording6	[32];
+
+	int			plStartPosition;
+	int			plservicesNumber;
+	int			plRetour;
+	EXEC SQL END DECLARE SECTION;
+
+	trace_event("Start GetServicesList() ", PROCESSING);
+
+	/* Initialisation des variables C */
+	for(cpt = 0; cpt < MAX_UTILITY; cpt++)
+	{
+		memset(serviceList[cpt].utilityNumber,	0,	25);
+		memset(serviceList[cpt].utilityWording,	0,	31);
+		serviceList[cpt].utilityAvailable	= NO;
+	}
+	*serviceListSize = 0;
+
+	memset(plserviceNumber1.arr,		0, sizeof(plserviceNumber1.arr));
+	memset(plserviceWording1.arr,		0, sizeof(plserviceWording1.arr));
+	plserviceNumber1.len	= 2;
+	plserviceWording1.len	= 2;
+
+	memset(plserviceNumber2.arr,		0, sizeof(plserviceNumber2.arr));
+	memset(plserviceWording2.arr,		0, sizeof(plserviceWording2.arr));
+	plserviceNumber2.len	= 2;
+	plserviceWording2.len	= 2;
+
+	memset(plserviceNumber3.arr,		0, sizeof(plserviceNumber3.arr));
+	memset(plserviceWording3.arr,		0, sizeof(plserviceWording3.arr));
+	plserviceNumber3.len	= 2;
+	plserviceWording3.len	= 2;
+
+	memset(plserviceNumber4.arr,		0, sizeof(plserviceNumber4.arr));
+	memset(plserviceWording4.arr,		0, sizeof(plserviceWording4.arr));
+	plserviceNumber4.len	= 2;
+	plserviceWording4.len	= 2;
+
+	memset(plserviceNumber5.arr,		0,sizeof(plserviceNumber5.arr));
+	memset(plserviceWording5.arr,		0,sizeof(plserviceWording5.arr));
+	plserviceNumber5.len	= 2;
+	plserviceWording5.len	= 2;
+
+	memset(plserviceNumber6.arr,		0, sizeof(plserviceNumber6.arr));
+	memset(plserviceWording6.arr,		0, sizeof(plserviceWording6.arr));
+	plserviceNumber6.len	= 2;
+	plserviceWording6.len	= 2;
+
+	/* initialisation des variables PL/SQL */
+	if (GetIsoField( ISO_ACCOUNT_ID1, P7IsoInfo, tmpField, &lgField) == SUCCES)
+	{
+		memcpy(plAccountNumber.arr,tmpField,lgField);
+		plAccountNumber.len     = lgField;
+	}
+	GetTransCode(pTransCode,plTransCode);
+	plStartPosition = firstutilitySeq;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL WHENEVER SQLERROR GOTO get_service_list_err;
+	EXEC SQL EXECUTE
+		DECLARE
+		v_enr_service1		PCRD_ATM_SERVICES_1.SERVICE_ROW;
+	v_enr_service2		PCRD_ATM_SERVICES_1.SERVICE_ROW;
+	v_enr_service3		PCRD_ATM_SERVICES_1.SERVICE_ROW;
+	v_enr_service4		PCRD_ATM_SERVICES_1.SERVICE_ROW;
+	v_enr_service5		PCRD_ATM_SERVICES_1.SERVICE_ROW;
+	v_enr_service6		PCRD_ATM_SERVICES_1.SERVICE_ROW;
+	v_enr_service7		PCRD_ATM_SERVICES_1.SERVICE_ROW;
+	v_enr_service8		PCRD_ATM_SERVICES_1.SERVICE_ROW;
+	BEGIN
+
+		:plRetour := PCRD_ATM_SERVICES_1.GET_SERVICES(
+		:plStartPosition,
+		TRUE,
+		:plTransCode,
+		v_enr_service1,
+		v_enr_service2,
+		v_enr_service3,
+		v_enr_service4,
+		v_enr_service5,
+		v_enr_service6,
+		v_enr_service7,
+		v_enr_service8,
+		:plservicesNumber);
+
+IF :plRetour = DECLARATION_CST.OK THEN
+		:plserviceNumber1	:= v_enr_service1.service_code;
+	:plserviceWording1	:= v_enr_service1.service_wording;
+IF :plservicesNumber > 1 THEN
+		:plserviceNumber2		:= v_enr_service2.service_code;
+	:plserviceWording2	:= v_enr_service2.service_wording;
+	END IF;
+IF :plservicesNumber > 2 THEN
+		:plserviceNumber3		:= v_enr_service3.service_code;
+	:plserviceWording3	:= v_enr_service3.service_wording;
+	END IF;
+IF :plservicesNumber > 3 THEN
+		:plserviceNumber4		:= v_enr_service4.service_code;
+	:plserviceWording4	:= v_enr_service4.service_wording;
+	END IF;
+IF :plservicesNumber > 4 THEN
+		:plserviceNumber5		:= v_enr_service5.service_code;
+	:plserviceWording5	:= v_enr_service5.service_wording;
+	END IF;
+IF :plservicesNumber > 5 THEN
+		:plserviceNumber6		:= v_enr_service6.service_code;
+	:plserviceWording6	:= v_enr_service6.service_wording;
+	END IF;
+	END IF;
+	END;
+	END-EXEC;
+
+	if(plRetour != OK)
+	{
+		sprintf(sLine, "End   GetServicesList(%d)", plRetour);
+		trace_event(sLine, ERROR);
+		return (plRetour);
+	}
+	/* recuperation du contenu des variable PL/SQL */
+	*serviceListSize = plservicesNumber;
+
+	memcpy(serviceList[0].utilityNumber,plserviceNumber1.arr, plserviceNumber1.len);
+	memcpy(serviceList[0].utilityWording,plserviceWording1.arr, plserviceWording1.len);
+	serviceList[0].utilityAvailable	= YES;
+
+	if(*serviceListSize > 1)
+	{
+		memcpy(serviceList[1].utilityNumber,plserviceNumber2.arr, plserviceNumber2.len);
+		memcpy(serviceList[1].utilityWording,plserviceWording2.arr, plserviceWording2.len);
+		serviceList[1].utilityAvailable	= YES;
+	}
+
+	if(*serviceListSize > 2)
+	{
+		memcpy(serviceList[2].utilityNumber,plserviceNumber3.arr, plserviceNumber3.len);
+		memcpy(serviceList[2].utilityWording,plserviceWording3.arr, plserviceWording3.len);
+		serviceList[2].utilityAvailable	= YES;
+	}
+
+	if(*serviceListSize > 3)
+	{
+		memcpy(serviceList[3].utilityNumber,plserviceNumber4.arr, plserviceNumber4.len);
+		memcpy(serviceList[3].utilityWording,plserviceWording4.arr, plserviceWording4.len);
+		serviceList[3].utilityAvailable	= YES;
+	}
+
+	if(*serviceListSize > 4)
+	{
+		memcpy(serviceList[4].utilityNumber,plserviceNumber5.arr, plserviceNumber5.len);
+		memcpy(serviceList[4].utilityWording,plserviceWording5.arr, plserviceWording5.len);
+		serviceList[4].utilityAvailable	= YES;
+	}
+
+	if(*serviceListSize > 5)
+	{
+		memcpy(serviceList[5].utilityNumber,plserviceNumber6.arr, plserviceNumber6.len);
+		memcpy(serviceList[5].utilityWording,plserviceWording6.arr, plserviceWording6.len);
+		serviceList[5].utilityAvailable	= YES;
+	}
+
+	PutIsoField(ISO_RESPONSE_CODE, P7IsoInfo, "085", 3);
+
+	sprintf(sLine, "service 1 number : %.24s", serviceList[0].utilityNumber);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "service 1 wording e : %.20s",serviceList[0].utilityWording);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "service 2 number : %.24s", serviceList[1].utilityNumber);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "service 2 wording e : %.20s",serviceList[1].utilityWording);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "service 3 number : %.24s", serviceList[2].utilityNumber);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "service 3 wording e : %.20s",serviceList[2].utilityWording);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "service 4 number : %.24s", serviceList[3].utilityNumber);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "service 4 wording e : %.20s",serviceList[3].utilityWording);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "service 5 number : %.24s", serviceList[4].utilityNumber);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "service 5 wording e : %.20s",serviceList[4].utilityWording);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "service 6 number : %.24s", serviceList[5].utilityNumber);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "service 6 wording e : %.20s",serviceList[5].utilityWording);
+	trace_event(sLine, PROCESSING);
+
+	sprintf(sLine, "End   GetServicesList(OK %d)", *serviceListSize);
+	trace_event(sLine, PROCESSING);
+	return (OK);
+
+
+get_service_list_err :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   GetServicesList(ERROR)", ERROR);
+    return (ERROR);
+}
+

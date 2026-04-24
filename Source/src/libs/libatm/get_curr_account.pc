@@ -1,0 +1,121 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_curr_account.pc                                                  */
+/*                                                                             */
+/* Description                                                                 */
+/*      Get Account Number                                                     */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#include <paramdef.h>
+#include <langue.h>
+#include <param_ctx.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/******************************************************************************/
+/* Fonction get_curr_account.                                               */
+/* -----------------------------	                                      */
+/* Description : Fonction qui recupere le numero de compte pour une carte     */
+/*		 donne.         					      */
+/* Entree      : le numero de compte					      */
+/*               le code da la banque					      */
+/*               le numero de la carte					      */
+/* Sortie      : OK						              */
+/*               NOK                   			                      */
+/*               MALFUNCTION                                                  */
+/* Date/Auteur : 09/11/1996 Y .KAOUTAR                                        */
+/* Revision    :                                                              */
+/******************************************************************************/
+int    get_curr_account(
+	int			nIndexCtx,
+	char		*v_card_nbr,
+	char		*v_account_nbr,
+	char		*v_currency)
+{
+
+	struct sqlca sqlca; /**Linux ***/
+	char		sLine[MAX_LINE_TRC];
+
+	
+	
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR 	T_account_nbr  [25];
+	VARCHAR 	T_card_nbr     [25];
+	char		T_currency	   [4];
+	int	 	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+
+	/*MKB060309 PCI Norme Integration */
+	if (debug_option == 1)
+		sprintf(sLine, "Start get_curr_account(%.22s,%22s)", v_card_nbr,v_account_nbr);
+	else
+	{
+		sprintf(sLine, "Start get_curr_account()");
+	}
+	trace_event(sLine, PROCESSING);
+
+	memset(T_currency, 0, sizeof(T_currency));
+
+	memset(T_account_nbr.arr, 0, sizeof(T_account_nbr.arr));
+	T_account_nbr.len = 24; 
+
+	memset(T_card_nbr.arr, 0, sizeof(T_card_nbr.arr));
+	memcpy(T_card_nbr.arr, v_card_nbr , strlen(v_card_nbr));
+	T_card_nbr.len = strlen(v_card_nbr) ;
+	memcpy(T_account_nbr.arr, v_account_nbr , strlen(v_account_nbr));
+	T_account_nbr.len = strlen(v_account_nbr) ;
+
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO account_card;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL EXECUTE
+		DECLARE 
+		T_Enrg_Account_Link      ACCOUNTS_LINK%ROWTYPE   ;
+	BEGIN
+		:response_code   :=  PCRD_ACCOUNTS_DATA.GET_ACCOUNTS_LINK_DATA_1      (    global_vars_1.EC_CARDHOLDER,
+		:T_card_nbr,
+		T_Enrg_Account_Link,
+		:T_account_nbr,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		global_vars.YES);
+
+
+	IF :response_code = DECLARATION_CST.OK THEN
+		:T_currency := T_Enrg_Account_Link.account_currency_code;
+	END IF;
+
+	END;
+	END-EXEC;
+
+	memset(T_card_nbr.arr, 0, sizeof(T_card_nbr.arr)); /* PCI */
+	if (response_code == OK)
+	{
+		memcpy(v_currency, T_currency, 3);
+		sprintf(sLine, "Fin   get_curr_account(%.3s)", v_currency);
+		trace_event(sLine, PROCESSING);
+		return(OK); 
+	}
+	trace_event("Fin   get_curr_account(NOK)", PROCESSING);
+	return(NOK);
+
+account_card :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, TRACE);
+	memset(T_card_nbr.arr, 0, sizeof(T_card_nbr.arr)); /* PCI */
+	trace_event("Fin  get_curr_account(MALFUNCTION)", PROCESSING);
+	return(MALFUNCTION);
+}

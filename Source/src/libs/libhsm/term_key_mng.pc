@@ -1,0 +1,235 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <hsm_inc.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+/*****************************************************************************/
+/* GetTPK                                                                    */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere les cles TPK.                           */
+/*  Entree   : L'identificateur du terminal.                                 */
+/*  Sortie   : La cle TPK1, TPK2.                                            */
+/*****************************************************************************/
+
+int     GetTPK( int nIndiceCtx , char *terminal_nbr, char *V_AcqBank /*ICH270715*/, char *TPK1, char *TPK2)
+{
+
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_terminal_nbr     [15 + 1];
+        VARCHAR      		 T_AcqBank  	 	[6+1];/*ICH270715*/ 
+        varchar             T_TPK1          [256 + 1];
+        varchar             T_TPK2          [256 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start GetTPK(%.15s,%.6s)", terminal_nbr,V_AcqBank);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_TPK1.arr,         		0, sizeof(T_TPK1.arr));
+	T_TPK1.len = 0;
+	memset(T_TPK2.arr,         		0, sizeof(T_TPK2.arr));
+	T_TPK2.len = 0;
+	memset(T_terminal_nbr.arr, 	0, sizeof(T_terminal_nbr.arr));
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+
+
+	memcpy(T_terminal_nbr.arr, terminal_nbr, strlen(terminal_nbr));
+	T_terminal_nbr.len = strlen(terminal_nbr);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank
+
+	response = HSM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO tpk_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response := PCRD_ATM_GET_HSM_KEY.GET_TPK_KEY(:T_terminal_nbr,
+           										 :T_AcqBank,/*ICH270715*/  
+                                                 :T_TPK1,
+                                                 :T_TPK2
+                                                );
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(TPK1, T_TPK1.arr, T_TPK1.len );
+        memcpy(TPK2, T_TPK2.arr, T_TPK2.len );
+
+        /*sprintf(sLine, "End   GetTPK(  %.32s,%.32s)", TPK1, TPK2);
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("End   GetTPK(OK)", PROCESSING);
+        return(OK);
+	}
+
+    sprintf(sLine, "End   GetTPK(NOK)");
+	trace_event(sLine, PROCESSING);
+	return(NOK);
+
+
+	tpk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetTPK (MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+/*****************************************************************************/
+/* GetTAK                                                                    */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere les cles TAK.                           */
+/*  Entree   : L'identificateur du terminal.                                 */
+/*  Sortie   : La cle TAK1, TAK2.                                            */
+/*****************************************************************************/
+
+int     GetTAK( int nIndiceCtx , char *terminal_nbr, char *V_AcqBank /*ICH270715*/, char *TAK1, char *TAK2)
+{
+
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_terminal_nbr     [15 + 1];
+		VARCHAR				T_AcqBank		[6+1];/*ICH270715*/
+        varchar             T_TAK1          [256 + 1];
+        varchar             T_TAK2          [256 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start GetTAK(%.15s,%.6s)", terminal_nbr,V_AcqBank);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_TAK1.arr,  		0, sizeof(T_TAK1.arr));
+	memset(T_TAK2.arr,     		0, sizeof(T_TAK2.arr));
+	memset(T_terminal_nbr.arr, 	0, sizeof(T_terminal_nbr.arr));
+    memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+
+	memcpy(T_terminal_nbr.arr, terminal_nbr, strlen(terminal_nbr));
+	T_terminal_nbr.len = strlen(terminal_nbr);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+	response = HSM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO tak_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response := PCRD_ATM_GET_HSM_KEY.GET_TAK_KEY(:T_terminal_nbr,
+        										 :T_AcqBank,/*ICH270715*/
+                                                 :T_TAK1,
+                                                 :T_TAK2
+                                                );
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(TAK1, T_TAK1.arr, T_TAK1.len );
+        memcpy(TAK2, T_TAK2.arr, T_TAK2.len );
+        /*sprintf(sLine, "End   GetTAK(%.16s,%.16s)", TAK1, TAK2);
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("End   GetTAK(OK)", PROCESSING);
+        return(OK);
+	}
+
+	sprintf(sLine, "End   GetTAK(NOK)");
+	trace_event(sLine, PROCESSING);
+	return(NOK);
+
+	tak_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetTAK (MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+
+/*****************************************************************************/
+/* GetTMK                                                                    */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere les cles TMK.                           */
+/*  Entree   : L'identificateur du terminal.                                 */
+/*  Sortie   : La cle TMK1, TMK2.                                            */
+/*****************************************************************************/
+
+int     GetTMK( int nIndiceCtx , char *terminal_nbr,char *V_AcqBank /*ICH270715*/, char *TMK1, char *TMK2)
+{
+
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR             T_terminal_nbr     [15 + 1];
+        VARCHAR      			T_AcqBank  	 	[6+1];/*ICH270715*/ 
+        varchar             T_TMK1          [256 + 1];
+        varchar             T_TMK2          [256 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start GetTMK(|%.15s,%.6s|)", terminal_nbr,V_AcqBank);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_TMK1.arr,    		0, sizeof(T_TMK1.arr));
+	T_TMK1.len = 0;
+	memset(T_TMK2.arr,    		0, sizeof(T_TMK2.arr));
+	T_TMK2.len = 0;
+	memset(T_terminal_nbr.arr, 	0, sizeof(T_terminal_nbr.arr));
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+
+	memcpy(T_terminal_nbr.arr, terminal_nbr, strlen(terminal_nbr));
+	T_terminal_nbr.len = strlen(terminal_nbr);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+	response = HSM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO tmk_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response := PCRD_ATM_GET_HSM_KEY.GET_TMK_KEY(:T_terminal_nbr,
+        										 :T_AcqBank/*ICH270715*/,  
+                                                 :T_TMK1,
+                                                 :T_TMK2
+                                                );
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(TMK1, T_TMK1.arr, T_TMK1.len );
+        memcpy(TMK2, T_TMK2.arr, T_TMK2.len  );
+        /*sprintf(sLine, "End   GetTMK(%.32s,%.32s)", TMK1, TMK2);
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("End   GetTMK(OK)", PROCESSING);
+        return(OK);
+	}
+
+	sprintf(sLine, "End   GetTMK(NOK)");
+	trace_event(sLine, PROCESSING);
+	return(NOK);
+
+	tmk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetTMK (MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+

@@ -1,0 +1,71 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <hsm_inc.h>
+/*
+#include <sqlca.h>
+#include <sqlcpr.h>
+*/
+/******************************************************************************/
+/* GetKDK                                                        	          */
+/*----------------                                                            */
+/*  Fonction : fonction qui recupere la cle KDK.                              */
+/*  Entree   : L'identificateur du resource.                                  */
+/*  Sortie   : La cle KDK.                                      	          */
+/******************************************************************************/
+
+int     GetKDK ( int nIndiceCtx , char *resource_id, char *KDK)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+		int		 response;
+        char     T_resource_id		[ 6 + 1 ];
+        VARCHAR  T_KDK    			[256 + 1 ]; 
+	EXEC SQL END DECLARE SECTION;
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start GetKDK (%.6s)", resource_id);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_KDK.arr    ,       0, sizeof(T_KDK.arr));
+    T_KDK.len = 0;
+	memset(T_resource_id,  0, sizeof(T_resource_id));
+
+	memcpy(T_resource_id, resource_id, 6); 
+	
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO KDK_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+		:response := PCRD_GET_C2P_KEY.GET_KDK_KEY(:T_resource_id,
+						 	                      :T_KDK
+							                      );
+	END;
+	END-EXEC;
+
+	sprintf(sLine, "response :  (%d)", response);
+	trace_event(sLine, PROCESSING);
+
+	if (response == OK)
+	{
+        memcpy(KDK, T_KDK.arr, T_KDK.len );
+        trace_event("End   GetKDK (OK)", PROCESSING);
+        return(OK);
+	}
+
+	trace_event("End   GetKDK (NOK)", PROCESSING);
+	return(NOK);
+
+	KDK_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);                                                                                                     
+    trace_event("End  GetKDK(MALFUNCTION)", PROCESSING);                                                                           
+    return(HSM_MALFUNCTION);
+
+}

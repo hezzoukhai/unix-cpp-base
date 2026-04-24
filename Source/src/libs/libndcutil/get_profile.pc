@@ -1,0 +1,99 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_profile.pc                                                                 */
+/*                                                                             */
+/* Description                                                                 */
+/*      GET PROFILE Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+
+#include <define.h>
+
+#include <paramdef.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+/*****************************************************************
+**  GetProfile(pTerminalNumber, pProfile)			**
+**  Descri : charge le profil.					**
+**  Entree : pTerminalNumber -> numero du terminal		**
+**  Sortie : pProfile -> structure ndc_param qui recevra le	**
+**	chaine profile(.data) et sa langueur(.len).		**
+**  Return : OK -> fonctionnement normal.			**
+**	     ERROR -> erreur ORACLE.				**
+**  Auteur : Younes OUADI (le 27/11/1997).			**
+*****************************************************************/
+
+int GetProfile(
+	int 		nIndexCtx,
+	char		*pTerminalNumber,
+	char		*pAcqBank,
+	ndc_param	*pProfile)
+{
+	struct sqlca sqlca;
+	char detail[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	char			plBankCode		[    6+1];
+	char			plProfileCode	[    3+1];
+	varchar		plProfile    	[10000+1];
+	int			plRetour;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(detail, "Start GetProfile(%.8s,%s))", pTerminalNumber, pAcqBank/*ICH270715*/);
+	trace_event(detail, PROCESSING);
+
+	/* initialisation des variables PL/SQL */
+	memset(plProfile.arr,	0,	sizeof(plProfile.arr));
+	plProfile.len = 10;
+	memset(plBankCode,	0,	sizeof(plBankCode));
+	memset(plProfileCode,	0,	sizeof(plProfileCode));
+
+	memcpy(plBankCode,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+
+	plRetour = GetTerminalProfile(nIndexCtx,
+		pTerminalNumber, plBankCode, plProfileCode);
+	if(plRetour != OK)
+	{
+		trace_event("End   GetProfile(NOK)", PROCESSING);
+		return (NOK);
+	}
+
+	EXEC SQL WHENEVER SQLERROR GOTO GetProfile_err;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+	EXEC SQL EXECUTE
+		BEGIN
+		:plRetour := PCRD_GET_NDCPARAM_1.PROFILE(:plBankCode,
+		:plProfileCode,
+		:plProfile);
+	END;
+	END-EXEC;
+
+	if (plRetour == NOK )
+	{
+		trace_event("End   GetProfile(NOK)",PROCESSING);
+		return(NOK);
+	}
+
+	memcpy(pProfile->data, plProfile.arr, plProfile.len);
+	pProfile->len = plProfile.len;
+
+	trace_event("End   GetProfile(OK)",PROCESSING);
+	return (OK);
+
+GetProfile_err :
+
+	sprintf(detail,"End   GetProfile(%s,X) -> %s",pTerminalNumber,sqlca.sqlerrm.sqlerrmc);
+	trace_event(detail, ERROR);
+	return(ERROR);
+
+}

@@ -1,0 +1,64 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+void GetInternalStan (    int   nIndiceCtx          ,
+                           char *sInternalStan
+					 )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	char      	T_stan_seq [6 + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetInternalStan() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset(T_stan_seq  ,0 , sizeof(T_stan_seq));
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_GetInternalStan;
+	EXEC SQL EXECUTE
+	BEGIN
+
+        /*:response_code := PCRD_P7_GENERAL_TOOLS.GET_INTERNAL_STAN( :T_stan_seq); MJ20050905*/
+        :response_code := PCRD_GENERAL_TOOLS_6.GET_NEXT_VAL( 'INTERNAL_STAN',400,:T_stan_seq);
+
+	END;
+	END-EXEC;
+	if (response_code != OK)
+		memcpy(sInternalStan, "999999", 6);
+	else
+		memcpy(sInternalStan, T_stan_seq, 6);
+	sInternalStan[6]='\0';
+
+	sprintf(sLine,"End GetInternalStan(%d | %s)", response_code,sInternalStan);
+	trace_event(sLine,PROCESSING);
+	return;
+
+err_GetInternalStan :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	memcpy(sInternalStan, "999999", 6);
+	trace_event("End GetInternalStan(SYSTEM_MALFUNCTION)", PROCESSING);
+	return;
+}

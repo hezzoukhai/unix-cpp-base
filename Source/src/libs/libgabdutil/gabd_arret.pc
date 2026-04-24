@@ -1,0 +1,188 @@
+#include <stdio.h>
+#include <string.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <stdlib.h>
+
+
+int	InsertArretCompt(	nIndexCtx,
+						lTerminal, 
+						lDate,
+   						lcp_nb_retrait,
+   						lcp_mt_retrait,
+   						lcp_nb_virement,
+   						lcp_mt_virement,
+   						lcp_nb_dpespece ,
+   						lcp_mt_dpespece ,
+   						lcp_nb_dpcheque,
+   						lcp_mt_dpcheque,
+   						lcp_nb_short_hist   ,
+   						lcp_nb_imp_rib    ,
+   						lcp_nb_solde  ,
+   						lcp_nb_cheque 
+						)
+int		nIndexCtx;
+char	*lTerminal;
+char    *lDate;
+char 	*lcp_nb_retrait;
+char 	*lcp_mt_retrait;
+char 	*lcp_nb_virement;
+char 	*lcp_mt_virement;
+char 	*lcp_nb_dpespece ;
+char 	*lcp_mt_dpespece ;
+char 	*lcp_nb_dpcheque;
+char 	*lcp_mt_dpcheque;
+char 	*lcp_nb_short_hist   ;
+char 	*lcp_nb_imp_rib    ;
+char 	*lcp_nb_solde  ;
+char 	*lcp_nb_cheque ;
+{
+EXEC SQL BEGIN DECLARE SECTION;
+char		sLine[MAX_LINE_TRC];
+varchar           pTermNbr         			[ 15];
+char              p_date 	       			[  6+1];
+/*	Modif Ouadie */
+
+char 	          p_lcp_nb_retrait         	[  5];
+char              p_lcp_mt_retrait         	[ 12];
+char              p_lcp_nb_virement         [  5];
+char              p_lcp_mt_virement         [ 12];
+char              p_lcp_nb_dpespece         [  5];
+char              p_lcp_mt_dpespece         [ 12];
+char    	 	  p_lcp_nb_dpcheque	       	[  5];
+char    	  	  p_lcp_mt_dpcheque	        [ 12];
+char    	  	  p_lcp_nb_short_hist	    [  5];
+char    	  	  p_lcp_nb_imp_rib	        [  5];
+char    	  	  p_lcp_nb_solde	        [  5];
+char    	  	  p_lcp_nb_cheque	        [  5];
+int               hRet,test=0;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start InsertArretCompt(%s)", lTerminal);
+trace_event(sLine, PROCESSING);
+
+
+memset(pTermNbr.arr,         '\0'           ,   sizeof(lTerminal));
+memcpy(pTermNbr.arr,         lTerminal     , strlen(lTerminal));
+pTermNbr.len = strlen(lTerminal); 
+    
+
+trace_event(" -------------------------------------------------", PROCESSING);
+sprintf(sLine, ">>>>Terminal (%s) : Longueur (%d)", pTermNbr.arr, pTermNbr.len);
+trace_event(sLine, PROCESSING);
+sprintf(sLine, ">>>>Nombre Retrait : (%s)    Montant Retrait : (%s)", lcp_nb_retrait, lcp_mt_retrait);
+trace_event(sLine, PROCESSING);
+sprintf(sLine, ">>>>Nombre De Histo : (%s)   Nombre De Solde : (%s) Nombre De Cheque : (%s)", lcp_nb_short_hist  ,
+			lcp_nb_solde  , lcp_nb_cheque );
+trace_event(sLine, PROCESSING);
+
+
+sprintf(sLine, "Longueur : (%.4d)",(int) strlen(lcp_nb_retrait));
+trace_event(sLine, PROCESSING);
+sprintf(sLine, "Longueur : (%.4d)",(int) strlen(lcp_mt_retrait));
+trace_event(sLine, PROCESSING);
+sprintf(sLine, "Longueur : (%.4d)",(int) strlen(lcp_nb_virement));
+trace_event(sLine, PROCESSING);
+sprintf(sLine, "Longueur : (%.4d)",(int) strlen(lcp_mt_virement));
+trace_event(sLine, PROCESSING);
+sprintf(sLine, "Longueur : (%.4d)",(int) strlen(lcp_nb_dpespece));
+trace_event(sLine, PROCESSING);
+sprintf(sLine, "Longueur : (%.4d)",(int) strlen(lcp_mt_dpespece));
+trace_event(sLine, PROCESSING);
+sprintf(sLine, "Longueur : (%.4d)",(int) strlen(lcp_nb_dpcheque));
+trace_event(sLine, PROCESSING);
+sprintf(sLine, "Longueur : (%.4d)",(int) strlen(lcp_mt_dpcheque));
+trace_event(sLine, PROCESSING);
+sprintf(sLine, "Longueur : (%.4d)",(int) strlen(lcp_nb_short_hist));
+trace_event(sLine, PROCESSING);
+sprintf(sLine, "Longueur : (%.4d)",(int) strlen(lcp_nb_imp_rib));
+trace_event(sLine, PROCESSING);
+sprintf(sLine, "Longueur : (%.4d)",(int) strlen(lcp_nb_solde));
+trace_event(sLine, PROCESSING);
+sprintf(sLine, "Longueur : (%.4d)",(int) strlen(lcp_nb_cheque));
+trace_event(sLine, PROCESSING);
+
+
+
+sprintf(sLine, ">>>>Date(%s)", lDate);
+trace_event(sLine, PROCESSING);
+trace_event(" -------------------------------------------------", PROCESSING);
+
+memset( p_date 	      ,			'\0'     , sizeof(p_date));
+memset( p_lcp_nb_retrait  ,		'\0'     , sizeof(p_lcp_nb_retrait));
+memset( p_lcp_mt_retrait  ,		'\0'    , sizeof(p_lcp_mt_retrait));
+memset( p_lcp_nb_virement  ,	'\0'     , sizeof(p_lcp_nb_virement));
+memset( p_lcp_mt_virement  ,	'\0'    , sizeof(p_lcp_mt_virement));
+memset( p_lcp_nb_dpespece   ,	'\0'    , sizeof(p_lcp_nb_dpespece));
+memset( p_lcp_mt_dpespece   ,	'\0'    , sizeof(p_lcp_mt_dpespece));
+memset( p_lcp_nb_dpcheque  ,	'\0'    , sizeof(p_lcp_nb_dpcheque));
+memset( p_lcp_mt_dpcheque  ,	'\0'    , sizeof(p_lcp_mt_dpcheque));
+memset( p_lcp_nb_short_hist    ,'\0'     , sizeof(p_lcp_nb_short_hist));
+memset( p_lcp_nb_imp_rib      ,	'\0'     , sizeof(p_lcp_nb_imp_rib));
+memset( p_lcp_nb_solde    ,		'\0'     , sizeof(p_lcp_nb_solde));
+memset( p_lcp_nb_cheque   ,		'\0'     , sizeof(p_lcp_nb_cheque));
+test =0;
+
+
+memcpy( p_date 	      ,			lDate     , 			strlen(lDate));
+memcpy( p_lcp_nb_retrait  ,		lcp_nb_retrait    , 	strlen(lcp_nb_retrait));
+memcpy( p_lcp_mt_retrait  ,		lcp_mt_retrait    , 	strlen(lcp_mt_retrait));
+memcpy( p_lcp_nb_virement  ,	lcp_nb_virement    , 	strlen(lcp_nb_virement));
+memcpy( p_lcp_mt_virement  ,	lcp_mt_virement    , 	strlen(lcp_mt_virement));
+memcpy( p_lcp_nb_dpespece  ,	lcp_nb_dpespece     , 	strlen(lcp_nb_dpespece));
+memcpy( p_lcp_mt_dpespece  ,	lcp_mt_dpespece     , 	strlen(lcp_mt_dpespece));
+memcpy( p_lcp_nb_dpcheque  ,	lcp_nb_dpcheque   , 	strlen(lcp_nb_dpcheque));
+memcpy( p_lcp_mt_dpcheque  ,	lcp_mt_dpcheque   , 	strlen(lcp_mt_dpcheque));
+memcpy( p_lcp_nb_short_hist ,	lcp_nb_short_hist     , strlen(lcp_nb_short_hist));
+memcpy( p_lcp_nb_imp_rib      ,	lcp_nb_imp_rib        , strlen(lcp_nb_imp_rib));
+memcpy( p_lcp_nb_solde    ,		lcp_nb_solde      , 	strlen(lcp_nb_solde));
+memcpy( p_lcp_nb_cheque   ,		lcp_nb_cheque     , 	strlen(lcp_nb_cheque));
+
+
+trace_event("Avant PLSQL", TRACE);
+EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+EXEC SQL WHENEVER SQLERROR GOTO ArretError;
+EXEC SQL EXECUTE
+BEGIN
+
+  :hRet := PCRD_GET_GABDPARAM.INSERT_GABD_CUTOFF(	:pTermNbr,
+									 				TO_DATE(:p_date,'DDMMYY'), 
+									 				TO_NUMBER(:p_lcp_nb_retrait),
+									 				TO_NUMBER(:p_lcp_mt_retrait),
+									 				TO_NUMBER(:p_lcp_nb_virement), 
+									 				TO_NUMBER(:p_lcp_mt_virement),  
+									 				TO_NUMBER(:p_lcp_nb_dpespece) ,
+									 				TO_NUMBER(:p_lcp_mt_dpespece) ,
+									 				TO_NUMBER(:p_lcp_nb_dpcheque), 
+									 				TO_NUMBER(:p_lcp_mt_dpcheque),
+									 				TO_NUMBER(:p_lcp_nb_short_hist),  
+									 				TO_NUMBER(:p_lcp_nb_imp_rib) , 
+									 				TO_NUMBER(:p_lcp_nb_solde) , 
+									 				TO_NUMBER(:p_lcp_nb_cheque) ); 
+  IF( :hRet = declaration_cst.OK )
+  THEN 
+		COMMIT;
+  END IF;
+END;
+END-EXEC;
+    /* - Examen du retour --------------------------------------------- */
+    if(hRet != OK)
+    {
+       trace_event("End    InsertArretCompt(NOK)", TRACE);
+        return (NOK);
+    }
+
+
+trace_event("End    InsertArretCompt(OK)", TRACE);
+return (OK);
+
+ArretError :
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End    InsertArretCompt(ERROR)", ERROR);
+    return (ERROR);
+}
+
+

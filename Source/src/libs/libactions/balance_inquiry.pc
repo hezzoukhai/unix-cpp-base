@@ -1,0 +1,149 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+int BalanceInquiry  ( int nIndiceCtx , char *sTlvBuffer )
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_bal	  [ LG_MAX + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    trace_event ( "Start Balance_Inquiry () ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  );
+	T_tlv_bal.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_bal.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_bal.len = strlen(sTlvBuffer );
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UpdateBalance;
+	EXEC SQL EXECUTE
+	BEGIN
+
+		:response_code := PCRD_P7_ACCOUNT_MNG.BALANCE_INQUIRY(
+                                                          :T_tlv_bal 
+														  ); 
+	END;
+	END-EXEC;
+	
+    tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  ); /* PCI */
+
+	sprintf(sLine,"End Balance_Inquiry (%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_UpdateBalance :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+    tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  ); /* PCI */
+
+	trace_event("End Balance_Inquiry (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+int GetCurrBalance  ( int nIndiceCtx , char *sTlvBuffer, char* p_inc_auth_amount)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_bal	  [ LG_MAX + 1];
+	char		T_inc_auth_amount [2];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    trace_event ( "Start GetCurrBalance () ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  );
+	T_tlv_bal.len = 0;
+
+	memset (T_inc_auth_amount,        0, sizeof(T_inc_auth_amount));
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_bal.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_bal.len = strlen(sTlvBuffer );
+
+	memcpy (T_inc_auth_amount, p_inc_auth_amount, 1);
+	
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UpdateBalance;
+	EXEC SQL EXECUTE
+	BEGIN
+
+		:response_code := PCRD_P7_ACCOUNT_MNG.GET_CURR_BALANCE(
+                                                          :T_tlv_bal,
+														  :T_inc_auth_amount
+														  ); 
+	END;
+	END-EXEC;
+	
+    tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  ); /* PCI */
+
+	sprintf(sLine,"End GetCurrBalance (%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_UpdateBalance :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+    tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  ); /* PCI */
+
+	trace_event("End GetCurrBalForCreditAuth (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

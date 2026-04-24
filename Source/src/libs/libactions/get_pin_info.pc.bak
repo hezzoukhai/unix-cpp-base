@@ -1,0 +1,126 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_pin_info.pc                                                        */
+/*                                                                             */
+/* Description                                                                 */
+/*      Pin Info Tools Management                                              */
+/*******************************************************************************/
+/*-----------------------------------------------------------------------------
+ Id             Date           	Author                       	Comment
+-----------------------------------------------------------------------------
+ 0001AZ     	02-10-2002   	A. ZAAZAA                       Initial Version	
+-----------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#ifdef SOLARIS
+#include <limits.h>
+#endif
+#include <param_ctx.h>
+#include <define.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+  /************************************************************
+  ** Fonction    : get_pin_info()                            **
+  ** Desc        : Retriev Card PVV/OFFSET/PVKi from table   **
+  ** Input       : pCardNumber   - Card Number               **
+  ** Output      : pOffset       - Card Offset               **
+  **               pPvv          - Card PVV                  **
+  **               pPvki         - PVKi                      **
+  ** Return      : OK     Success                            **
+  **               NOK    Error                              **
+  *************************************************************/
+int get_pin_info ( int  nIndexCtx,
+                   char *pCardNumber, 
+                   int  *pPvki, /* Mehdi Elyajizi PCI Changes */
+                   int  *pVisaOffset, /* Mehdi Elyajizi PCI Changes */
+                   char *pOffset,
+				   char *pPvv,
+                   int  *pPinLength )
+{
+    char 	sLine[MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+         VARCHAR             hCardNumber     [22];
+         VARCHAR             hPinOffset      [12];
+/* Mehdi elyajizi PCI */
+         int                 hPvki;
+         int                 hPVisaOffset;
+/* Mehdi Elyajizi PCI */
+		 VARCHAR 			 hPvv[20 + 1];
+         int                 hPinLength;
+         int                 hResult;
+    EXEC SQL END DECLARE SECTION;
+/*MKB060309 PCI Norme Integration */
+    if (debug_option == 1)
+        sprintf(sLine, "Start get_pin_info (%.22s)", pCardNumber);
+    else
+        sprintf(sLine, "Start get_pin_info ()");
+   trace_event(sLine, PROCESSING);
+
+    /* - Memset des variables --------------------------------- */
+    memset(hCardNumber.arr,	0, sizeof(hCardNumber.arr)  );
+    hCardNumber.len = 0;
+    memset(hPinOffset.arr,	0, sizeof(hPinOffset.arr)   );
+    hPinOffset.len  = 0;
+	memset(hPvv.arr,	0, sizeof(hPvv.arr)   );
+    hPvv.len  = 0;
+   
+    /* - Initialisation des variables -------------------------- */
+    memcpy(hCardNumber.arr,	pCardNumber, strlen(pCardNumber)	);
+    hCardNumber.len     	= strlen(hCardNumber.arr);
+
+    /* - Capture des exceptions -------------------------------- */
+    EXEC SQL WHENEVER SQLERROR GOTO GetPinInfoErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL EXECUTE
+    BEGIN
+       :hResult := PCRD_P7_CTRL_SECURITY.GET_PIN_INFO (:hCardNumber, 
+							:hPvki,
+							:hPVisaOffset, 
+							:hPinOffset, 
+							:hPvv,
+							:hPinLength); /* Mehdi Elyajizi PCI */
+    END;
+    END-EXEC;
+
+    if ( hResult == OK )
+    {
+	/* Mehdi Elyajizi PCI */
+	/* memcpy ( pPvkiPvv, hPvkiPvv.arr, hPvkiPvv.len );*/
+
+         *pPvki = hPvki;
+         *pVisaOffset =   hPVisaOffset;
+         
+        /* Mehdi Elyajizi PCI */
+
+        sprintf(sLine, "hPinOffset.len : %d ", hPinOffset.len);
+        trace_event(sLine, PROCESSING);
+
+        memcpy ( pOffset, hPinOffset.arr, hPinOffset.len );
+		
+		memcpy(pPvv,hPvv.arr, 4);
+
+        sprintf(sLine, "hPinLength : %d ",hPinLength);
+        trace_event(sLine, PROCESSING);
+
+         *pPinLength = hPinLength;
+
+
+   	sprintf(sLine, "End   get_pin_info(OK)");
+    	trace_event(sLine, PROCESSING);
+        return (OK);
+    }
+
+    sprintf(sLine, "End   get_pin_info(NOK)");
+    trace_event(sLine, PROCESSING);
+    return (NOK);
+
+GetPinInfoErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   get_pin_info(ERROR)", ERROR);
+    return (ERROR);
+}
+

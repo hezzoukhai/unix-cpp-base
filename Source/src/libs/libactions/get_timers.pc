@@ -1,0 +1,125 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int GetTimers ( int   nIndiceCtx,
+                char *sTlvBuffer         ,
+				char  *sSourceResource	 ,
+				char  *sDestinationResource	 ,
+				int	  *nAcqTimer,
+				int	  *nIssTimer,
+				time_t  *nAcquirerTime	 ,
+				time_t  *nIssuerTime	  
+               )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_buffer	 [ LG_MAX + 1];
+ 	char       	T_source_resource [ 6 + 1];
+ 	char       	T_destination_resource [ 6 + 1];
+	int			T_acquirer_timer;
+	int			T_issuer_timer;
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetTimers() ", PROCESSING );
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_buffer.arr            ,0    ,   sizeof(T_tlv_buffer.arr )  );
+	T_tlv_buffer.len = 0;
+	memset(T_source_resource, 0, sizeof(T_source_resource));
+	memset(T_destination_resource, 0, sizeof(T_destination_resource));
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_buffer.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_buffer.len = strlen(sTlvBuffer );
+	memcpy(T_source_resource, sSourceResource, 6);
+	memcpy(T_destination_resource, sDestinationResource, 6);
+
+	sprintf(sLine, "Source Resource      :   |%s|", T_source_resource);
+	trace_event(sLine,STREAM);
+	sprintf(sLine, "Destination Resource :   |%s|", T_destination_resource);
+	trace_event(sLine,STREAM);
+
+	
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_timers;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_FO_P7_GENERAL_TOOLS.GET_ISSUER_TIMERS ( :T_tlv_buffer , 
+								     :T_source_resource , 
+								     :T_destination_resource ,
+								     :T_acquirer_timer,
+								     :T_issuer_timer
+								   ); 
+
+	END;
+	END-EXEC;
+
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		*nAcqTimer  = T_acquirer_timer;
+		*nIssTimer  = T_issuer_timer;
+
+		sprintf(sLine, "Acquirer timer       :   |%d|", T_acquirer_timer);
+		trace_event(sLine,STREAM);
+
+	   	time(nAcquirerTime);
+   	   	*nAcquirerTime += T_acquirer_timer;
+   		*nAcquirerTime -=  1000000000;
+
+		sprintf(sLine, "Issuer   timer       :   |%d|", T_issuer_timer);
+		trace_event(sLine,STREAM);
+
+	   	time(nIssuerTime);
+   	   	*nIssuerTime += T_issuer_timer;
+   		*nIssuerTime -=  1000000000;
+		memset ( T_tlv_buffer.arr            ,0    ,   sizeof(T_tlv_buffer.arr )  ); /* PCI */
+		trace_event("End GetTimers(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	memset ( T_tlv_buffer.arr            ,0    ,   sizeof(T_tlv_buffer.arr )  ); /* PCI */
+	sprintf(sLine,"End GetTimers(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_get_timers :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	memset ( T_tlv_buffer.arr            ,0    ,   sizeof(T_tlv_buffer.arr )  ); /* PCI */
+	trace_event("End GetTimers(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

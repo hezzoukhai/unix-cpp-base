@@ -1,0 +1,179 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetBankNetwork  (int nIndiceCtx, TSBankNetwork *bank_network)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	char   BANK_CODE [ 6 ];
+ 	char   NETWORK_CODE [ 2 ];
+ 	VARCHAR   ACQUIRER_BIN [ 11 ];
+ 	char   ACQUIRER_ICA [ 4 ];
+ 	char   SETTLEMENT_CURRENCY [ 3 ];
+ 	char   BILLING_CURRENCY [ 3 ];
+ 	char   RECONCILIATION_CURRENCY [ 3 ];
+ 	VARCHAR   VIRTUAL_MERCHANT_NUMBER [ 15 ];
+ 	VARCHAR   VIRTUAL_OUTLET_NUMBER [ 15 ];
+ 	VARCHAR   VIRTUAL_ABREV_LOCATION [ 25 ];
+ 	char   VIRTUAL_ACTIVITY_CODE [ 4 ];
+ 	char   VIRTUAL_CITY_CODE [ 3 ];
+ 	char   VIRTUAL_REGION_CODE [ 3 ];
+ 	char   VIRTUAL_COUNTRY_CODE [ 3 ];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetBankNetwork() ", PROCESSING );
+	memset ( BANK_CODE            ,  0  ,   6  );
+	memset ( NETWORK_CODE         ,  0  ,   2  );
+ 	memset ( ACQUIRER_BIN.arr     ,  0  , sizeof  ( ACQUIRER_BIN.arr ));
+ 	memset ( ACQUIRER_ICA         ,  0  ,   4  );
+ 	memset ( SETTLEMENT_CURRENCY  ,  0  ,   3  );
+ 	memset ( BILLING_CURRENCY     ,  0  ,   3  );
+ 	memset ( RECONCILIATION_CURRENCY,0  ,   3  );
+ 	memset ( VIRTUAL_MERCHANT_NUMBER.arr, 
+					sizeof(VIRTUAL_MERCHANT_NUMBER.arr )); 
+ 	memset ( VIRTUAL_OUTLET_NUMBER.arr,0,  
+ 					sizeof ( VIRTUAL_OUTLET_NUMBER.arr ));
+ 	memset ( VIRTUAL_ABREV_LOCATION.arr , 0 , 
+ 					sizeof ( VIRTUAL_ABREV_LOCATION.arr ));
+ 	memset ( VIRTUAL_ACTIVITY_CODE , 0 , 4 );
+ 	memset ( VIRTUAL_CITY_CODE     , 0 , 3 );
+ 	memset ( VIRTUAL_REGION_CODE   , 0 , 3 );
+ 	memset ( VIRTUAL_COUNTRY_CODE  , 0 , 3 );
+
+	memcpy ( BANK_CODE    , bank_network->bank_code    , 6);
+	memcpy ( NETWORK_CODE , bank_network->network_code , 2);
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_bank_network;
+	EXEC SQL EXECUTE
+	    DECLARE T_BANK_NETWORK   BANK_NETWORK%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_PARAM_GENERAL_ROWS.GET_BANK_NETWORK
+						(   :BANK_CODE, 
+						    :NETWORK_CODE,
+	                                             T_BANK_NETWORK 
+	                                        );
+
+
+	   IF :response_code = 0 THEN
+	      :BANK_CODE              := T_BANK_NETWORK.BANK_CODE;
+	      :NETWORK_CODE           := T_BANK_NETWORK.NETWORK_CODE;
+	      :ACQUIRER_BIN           := T_BANK_NETWORK.ACQUIRER_BIN;
+	      :ACQUIRER_ICA           := T_BANK_NETWORK.ACQUIRER_ICA;
+	      :SETTLEMENT_CURRENCY    := T_BANK_NETWORK.SETTLEMENT_CURRENCY;
+	      :BILLING_CURRENCY       := T_BANK_NETWORK.BILLING_CURRENCY;
+	      :RECONCILIATION_CURRENCY:= T_BANK_NETWORK.RECONCILIATION_CURRENCY;
+	      :VIRTUAL_MERCHANT_NUMBER:= T_BANK_NETWORK.VIRTUAL_MERCHANT_NUMBER;
+	      :VIRTUAL_OUTLET_NUMBER  := T_BANK_NETWORK.VIRTUAL_OUTLET_NUMBER;
+	      :VIRTUAL_ABREV_LOCATION := T_BANK_NETWORK.VIRTUAL_ABREV_LOCATION;
+	      :VIRTUAL_ACTIVITY_CODE  := T_BANK_NETWORK.VIRTUAL_ACTIVITY_CODE;
+	      :VIRTUAL_CITY_CODE      := T_BANK_NETWORK.VIRTUAL_CITY_CODE;
+	      :VIRTUAL_REGION_CODE    := T_BANK_NETWORK.VIRTUAL_REGION_CODE;
+	      :VIRTUAL_COUNTRY_CODE   := T_BANK_NETWORK.VIRTUAL_COUNTRY_CODE;
+	    END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+		memcpy(bank_network->acquirer_bin,
+				ACQUIRER_BIN.arr, ACQUIRER_BIN.len );
+		bank_network->acquirer_bin[ACQUIRER_BIN.len] = 0;
+
+		memcpy(bank_network->acquirer_ica,
+							ACQUIRER_ICA,4);
+		memcpy(bank_network->settlement_currency,
+							SETTLEMENT_CURRENCY,3);
+		memcpy(bank_network->billing_currency,
+							BILLING_CURRENCY,3);
+		memcpy(bank_network->reconciliation_currency,
+						RECONCILIATION_CURRENCY,3);
+		memcpy(bank_network->virtual_merchant_number,
+		VIRTUAL_MERCHANT_NUMBER.arr, VIRTUAL_MERCHANT_NUMBER.len );
+		bank_network->virtual_merchant_number[VIRTUAL_MERCHANT_NUMBER.len] = 0;
+
+		memcpy(bank_network->virtual_outlet_number,
+		VIRTUAL_OUTLET_NUMBER.arr, VIRTUAL_OUTLET_NUMBER.len );
+		bank_network->virtual_outlet_number[VIRTUAL_OUTLET_NUMBER.len] = 0;
+
+		memcpy(bank_network->virtual_abrev_location,
+		VIRTUAL_ABREV_LOCATION.arr, VIRTUAL_ABREV_LOCATION.len );
+		bank_network->virtual_abrev_location[VIRTUAL_ABREV_LOCATION.len] = 0;
+
+		memcpy(bank_network->virtual_activity_code,
+						VIRTUAL_ACTIVITY_CODE,4);
+		memcpy(bank_network->virtual_city_code,
+						VIRTUAL_CITY_CODE,3);
+		memcpy(bank_network->virtual_region_code,
+						VIRTUAL_REGION_CODE,3);
+		memcpy(bank_network->virtual_country_code,
+						VIRTUAL_COUNTRY_CODE,3);
+	        trace_event ( "End GetBankNetwork( OK ) ", PROCESSING );
+		return(OK);
+	}
+	trace_event ( "End GetBankNetwork( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_bank_network:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+		memcpy(bank_network->acquirer_bin,
+				ACQUIRER_BIN.arr, ACQUIRER_BIN.len );
+		bank_network->acquirer_bin[ACQUIRER_BIN.len] = 0;
+
+		memcpy(bank_network->acquirer_ica,
+							ACQUIRER_ICA,4);
+		memcpy(bank_network->settlement_currency,
+							SETTLEMENT_CURRENCY,3);
+		memcpy(bank_network->billing_currency,
+							BILLING_CURRENCY,3);
+		memcpy(bank_network->reconciliation_currency,
+						RECONCILIATION_CURRENCY,3);
+		memcpy(bank_network->virtual_merchant_number,
+		VIRTUAL_MERCHANT_NUMBER.arr, VIRTUAL_MERCHANT_NUMBER.len );
+		bank_network->virtual_merchant_number[VIRTUAL_MERCHANT_NUMBER.len] = 0;
+
+		memcpy(bank_network->virtual_outlet_number,
+		VIRTUAL_OUTLET_NUMBER.arr, VIRTUAL_OUTLET_NUMBER.len );
+		bank_network->virtual_outlet_number[VIRTUAL_OUTLET_NUMBER.len] = 0;
+
+		memcpy(bank_network->virtual_abrev_location,
+		VIRTUAL_ABREV_LOCATION.arr, VIRTUAL_ABREV_LOCATION.len );
+		bank_network->virtual_abrev_location[VIRTUAL_ABREV_LOCATION.len] = 0;
+
+		memcpy(bank_network->virtual_activity_code,
+						VIRTUAL_ACTIVITY_CODE,4);
+		memcpy(bank_network->virtual_city_code,
+						VIRTUAL_CITY_CODE,3);
+		memcpy(bank_network->virtual_region_code,
+						VIRTUAL_REGION_CODE,3);
+		memcpy(bank_network->virtual_country_code,
+						VIRTUAL_COUNTRY_CODE,3);
+	        trace_event ( "End GetBankNetwork( OK ) ", PROCESSING );
+		return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetBankNetwork( NOK ) ", PROCESSING );
+	return( NOK );
+}

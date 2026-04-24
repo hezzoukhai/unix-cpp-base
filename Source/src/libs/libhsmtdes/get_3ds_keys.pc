@@ -1,0 +1,232 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <hsm_inc.h>
+/*
+#include <sqlca.h>
+#include <sqlcpr.h>
+*/
+
+#include <p7_config.h>
+
+/*START 3D-SECURE MCK26072012*/
+/*****************************************************************************/
+/* Get_CAVV_Key                                                              */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere le CAVV KEY                             */
+/*  Author   : M.CHAKOUR   Date: 26/07/2012                                  */
+/*  Entree   : Pan                                                           */
+/*  Sortie   : CAVV_KEY                                                          */
+/*****************************************************************************/
+/* int Get_CAVV_Key( int nIndiceCtx, char *sPan,  char *sKey_Ind, char *sCAVV_KEY) */ /* MJA23102012 3D-SECURE */
+int Get_CAVV_Key( int nIndiceCtx, char *sPan,  char *sKey_Ind , char *CVKA ,char *CVKB)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+		EXEC SQL BEGIN DECLARE SECTION;
+		int              response;
+		VARCHAR          T_Pan    	[ 22 + 1];
+/*		VARCHAR          T_CAVV_KEY [256 + 1]; */ /* MJA23102012 3D-SECURE */
+                varchar             T_CVKA [256 + 1];  /* MJA23102012 3D-SECURE */
+                varchar             T_CVKB [256 + 1];  /* MJA23102012 3D-SECURE */
+		VARCHAR          T_KEY_IND  [2   + 1];
+		EXEC SQL END DECLARE SECTION;
+
+
+		EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+		if (debug_option == 1)
+		{
+			sprintf(sLine, "Start Get_CAVV_Key(%.16s,%s)", sPan,sKey_Ind);
+			trace_event(sLine, PROCESSING);
+		}
+		else
+		{
+			sprintf(sLine, "Start Get_CAVV_Key(OK)");
+			trace_event(sLine, PROCESSING);
+		}
+
+		memset( T_Pan.arr				, 0	, sizeof(T_Pan.arr));
+		T_Pan.len = 0;
+
+/* START MJA23102012 3D-SECURE */
+                memset(T_CVKA.arr,      0, sizeof(T_CVKA.arr));
+                T_CVKA.len = 0;
+                memset(T_CVKB.arr,      0, sizeof(T_CVKB.arr));
+                T_CVKB.len = 0;
+
+/*		memset( T_CAVV_KEY.arr	,	0	, sizeof(T_CAVV_KEY.arr));
+		T_CAVV_KEY.len = 0;  */
+/* END MJA23102012 3D-SECURE */
+
+		memset( T_KEY_IND.arr		,	0	, sizeof(T_KEY_IND.arr));
+		T_KEY_IND.len = 0;
+		
+		memcpy( T_Pan.arr, sPan, strlen(sPan) );
+		T_Pan.len = strlen(sPan);
+		
+		memcpy( T_KEY_IND.arr, sKey_Ind, strlen(sKey_Ind) );
+		T_KEY_IND.len = strlen(sKey_Ind);
+		
+		if (debug_option == 1)
+		{
+			sprintf(sLine, "T_Pan.arr=[%s], T_Pan.len=[%d])", T_Pan.arr, T_Pan.len);
+			trace_event(sLine, PROCESSING);
+		}
+    
+    response = 909;
+    
+		EXEC SQL WHENEVER SQLERROR GOTO sql_exception_tag;
+		EXEC SQL EXECUTE
+		BEGIN
+
+/* START MJA23102012 3D-SECURE */
+		/*	:response := PCRD_GET_HSM_KEY.GET_CAVV_KEY (:T_Pan ,:T_KEY_IND ,:T_CAVV_KEY ); */
+
+                        :response := PCRD_GET_HSM_KEY_2.GET_CAVV_KEY(     :T_Pan   ,
+                                                                        :T_KEY_IND ,
+                                                                        :T_CVKA  ,
+                                                                        :T_CVKB
+                                                                         );
+/* END MJA23102012 3D-SECURE */
+
+    END;
+    END-EXEC;
+
+		if (response == OK)
+		{
+               /* 	memcpy(sCAVV_KEY, T_CAVV_KEY.arr, T_CAVV_KEY.len);  MJA23102012 3D-SECURE */
+                        memcpy(CVKA, T_CVKA.arr, T_CVKA.len);               /* MJA23102012 3D-SECURE */
+                        memcpy(CVKB, T_CVKB.arr, T_CVKB.len);               /* MJA23102012 3D-SECURE */ 
+				memset( T_Pan.arr				, 0	, sizeof(T_Pan.arr));
+				memset(T_CVKA.arr,      0, sizeof(T_CVKA.arr));
+				memset(T_CVKB.arr,      0, sizeof(T_CVKB.arr));
+			if (debug_option == 1)
+			{
+                       /*   	sprintf(sLine, "End   Get_CAVV_Key(%s)", sCAVV_KEY); */
+                                sprintf(sLine, "End   Get_CAVV_Key(%.32s,%.32s)", CVKA, CVKB); /* MJA23102012 3D-SECURE */ 
+				trace_event(sLine, PROCESSING);
+			}
+			else
+			{
+				sprintf(sLine, "End   Get_CAVV_Key(OK)");
+				trace_event(sLine, PROCESSING);
+			}
+      return(OK);
+		}
+
+		memset( T_Pan.arr,      0	, sizeof(T_Pan.arr));
+		memset(T_CVKA.arr,      0, sizeof(T_CVKA.arr));
+		memset(T_CVKB.arr,      0, sizeof(T_CVKB.arr));
+		trace_event("End   Get_CAVV_Key(NOK)", PROCESSING);
+		return(NOK);
+
+    sql_exception_tag :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+	memset( T_Pan.arr				, 0	, sizeof(T_Pan.arr));
+	memset(T_CVKA.arr,      0, sizeof(T_CVKA.arr));
+	memset(T_CVKB.arr,      0, sizeof(T_CVKB.arr));
+    sprintf(sLine, "[%.100s]",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  Get_CAVV_Key(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+}
+
+/*****************************************************************************/
+/* Get_UCAF_Key                                                              */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere le UCAF KEY                             */
+/*  Author   : M.CHAKOUR   Date: 26/07/2012                                  */
+/*  Entree   : Pan                                                           */
+/*  Sortie   : UCAF_KEY                                                          */
+/*****************************************************************************/
+/*AMER20200705 PLUTONL-2089: nCvki is no more needed. We get UCAF seq nbr from CAVV_UCAF_KEY_MEMBER table directly */
+int Get_UCAF_Key( int nIndiceCtx, char *sPan /*,int nCvki*//*ICH20200310*/,  char *sKey_Ind, char *sUCAF_KEY)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+		EXEC SQL BEGIN DECLARE SECTION;
+		int              response;
+		VARCHAR          T_Pan    	[ 22 + 1];
+		VARCHAR          T_UCAF_KEY [256 + 1];
+		VARCHAR          T_KEY_IND  [2   + 1];
+		EXEC SQL END DECLARE SECTION;
+
+
+		EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+		if (debug_option == 1)
+		{
+			sprintf(sLine, "Start Get_UCAF_Key(%.16s)", sPan);
+			trace_event(sLine, PROCESSING);
+		}
+		else
+		{
+			sprintf(sLine, "Start Get_UCAF_Key(OK)");
+			trace_event(sLine, PROCESSING);
+		}
+
+		memset( T_Pan.arr				, 0	, sizeof(T_Pan.arr));
+		T_Pan.len = 0;
+
+		memset( T_UCAF_KEY.arr	,	0	, sizeof(T_UCAF_KEY.arr));
+		T_UCAF_KEY.len = 0;
+
+		memset( T_KEY_IND.arr		,	0	, sizeof(T_KEY_IND.arr));
+		T_KEY_IND.len = 0;
+		
+		memcpy( T_Pan.arr, sPan, strlen(sPan) );
+		T_Pan.len = strlen(sPan);
+		
+		memcpy( T_KEY_IND.arr, sKey_Ind, strlen(sKey_Ind) );
+		T_KEY_IND.len = strlen(sKey_Ind);
+		
+		if (debug_option == 1)
+		{
+			sprintf(sLine, "T_Pan.arr=[%s], T_Pan.len=[%d])", T_Pan.arr, T_Pan.len);
+			trace_event(sLine, PROCESSING);
+		}
+    
+    response = 909;
+    
+		EXEC SQL WHENEVER SQLERROR GOTO sql_exception_tag;
+		EXEC SQL EXECUTE
+		BEGIN
+			:response := PCRD_GET_HSM_KEY_2.GET_ECOM_KEY (:T_Pan, /*:nCvki,*/ :T_KEY_IND ,:T_UCAF_KEY );
+    END;
+    END-EXEC;
+
+		if (response == OK)
+		{
+			memcpy(sUCAF_KEY, T_UCAF_KEY.arr, T_UCAF_KEY.len);
+			memset( T_UCAF_KEY.arr	,	0	, sizeof(T_UCAF_KEY.arr));
+			memset( T_Pan.arr				, 0	, sizeof(T_Pan.arr));
+			if (debug_option == 1)
+			{
+				sprintf(sLine, "End   Get_UCAF_Key(%s)", sUCAF_KEY);
+				trace_event(sLine, PROCESSING);
+			}
+			else
+			{
+				sprintf(sLine, "End   Get_UCAF_Key(OK)");
+				trace_event(sLine, PROCESSING);
+			}
+      return(OK);
+		}
+
+		memset( T_UCAF_KEY.arr	,	0	, sizeof(T_UCAF_KEY.arr));
+		memset( T_Pan.arr				, 0	, sizeof(T_Pan.arr));
+		trace_event("End   Get_UCAF_Key(NOK)", PROCESSING);
+		return(NOK);
+
+    sql_exception_tag :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+	memset( T_UCAF_KEY.arr	,	0	, sizeof(T_UCAF_KEY.arr));
+	memset( T_Pan.arr				, 0	, sizeof(T_Pan.arr));
+    sprintf(sLine, "[%.100s]",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  Get_UCAF_Key(MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+}

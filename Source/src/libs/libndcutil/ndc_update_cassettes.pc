@@ -1,0 +1,294 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      ndc_update_cassettes.pc                                                */
+/*                                                                             */
+/* Description                                                                 */
+/*      MAJ Cassette Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+
+#include <stdio.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <define.h>
+#include <ndc_param.h>
+#include <param_ctx.h>
+
+
+  /***********************************************************************
+  **  nom	: UpdateCassettesStatus()				**
+  **  desc	: maj de l'etat des cassettes				**
+  **  entree	: Terminal_Number	-> numero terminal		**
+  **		  Error_Severity	-> niveau erreur		**
+  **		  Supplies_Status	-> informations supplimentaires	**
+  **  sortie	: aucune						**
+  **  retour	:							**
+  ***********************************************************************/
+int	UpdateCassettesStatus(
+							int		nIndexCtx,
+							char	Terminal_Number	[],
+                            char    *pAcqBank /*ICH270715*/,
+							char    *Error_Severity,
+							char	Supplies_Status	[])
+{
+   struct sqlca sqlca;
+    char		detail	[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar	hTerminalNumber		[15+1];
+	VARCHAR	hAcqBank			[6+1];/*ICH270715*/ 	
+    char	hCassette1Status	[ 1+1];
+    char	hCassette2Status	[ 1+1];
+    char	hCassette3Status	[ 1+1];
+    char	hCassette4Status	[ 1+1];
+    char	hRejectStatus	    [ 1+1]; /**MK 060606*/
+    int		hRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(detail, "Start UpdateCassettesStatus(%.5s,%.5s)",
+                 Error_Severity, Supplies_Status);
+trace_event(detail, PROCESSING);
+
+    /* - initialisation des buffer ----------------------------------- */
+    memset(hTerminalNumber.arr,		0, sizeof(hTerminalNumber.arr));
+    memset(hAcqBank.arr,			0, sizeof(hAcqBank.arr));/*ICH270715*/
+    memset(hCassette1Status,		0, sizeof(hCassette1Status));
+    memset(hCassette2Status,		0, sizeof(hCassette2Status));
+    memset(hCassette3Status,		0, sizeof(hCassette3Status));
+    memset(hCassette4Status,		0, sizeof(hCassette4Status));
+    memset(hRejectStatus,		0, sizeof(hRejectStatus));
+
+    memcpy(hTerminalNumber.arr, Terminal_Number, strlen(Terminal_Number));
+    hTerminalNumber.len = strlen(Terminal_Number);
+
+	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+
+    /* - determination de l'etat des cassettes ------------------------ **
+    ** ---------------------------------------------------------------- **
+    ** Supplies_Status			Etat cassette			**
+    ** ---------------------------------------------------------------- **
+    ** 0 : etat indifini		cassette disponible		**
+    ** 1 : billets suffisantes		cassette disponible		**
+    ** 2 : billets insuffisantes	cassette critique		**
+    ** 3 : pas de billets		cassette vide			**
+    ** 4 : non configuree		cassette indisponible		**
+    ** ---------------------------------------------------------------- */
+    /**MK 060606*/
+    switch(Supplies_Status[0])
+    {
+        case '0' : memcpy(hRejectStatus, "O", 1); break;
+        case '1' : memcpy(hRejectStatus, "I", 1); break;
+        case '4' : memcpy(hRejectStatus, "O", 1); break;
+    }
+    
+
+    switch(Supplies_Status[1])
+    {
+        case '0' : memcpy(hCassette1Status, "#", 1); break;
+        case '1' : memcpy(hCassette1Status, "A", 1); break;
+        case '2' : memcpy(hCassette1Status, "C", 1); break;
+        case '3' : memcpy(hCassette1Status, "E", 1); break;
+        case '4' : memcpy(hCassette1Status, "N", 1); break;
+    }
+
+    switch(Supplies_Status[2])
+    {
+        case '0' : memcpy(hCassette2Status, "#", 1); break;
+        case '1' : memcpy(hCassette2Status, "A", 1); break;
+        case '2' : memcpy(hCassette2Status, "C", 1); break;
+        case '3' : memcpy(hCassette2Status, "E", 1); break;
+        case '4' : memcpy(hCassette2Status, "N", 1); break;
+    }
+
+    switch(Supplies_Status[3])
+    {
+        case '0' : memcpy(hCassette3Status, "#", 1); break;
+        case '1' : memcpy(hCassette3Status, "A", 1); break;
+        case '2' : memcpy(hCassette3Status, "C", 1); break;
+        case '3' : memcpy(hCassette3Status, "E", 1); break;
+        case '4' : memcpy(hCassette3Status, "N", 1); break;
+    }
+
+    switch(Supplies_Status[4])
+    {
+        case '0' : memcpy(hCassette4Status, "#", 1); break;
+        case '1' : memcpy(hCassette4Status, "A", 1); break;
+        case '2' : memcpy(hCassette4Status, "C", 1); break;
+        case '3' : memcpy(hCassette4Status, "E", 1); break;
+        case '4' : memcpy(hCassette4Status, "N", 1); break;
+    }
+
+
+    if(Error_Severity[1] == '3' || Error_Severity[1] == '4')
+    {
+        memcpy(hCassette1Status, "N", 1);
+    }
+
+    if(Error_Severity[2] == '3' || Error_Severity[2] == '4')
+    {
+        memcpy(hCassette2Status, "N", 1);
+    }
+
+    if(Error_Severity[3] == '3' || Error_Severity[3] == '4')
+    {
+        memcpy(hCassette3Status, "N", 1);
+    }
+
+    if(Error_Severity[4] == '3' || Error_Severity[4] == '4')
+    {
+        memcpy(hCassette4Status, "N", 1);
+    }
+
+    /* - On ne mettait a jour que hCassette1Status ------------------- */
+    if(Error_Severity[0] == '3' || Error_Severity[0] == '4')
+    {
+        memcpy(hCassette1Status, "N", 1);
+        memcpy(hCassette2Status, "N", 1);
+        memcpy(hCassette3Status, "N", 1);
+        memcpy(hCassette4Status, "N", 1);
+    }
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO updateCassettesStatusErr;
+    EXEC SQL EXECUTE
+      BEGIN
+        :hRetour := PCRD_ATM_WATCH.UPDATE_WATCH_CASSETTE_STATUS(:hTerminalNumber,
+        													:hAcqBank/*ICH270715*/,
+                 									   			:hCassette1Status,
+                 									   			:hCassette2Status,
+                 									   			:hCassette3Status,
+														:hCassette4Status,
+                 									   			:hRejectStatus);
+      END;
+    END-EXEC;
+
+    if(hRetour != OK)
+    {
+		sprintf(detail, "End   UpdateCassettesStatus(NOK)");
+        trace_event(detail, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(detail, "End   UpdateCassettesStatus(OK)");
+trace_event(detail, PROCESSING);
+return (OK);
+
+updateCassettesStatusErr :
+    sprintf(detail, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(detail, ERROR);
+    trace_event("End   UpdateCassettesStatus(ERROR)", ERROR);
+    return (ERROR);
+}
+
+
+  /***********************************************************************
+  **  nom	: UpdateCassettesCounters()				**
+  **  desc	: maj des compteurs des cassettes			**
+  **  entree	: Terminal_Number	-> numero terminal		**
+  **		  pNote1Nbr	-> nombre de notes de type 1 distribuees**
+  **		  pNote2Nbr	-> nombre de notes de type 2 distribuees**
+  **		  pNote3Nbr	-> nombre de notes de type 3 distribuees**
+  **		  pNote4Nbr	-> nombre de notes de type 4 distribuees**
+  **  sortie	: aucune						**
+  **  retour	:							**
+  **  auteur	: Younes OUADI (15 Dec 1998)				**
+  ***********************************************************************/
+int	UpdateCassettesCounters(
+							int		nIndexCtx,
+							char	*pTerminalNbr,
+							char	*pAcqBank,
+							char	*pNote1Nbr,
+							char	*pNote2Nbr,
+							char	*pNote3Nbr,
+							char	*pNote4Nbr)
+{
+   struct sqlca sqlca;
+    char		detail	[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    VARCHAR		hTerminalNbr[15+1];
+    VARCHAR		hAcqBank	[6+1];/*ICH270715*/ 
+    VARCHAR		hNote1Nbr	[ 2+1];
+    VARCHAR		hNote2Nbr	[ 2+1];
+    VARCHAR		hNote3Nbr	[ 2+1];
+    VARCHAR		hNote4Nbr	[ 2+1];
+    int			hResponseCode;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(detail, "Start UpdateCassettesCounters(%.15s,%.6s,%.2s,%.2s,%.2s,%.2s)",
+        pTerminalNbr,pAcqBank/*ICH270715*/, pNote1Nbr, pNote2Nbr, pNote3Nbr, pNote4Nbr);
+trace_event(detail, PROCESSING);
+
+
+    /* - initialisation ----------------------------------------------------- */
+    memset(hTerminalNbr.arr,	0, sizeof(hTerminalNbr.arr)	);
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hNote1Nbr.arr,	0, sizeof(hNote1Nbr.arr)	);
+    memset(hNote2Nbr.arr,	0, sizeof(hNote2Nbr.arr)	);
+    memset(hNote3Nbr.arr,	0, sizeof(hNote3Nbr.arr)	);
+    memset(hNote4Nbr.arr,	0, sizeof(hNote4Nbr.arr)	);
+
+    memcpy(hTerminalNbr.arr, pTerminalNbr, strlen(pTerminalNbr));
+    hTerminalNbr.len = strlen(pTerminalNbr);
+    
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    memcpy(hNote1Nbr.arr, pNote1Nbr, 2);
+    hNote1Nbr.len = 2;
+
+    memcpy(hNote2Nbr.arr, pNote2Nbr, 2);
+    hNote2Nbr.len = 2;
+
+    memcpy(hNote3Nbr.arr, pNote3Nbr, 2);
+    hNote3Nbr.len = 2;
+
+    memcpy(hNote4Nbr.arr, pNote4Nbr, 2);
+    hNote4Nbr.len = 2;
+
+
+    /* - capture des exceptions --------------------------------------------- */
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO updateCassettesCountersErr;
+
+
+    /* - fonction PL/SQL ---------------------------------------------------- */
+    EXEC SQL EXECUTE
+    BEGIN
+        :hResponseCode := PCRD_NDC_CASSETTE_MNG.UPDATE_COUNTERS(
+					:hTerminalNbr,
+				    :hAcqBank,/*ICH270715*/					
+					:hNote1Nbr,
+					:hNote2Nbr,
+					:hNote3Nbr,
+					:hNote4Nbr);
+    END;
+    END-EXEC;
+
+
+    /* - examen du retour de la fonction PL/SQL ----------------------------- */
+    if(hResponseCode != OK)
+    {
+        trace_event("End   UpdateCassettesCounters(NOK)", PROCESSING);
+        return (NOK);
+    }
+
+sprintf(detail, "End   UpdateCassettesCounters(OK)");
+trace_event(detail, PROCESSING);
+return (OK);
+
+updateCassettesCountersErr :
+    sprintf(detail, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(detail, ERROR);
+    trace_event("End   UpdateCassettesCounters(ERROR)", ERROR);
+    return (ERROR);
+}
+
+                               
+

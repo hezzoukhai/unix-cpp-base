@@ -1,0 +1,99 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <stdlib.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+
+int AmountMng ( int   nIndiceCtx,
+				char  *sServGatewayFlag,
+				char  *sBillCalculation,
+				char *sTlvBuffer          
+               )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+ 	char       	T_serv_client_flag;
+ 	char       	T_bill_calcul_flag;
+	int			response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start AmountMng() ", PROCESSING );
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+ 	T_serv_client_flag 	=   0;
+ 	T_bill_calcul_flag 	=   0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+ 	T_serv_client_flag 	=   sServGatewayFlag [ 0 ]; 
+ 	T_bill_calcul_flag 	=   sBillCalculation [ 0 ];
+	
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_AmountMng;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_AUTH_AMOUNT_MNG.AMOUNT_AUTH_MNG( :T_tlv_auth ); 
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		trace_event("End AmountMng(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	sprintf(sLine,"End AmountMng(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_AmountMng :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+	
+	sprintf(sLine, "%.70s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End AmountMng(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+

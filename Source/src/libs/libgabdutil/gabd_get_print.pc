@@ -1,0 +1,96 @@
+#include <stdio.h>
+#include <define.h>
+#include <gabd_struct.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+int mcount; 
+     /*****************************************************************
+     **  GetPrint(pPrintsCode, pISOBuffer, pPrints)                **
+     **								     **
+     **  Descri : charge l'imprime demande.			     **
+     **  Entree :  pPrintsCode -> code imprime enregistre dans       **
+     **		la base.					     **
+     **            pISOBuffer -> buffer contenant les donnees a      **
+     **		imprimer.					     **
+     **  Sortie : pPrints -> structure gabd_param qui recevra la     **
+     **      chaine prints(.data) et sa langueur(.len).              **
+     **  Return : OK -> fonctionnement normak.			     **
+     **		  ERROR -> erreur ORACLE.			     **
+     *****************************************************************/
+
+int GetPrint(nIndexCtx,pTerminalNbr, pPrintsCode,pAcqBank/*ICH270715*/, pISOBuffer,pPrints)
+int 		nIndexCtx;
+char		*pTerminalNbr;
+char		*pAcqBank/*ICH270715*/;
+char		*pPrintsCode;
+TSIsoInfo  	*pISOBuffer;
+gabd_param	*pPrints;
+{
+EXEC SQL BEGIN DECLARE SECTION;
+	char sLine[MAX_LINE_TRC];
+   char		plBankCode		[    6+1];
+   char		plProfileCode	[    3+1];
+   char		plPrintsCode	[    3+1]; 
+   varchar	plPrints    	[10000+1];
+   int		plRetour;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start GetPrint(%.15s,%s,%.3s)", pTerminalNbr, pAcqBank/*ICH270715*/, pPrintsCode);
+trace_event(sLine, PROCESSING);
+
+   /* initialisation des variables PL/SQL */
+   memset(plPrints.arr,		0, sizeof(plPrints.arr));
+   plPrints.len		= 3;
+   memset(plPrintsCode, 0, sizeof(plPrintsCode)); 
+   memset(plBankCode, 0, sizeof(plBankCode)); 
+   memset(plProfileCode, 0, sizeof(plProfileCode)); 
+	memcpy(plBankCode,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+
+   plRetour = GetTerminalProfile(nIndexCtx,
+				pTerminalNbr, plBankCode, plProfileCode);
+   if(plRetour != OK)
+   {
+      trace_event("End   GetPrint(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+   memcpy(plPrintsCode, pPrintsCode, 3); 
+   sprintf(sLine,"PRINT (%s,%s,%s) ",plBankCode,plProfileCode,plPrintsCode);
+   trace_event(sLine,PROCESSING);
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO getPrintErr;
+
+   EXEC SQL EXECUTE
+      BEGIN
+        	:plRetour := PCRD_GET_GABDPARAM.PRINT(	:plBankCode,
+                                               		:plProfileCode,
+                                               		:plPrintsCode,
+                                               		:plPrints);
+      END;
+   END-EXEC;
+
+   if (plRetour == NOK)
+   {
+      trace_event("End   GetPrint(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+   memcpy(pPrints->data, plPrints.arr, plPrints.len);
+   pPrints->len = plPrints.len;
+
+   insert_text(nIndexCtx,pPrints, pISOBuffer);
+
+   trace_event("End   GetPrint(OK)",PROCESSING);
+   return (OK);
+
+getPrintErr :
+
+   sprintf(sLine,"End   GetPrint(%s,X) -> %s",pPrintsCode,sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine,ERROR);
+   return(ERROR);
+
+}

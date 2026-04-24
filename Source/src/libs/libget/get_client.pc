@@ -1,0 +1,143 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetClient  (int nIndiceCtx, TSClient *client)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	char   	BANK_CODE   [ 6 ];
+ 	VARCHAR CLIENT_CODE [ 24 ];
+ 	char   	BRANCH_CODE [ 6 ];
+ 	char   	STATUS_CODE [ 1 ];
+ 	char   	BANK_ACCOUNT_OPENING_DATE [ 8];  /* YYYYMMDD */
+ 	char   	BANK_ACCOUNT_CODE [ 6 ];
+ 	char   	BANK_ACCOUNT_NUMBER [ 24 ];
+ 	char   	CURRENCY_CODE [ 3 ];
+ 	double  CREDIT_LIMIT;
+ 	double  CASH_TRANSFER_LIMIT;
+ 	double  LOAN_LIMIT;
+ 	char   	SENSITIVE_OPERATION_RECORD [ 1 ];
+ 	char   	CLIENT_ADDENDUM_FLAG [ 1 ];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetClient() ", PROCESSING );
+
+ 	memset ( BANK_CODE , 0,  6 );
+ 	memset ( CLIENT_CODE  , CLIENT_CODE.arr , sizeof( CLIENT_CODE.arr ));
+ 	memset ( BRANCH_CODE , 0,  6  );
+ 	memset ( STATUS_CODE , 0,  1  );
+ 	memset ( BANK_ACCOUNT_OPENING_DATE , 0,  8 );  /* YYYYMMDD */
+ 	memset ( BANK_ACCOUNT_CODE , 0,  6  );
+ 	memset ( BANK_ACCOUNT_NUMBER , 0,  24  );
+ 	memset ( CURRENCY_CODE , 0,  3  );
+ 	CREDIT_LIMIT = 0.0;
+ 	CASH_TRANSFER_LIMIT = 0.0;
+ 	LOAN_LIMIT = 0.0;
+ 	memset ( SENSITIVE_OPERATION_RECORD , 0,  1  );
+ 	memset ( CLIENT_ADDENDUM_FLAG , 0,  1  );
+
+	memcpy ( BANK_CODE , client->bank_code , 6);
+	memcpy ( CLIENT_CODE.arr , client->client_code , 
+		                strlen ( client->client_code ));
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_client;
+	EXEC SQL EXECUTE
+	    DECLARE T_CLIENT   CLIENT%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_DATA_CARD_ROWS.GET_CLIENT
+						(   :BANK_CODE, 
+						    :CLIENT_CODE,
+	                                             T_CLIENT 
+	                                        );
+
+
+		IF :response_code = 0 THEN
+		:BANK_CODE              := T_CLIENT.BANK_CODE;
+		:CLIENT_CODE            := T_CLIENT.CLIENT_CODE;
+		:BRANCH_CODE            := T_CLIENT.BRANCH_CODE;
+		:STATUS_CODE            := T_CLIENT.STATUS_CODE;
+		:BANK_ACCOUNT_OPENING_DATE := TO_CHAR ( T_CLIENT.BANK_ACCOUNT_OPENING_DATE , 'YYYYMMDD' );
+		:BANK_ACCOUNT_CODE    := T_CLIENT.BANK_ACCOUNT_CODE;
+		:BANK_ACCOUNT_NUMBER  := T_CLIENT.BANK_ACCOUNT_NUMBER;
+		:CURRENCY_CODE          := T_CLIENT.CURRENCY_CODE        ;
+		:CREDIT_LIMIT           := T_CLIENT.CREDIT_LIMIT         ;
+		:CASH_TRANSFER_LIMIT    := T_CLIENT.CASH_TRANSFER_LIMIT  ;
+		:LOAN_LIMIT             := T_CLIENT.LOAN_LIMIT           ;
+	      :SENSITIVE_OPERATION_RECORD:=T_CLIENT.SENSITIVE_OPERATION_RECORD;
+		:CLIENT_ADDENDUM_FLAG   := T_CLIENT.CLIENT_ADDENDUM_FLAG ;
+		END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+		memcpy ( client->branch_code , BRANCH_CODE, 6 );
+		memcpy ( client->status_code , STATUS_CODE, 1 );
+		memcpy ( client->bank_account_opening_date , 
+					BANK_ACCOUNT_OPENING_DATE , 8);
+		memcpy ( client->bank_account_code, BANK_ACCOUNT_CODE , 6 );
+		memcpy ( client->bank_account_number, BANK_ACCOUNT_NUMBER,24);
+		memcpy ( client->currency_code, CURRENCY_CODE         ,  3 );
+		client->credit_limit =  CREDIT_LIMIT ;
+		client->cash_transfer_limit =  CASH_TRANSFER_LIMIT;
+		client->loan_limit =  LOAN_LIMIT;
+		memcpy ( client->sensitive_operation_record,
+ 			   		 SENSITIVE_OPERATION_RECORD , 1 );
+		memcpy ( client->client_addendum_flag,
+ 			   		CLIENT_ADDENDUM_FLAG       , 1 );
+
+	        trace_event ( "End GetClient( OK ) ", PROCESSING );
+		return(OK);
+	}
+	trace_event ( "End GetClient( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_client:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+		memcpy ( client->branch_code , BRANCH_CODE, 6 );
+		memcpy ( client->status_code , STATUS_CODE, 1 );
+		memcpy ( client->bank_account_opening_date , 
+					BANK_ACCOUNT_OPENING_DATE , 8);
+		memcpy ( client->bank_account_code, BANK_ACCOUNT_CODE , 6 );
+		memcpy ( client->bank_account_number,
+ 				   	BANK_ACCOUNT_NUMBER , 24 );
+		memcpy ( client->currency_code,
+ 				   	CURRENCY_CODE         ,  3 );
+		client->credit_limit =  CREDIT_LIMIT ;
+		client->cash_transfer_limit =  CASH_TRANSFER_LIMIT;
+		client->loan_limit =  LOAN_LIMIT;
+		memcpy ( client->sensitive_operation_record,
+ 			   		SENSITIVE_OPERATION_RECORD , 1 );
+		memcpy ( client->client_addendum_flag,
+ 			   		CLIENT_ADDENDUM_FLAG       , 1 );
+
+	        trace_event ( "End GetClient( OK ) ", PROCESSING );
+		return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetClient( NOK ) ", PROCESSING );
+	return( NOK );
+}

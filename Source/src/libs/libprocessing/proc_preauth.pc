@@ -1,0 +1,165 @@
+#include <stdio.h>
+#include <define.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+/****************************************************************************/
+/*  GetOriginalPreAuth()													*/
+/****************************************************************************/
+int  GetOriginalPreAuth (int  nIndexCtx, char *sTlvBuffer)
+{
+      char     sLine[MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR		T_tlv_buffer       [LG_MAX];
+        int			result;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GetOriginalPreAuth()",PROCESSING);
+
+   memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr));
+   T_tlv_buffer.len=0;
+   result = 909;
+
+   T_tlv_buffer.len = strlen(sTlvBuffer);
+   tlvcpy(T_tlv_buffer.arr,sTlvBuffer,T_tlv_buffer.len);
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_original_preauth_err;
+   EXEC SQL EXECUTE
+   BEGIN
+		:result := PCRD_AUTHO_TOOLS_2.GET_ORIGINAL_PREAUT(:T_tlv_buffer);
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+		tlvcpy(sTlvBuffer,T_tlv_buffer.arr,T_tlv_buffer.len);
+		sTlvBuffer[T_tlv_buffer.len]='\0';
+		memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr));
+		sprintf (sLine, "End GetOriginalPreAuth(OK)");
+		trace_event(sLine,PROCESSING);
+		return (OK);
+   }
+   else
+   {
+	  memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr));
+      trace_event ("End GetOriginalPreAuth(NOK)",PROCESSING);
+      return (NOK);
+   }
+
+get_original_preauth_err:
+	memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr));
+	sprintf (sLine, "End GetOriginalPreAuth(MALFUNCTION)|%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine,PROCESSING);
+	return (NOK);
+}
+
+/****************************************************************************/
+/*  GetOriginalPreAuth()													*/
+/****************************************************************************/
+int  ControlPreAuth (int  nIndexCtx, char *sTlvBuffer)
+{
+      char     sLine[MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR		T_tlv_buffer       [LG_MAX];
+        int			result;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  ControlPreAuth()",PROCESSING);
+
+   memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr));
+   T_tlv_buffer.len=0;
+   result = 909;
+
+   T_tlv_buffer.len = strlen(sTlvBuffer);
+   tlvcpy(T_tlv_buffer.arr,sTlvBuffer,T_tlv_buffer.len);
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO control_preauth_err;
+   EXEC SQL EXECUTE
+   BEGIN
+		:result := PCRD_AUTHO_TOOLS_2.CONTROL_PREAUT(:T_tlv_buffer);
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+		tlvcpy(sTlvBuffer,T_tlv_buffer.arr,T_tlv_buffer.len);
+		sTlvBuffer[T_tlv_buffer.len]='\0';
+		memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr));
+		sprintf (sLine, "End ControlPreAuth(OK)");
+		trace_event(sLine,PROCESSING);
+		return (OK);
+   }
+   else
+   {
+	  memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr));
+      trace_event ("End ControlPreAuth(NOK)",PROCESSING);
+      return (NOK);
+   }
+
+control_preauth_err:
+	memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr));
+	sprintf (sLine, "End ControlPreAuth(MALFUNCTION)|%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine,PROCESSING);
+	return (NOK);
+}
+
+/****************************************************************************/
+/*  CompletePreauth()														*/
+/****************************************************************************/
+int  CompletePreauth (int  nIndexCtx, char *sTlvBuffer)
+{
+      char     sLine[MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR		T_tlv_buffer       [LG_MAX];
+        int			result;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  CompletePreauth()",PROCESSING);
+
+   memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr));
+   T_tlv_buffer.len=0;
+   result = 909;
+
+   T_tlv_buffer.len = strlen(sTlvBuffer);
+   tlvcpy(T_tlv_buffer.arr,sTlvBuffer,T_tlv_buffer.len);
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO complete_preauth_err;
+   EXEC SQL EXECUTE
+   BEGIN
+		:result := PCRD_AUTHO_TOOLS_2.COMPLETE_PREAUTHORIZATION(:T_tlv_buffer);
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+		tlvcpy(sTlvBuffer,T_tlv_buffer.arr,T_tlv_buffer.len);
+		sTlvBuffer[T_tlv_buffer.len]='\0';
+		memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr));
+		sprintf (sLine, "End CompletePreauth(OK)");
+		trace_event(sLine,PROCESSING);
+		return (OK);
+   }
+   else
+   {
+	  memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr));
+      trace_event ("End CompletePreauth(NOK)",PROCESSING);
+      return (NOK);
+   }
+
+complete_preauth_err:
+	memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr));
+	sprintf (sLine, "End CompletePreauth(MALFUNCTION)|%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine,PROCESSING);
+	return (NOK);
+}
+

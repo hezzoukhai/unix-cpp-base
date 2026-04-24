@@ -1,0 +1,196 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetBalance  (int nIndiceCtx, TSBalance *balance)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   ACCOUNT_NUMBER [ 24 ];
+	char   BANK_CODE [ 6 ];
+ 	char   BRANCH_CODE [ 6 ];
+ 	VARCHAR   CLIENT_CODE [ 24 ];
+ 	double   BALANCE;
+ 	double   FACILITIES;
+ 	double   BLOCKED_AMOUNT;
+ 	double   CURRENT_TRN;
+ 	double   CURRENT_AUTH;
+ 	double   PENDING_TRN;
+ 	double   PENDING_AUTH;
+ 	char   TRN_CUT_OFF_DATE [ 8]; /* YYYYMMDD */
+  	VARCHAR   TRN_CUT_OFF_ID [ 8 ];
+ 	char   BAL_CUT_OFF_DATE[ 8] ; /* YYYYMMDD */
+ 	VARCHAR   BAL_CUT_OFF_ID [ 8 ];
+ 	char   CURRENCY_CODE [ 3 ];
+ 	char   ACCOUNT_STATUS [ 1 ];
+ 	char   LAST_AUTHO_ACCEPT_DATE[ 8] ; /* YYYYMMDD */
+ 	char   LAST_AUTHO_REFUS_DATE[ 8] ; /* YYYYMMDD */
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetBalance() ", PROCESSING );
+
+ 	memset ( ACCOUNT_NUMBER.arr 	, 0 , sizeof ( ACCOUNT_NUMBER.arr ));
+	memset ( BANK_CODE  		, 0 ,  6  );
+ 	memset ( BRANCH_CODE  		, 0 ,  6  );
+ 	memset ( CLIENT_CODE.arr 	, 0 , sizeof ( CLIENT_CODE.arr ));
+ 	BALANCE  	= 0.0;
+ 	FACILITIES 	= 0.0;
+ 	BLOCKED_AMOUNT 	= 0.0;
+ 	CURRENT_TRN   	= 0.0;
+ 	CURRENT_AUTH 	= 0.0;
+ 	PENDING_TRN  	= 0.0;
+ 	PENDING_AUTH 	= 0.0;
+ 	memset ( TRN_CUT_OFF_DATE  	, 0 ,  8 ); /* YYYYMMDD */
+  	memset ( TRN_CUT_OFF_ID.arr 	, 0 , sizeof ( TRN_CUT_OFF_ID.arr ));
+ 	memset ( BAL_CUT_OFF_DATE 	, 0 ,  8 ); ; /* YYYYMMDD */
+ 	memset ( BAL_CUT_OFF_ID.arr 	, 0 , sizeof ( BAL_CUT_OFF_ID.arr ));
+ 	memset ( CURRENCY_CODE  	, 0 ,  3  );
+ 	memset ( ACCOUNT_STATUS  	, 0 ,  1  );
+ 	memset ( LAST_AUTHO_ACCEPT_DATE , 0 ,  8 ); ; /* YYYYMMDD */
+ 	memset ( LAST_AUTHO_REFUS_DATE 	, 0 ,  8 ); ; /* YYYYMMDD */
+
+ 	memcpy ( ACCOUNT_NUMBER.arr , balance->account_number, 
+			strlen ( balance->account_number ));
+ 	ACCOUNT_NUMBER.len = strlen ( balance->account_number );
+
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_balance;
+	EXEC SQL EXECUTE
+	    DECLARE T_BALANCE   BALANCE%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_DATA_AUTHO_ROWS.GET_BALANCE
+						(   :ACCOUNT_NUMBER, 
+	                                            T_BALANCE 
+	                                        );
+
+
+	IF :response_code = 0 THEN
+	   :BANK_CODE  		:= T_BALANCE.BANK_CODE;
+	   :BRANCH_CODE       	:= T_BALANCE.BRANCH_CODE;
+	   :CLIENT_CODE  	:= T_BALANCE.CLIENT_CODE;
+	   :BALANCE      	:= T_BALANCE.BALANCE    ;
+	   :FACILITIES   	:= T_BALANCE.FACILITIES    ;
+	   :BLOCKED_AMOUNT   	:= T_BALANCE.BLOCKED_AMOUNT    ;
+	   :CURRENT_TRN   	:= T_BALANCE.CURRENT_TRN    ;
+	   :CURRENT_AUTH   	:= T_BALANCE.CURRENT_AUTH    ;
+	   :PENDING_TRN   	:= T_BALANCE.PENDING_TRN    ;
+	   :PENDING_AUTH   	:= T_BALANCE.PENDING_AUTH    ;
+	   :TRN_CUT_OFF_DATE 	:= TO_CHAR(T_BALANCE.TRN_CUT_OFF_DATE
+							,'YYYYMMDD' );
+	   :TRN_CUT_OFF_ID 	:= T_BALANCE.TRN_CUT_OFF_ID;
+	   :BAL_CUT_OFF_DATE 	:= TO_CHAR(T_BALANCE.BAL_CUT_OFF_DATE
+          						,'YYYYMMDD' );
+	   :BAL_CUT_OFF_ID 	:= T_BALANCE.BAL_CUT_OFF_ID;
+	   :CURRENCY_CODE  	:= T_BALANCE.CURRENCY_CODE ;
+	   :ACCOUNT_STATUS  	:= T_BALANCE.ACCOUNT_STATUS ;
+	   :LAST_AUTHO_ACCEPT_DATE := TO_CHAR(T_BALANCE.LAST_AUTHO_ACCEPT_DATE 
+							,'YYYYMMDD' );
+	   :LAST_AUTHO_REFUS_DATE  := TO_CHAR(T_BALANCE.LAST_AUTHO_REFUS_DATE 
+							,'YYYYMMDD' );
+	END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+	       memcpy(balance->bank_code   , BANK_CODE  ,6);
+	       memcpy(balance->branch_code , BRANCH_CODE,6);
+	       memcpy(balance->client_code , CLIENT_CODE.arr
+							,CLIENT_CODE.len);
+	       balance->client_code[ CLIENT_CODE.len ] = 0;
+	       balance->balance         =  BALANCE;
+	       balance->facilities     =  FACILITIES;
+	       balance->blocked_amount =  BLOCKED_AMOUNT;
+	       balance->current_trn    =  CURRENT_TRN;
+	       balance->current_auth   =  CURRENT_AUTH;
+	       balance->pending_trn    =  PENDING_TRN;
+	       balance->pending_auth   =  PENDING_AUTH;
+	       memcpy(balance->trn_cut_off_date,
+							TRN_CUT_OFF_DATE,8);
+	       memcpy(balance->trn_cut_off_id,
+				TRN_CUT_OFF_ID.arr,
+				TRN_CUT_OFF_ID.len );
+	       balance->trn_cut_off_id[ TRN_CUT_OFF_ID.len ] = 0;
+
+	       memcpy(balance->bal_cut_off_date,
+							BAL_CUT_OFF_DATE,8);
+	       memcpy(balance->bal_cut_off_id,
+				BAL_CUT_OFF_ID.arr,
+				BAL_CUT_OFF_ID.len );
+	       balance->bal_cut_off_id[ TRN_CUT_OFF_ID.len ] = 0;
+	       memcpy(balance->currency_code,CURRENCY_CODE,3);
+	       memcpy(balance->account_status,ACCOUNT_STATUS,1);
+	       memcpy(balance->last_autho_accept_date,
+						LAST_AUTHO_ACCEPT_DATE,8);
+	       memcpy(balance->last_autho_refus_date,
+						LAST_AUTHO_REFUS_DATE,8);
+
+	        trace_event ( "End GetBalance( OK ) ", PROCESSING );
+		return(OK);
+	}
+	trace_event ( "End GetBalance( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_balance:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+	       memcpy(balance->bank_code   , BANK_CODE  ,6);
+	       memcpy(balance->branch_code , BRANCH_CODE,6);
+	       memcpy(balance->client_code , CLIENT_CODE.arr
+							,CLIENT_CODE.len);
+	       balance->client_code[ CLIENT_CODE.len ] = 0;
+	       balance->balance        =  BALANCE;
+	       balance->facilities     =  FACILITIES;
+	       balance->blocked_amount =  BLOCKED_AMOUNT;
+	       balance->current_trn    =  CURRENT_TRN;
+	       balance->current_auth   =  CURRENT_AUTH;
+	       balance->pending_trn    =  PENDING_TRN;
+	       balance->pending_auth   =  PENDING_AUTH;
+	       memcpy(balance->trn_cut_off_date,
+							TRN_CUT_OFF_DATE,8);
+	       memcpy(balance->trn_cut_off_id,
+				TRN_CUT_OFF_ID.arr,
+				TRN_CUT_OFF_ID.len );
+	       balance->trn_cut_off_id[ TRN_CUT_OFF_ID.len ] = 0;
+
+	       memcpy(balance->bal_cut_off_date,
+							BAL_CUT_OFF_DATE,8);
+	       memcpy(balance->bal_cut_off_id,
+				BAL_CUT_OFF_ID.arr,
+				BAL_CUT_OFF_ID.len );
+	       balance->bal_cut_off_id[ TRN_CUT_OFF_ID.len ] = 0;
+	       memcpy(balance->currency_code,CURRENCY_CODE,3);
+	       memcpy(balance->account_status,ACCOUNT_STATUS,1);
+	       memcpy(balance->last_autho_accept_date,
+						LAST_AUTHO_ACCEPT_DATE,8);
+	       memcpy(balance->last_autho_refus_date,
+						LAST_AUTHO_REFUS_DATE,8);
+
+	        trace_event ( "End GetBalance( OK ) ", PROCESSING );
+		return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetBalance( NOK ) ", PROCESSING );
+	return( NOK );
+}

@@ -1,0 +1,90 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int UpdateAuthoActivityForAtmAdvice  ( int nIndiceCtx , char *sTlvBuffer, char *Pstatus )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	int i;
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+ 	VARCHAR   	T_tlv_warning [ 6 + 1];
+	VARCHAR     T_status          [ 2 + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start UpdateAuthoActivityForAtmAdvice() ", PROCESSING );
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	memset ( T_tlv_warning.arr         ,  0  ,   sizeof(T_tlv_warning.arr )  );
+	T_tlv_warning.len = 0;
+
+ 	memset ( T_status.arr         ,  0  ,   sizeof(T_status.arr )  );
+    	T_status.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+	
+	memcpy ( T_status.arr     ,  Pstatus   ,   strlen(Pstatus )  );
+    T_status.len = strlen(Pstatus );
+
+	
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UpdateAuth;
+	EXEC SQL EXECUTE
+	BEGIN
+
+        :response_code := PCRD_ATM_TOOLS_3.UPDATE_AUTHO_ACTIVITY_ATM_ADV( :T_tlv_auth, :T_tlv_warning,:T_status); 
+	END;
+	END-EXEC;
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine,"End UpdateAuthoActivityForAtmAdvice (%d,%.6s)", response_code, T_tlv_warning.arr);
+	trace_event(sLine,PROCESSING);
+
+	
+	return(response_code);
+
+err_UpdateAuth :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	trace_event("End UpdateAuthoActivityForATmAdvice (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+

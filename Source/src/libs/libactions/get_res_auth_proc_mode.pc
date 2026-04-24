@@ -1,0 +1,116 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <tlv_autho.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int GetResAuthProcMode (	int		nIndiceCtx, 
+							char 	*sResourceId , 
+							char* sMTI, 
+							char* sMcc, 
+							char* sProcCode, 
+							char* sFunctionCode, 
+							/*char* sTcc, */
+							char* sSourceAcc, 
+							char* sDestAcc, 
+							char *sAuthMode )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+    char sEventCode [ 3 + 1];
+    int  nLength;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+ 	char   		T_proc_mode [ 1 + 1];
+	char		T_resource_id[6 + 1];
+ 	char   		T_msg_class      [ 1 + 1];
+	char   		T_mcc			 [ 4 + 1];
+ 	char   		T_proc_code		 [ 2 + 1];
+ 	char   		T_fct_code		 [ 3 + 1];
+	/*char   		T_tcc			 [ 1 + 1];*/
+ 	char   		T_src_account	 [ 2 + 1];
+ 	char   		T_dest_account	 [ 2 + 1];
+
+	int		    response_code;
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetResAuthProcMode() ", PROCESSING );
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    memset ( T_proc_mode , 0, sizeof ( T_proc_mode  ));
+	memset ( T_resource_id , 0, sizeof ( T_resource_id  ));
+	memset ( T_msg_class , 0, sizeof ( T_msg_class  ));
+	memset ( T_mcc , 0, sizeof ( T_mcc  ));
+	memset ( T_proc_code , 0, sizeof ( T_proc_code  ));
+	memset ( T_fct_code , 0, sizeof ( T_fct_code  ));
+	/*memset ( T_tcc , 0, sizeof ( T_tcc  ));*/
+	memset ( T_src_account , 0, sizeof ( T_src_account  ));
+	memset ( T_dest_account , 0, sizeof ( T_dest_account  ));
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+	memcpy ( T_resource_id, sResourceId, 6);
+	T_msg_class[0] = sMTI[1];
+	memcpy ( T_mcc, sMcc, 4);
+	memcpy ( T_proc_code, sProcCode, 2);
+	memcpy ( T_fct_code, sFunctionCode, 3);
+	/*T_tcc[0]=sTcc[0];*/
+	memcpy ( T_src_account, sSourceAcc, 2);
+	memcpy ( T_dest_account, sDestAcc, 2);
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_proc_mode;
+	EXEC SQL EXECUTE
+	BEGIN
+
+        :response_code := PCRD_P7_GENERAL_TOOLS.GET_RES_AUTH_PROC_MODE( 
+								:T_resource_id,
+								:T_msg_class , 
+								:T_mcc , 
+								:T_proc_code , 
+								:T_fct_code , 
+								:T_src_account , 
+								:T_dest_account , 
+								 :T_proc_mode
+							       );
+	END;
+	END-EXEC;
+
+
+    if ( response_code == 0 )
+    {
+       	sAuthMode[0]=T_proc_mode[0];
+		sAuthMode[1]='\0';
+		trace_event("End GetResAuthProcMode( OK )", PROCESSING);
+		return OK;
+     }
+
+ 
+	sprintf(sLine,"End GetResAuthProcMode( %d )", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+ err_get_proc_mode :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End GetResAuthProcMode(SYSTEM_MALFUNCTION)", PROCESSING);
+ 	return( SYSTEM_MALFUNCTION );
+}
+

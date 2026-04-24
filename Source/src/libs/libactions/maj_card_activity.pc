@@ -1,0 +1,108 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int UpdateCardActivity  ( int nIndiceCtx , char cUpdateFlag, char *sTlvBuffer )
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+ 	char      	T_update_flag ;
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    trace_event ( "Start UpdateCardActivity () ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+	T_update_flag = cUpdateFlag;
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UpdateCardActivity;
+	EXEC SQL EXECUTE
+	DECLARE
+	pin_error_flag    BOOLEAN :=FALSE;
+        declined_flag     BOOLEAN :=FALSE;
+        approval_flag     BOOLEAN :=FALSE;
+        reversal_flag     BOOLEAN :=FALSE;
+        partial_flag      BOOLEAN :=FALSE;
+	BEGIN
+		IF :T_update_flag = '0'
+		THEN
+			pin_error_flag  := TRUE;
+		ELSIF :T_update_flag = '1'
+		THEN
+    		declined_flag 	:= TRUE;    
+		ELSIF :T_update_flag = '2'
+		THEN
+    		approval_flag  	:= TRUE; 
+		ELSIF :T_update_flag = '3'
+		THEN
+    		reversal_flag  	:= TRUE; 
+		ELSIF :T_update_flag = '4'
+		THEN
+    		partial_flag  	:= TRUE; 
+		END IF;
+		
+
+        :response_code := PCRD_P7_CARD_ACTIVITY_MNG.CARD_ACTIVITY_UPDATE( pin_error_flag, 
+								     									  declined_flag, 
+                                                                          approval_flag, 
+                                                                          reversal_flag, 
+                                                                          partial_flag, 
+                                                                          :T_tlv_auth ); 
+	END;
+	END-EXEC;
+	
+    tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+
+	sprintf(sLine,"End UpdateCardActivity (%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_UpdateCardActivity :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+    tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End UpdateCardActivity (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+

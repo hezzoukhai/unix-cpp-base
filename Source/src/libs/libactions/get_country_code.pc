@@ -1,0 +1,380 @@
+#include <stdio.h>
+
+#include <define.h>
+
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/****************************************************************************/
+/****************************************************************************/
+int  GetCountryCodeVisa (int  nIndexCtx, char * sCountryCode,char* sCountryCodeVisa)
+{
+
+   EXEC SQL BEGIN DECLARE SECTION;
+		char	   sLine[MAX_LINE_TRC];
+        char	   T_CountryCode[3 +1 ];
+        char	   T_CountryCodeVisa[2 +1 ];
+        int        result;
+
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GetCountryCodeVisa()", PROCESSING);
+
+   memset (T_CountryCode,0,sizeof(T_CountryCode));
+   memset(T_CountryCodeVisa,0,sizeof(T_CountryCodeVisa));
+
+   strncpy (T_CountryCode, sCountryCode,3);
+
+   
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_cntry_code_visa_err;
+   EXEC SQL EXECUTE
+   BEGIN
+		:result := PCRD_GENERAL_TOOLS_5.GET_COUNTRY_CODE_VISA ( :T_CountryCode,:T_CountryCodeVisa);
+   END;
+   END-EXEC;
+
+
+   if (result == OK)
+   {
+      memcpy(sCountryCodeVisa,T_CountryCodeVisa,2); 
+	  sprintf(sLine,"End GetCountryCodeVisa(OK)[%s]",sCountryCodeVisa);
+      trace_event (sLine, PROCESSING);
+      return (OK) ;
+   }
+   else
+   {
+      trace_event ("End GetCountryCodeVisa(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_cntry_code_visa_err:
+      sprintf(sLine, "%s", sqlca.sqlerrm.sqlerrmc);
+      trace_event(sLine, FATAL);
+
+      trace_event ("End GetCountryCodeVisa (ERROR)", PROCESSING);
+      return (NOK);
+}
+/****************************************************************************/
+/*PLUTONL-3660*/
+int  GetCountryCodeAlphaVISA (int  nIndexCtx, char * sVisaCountryAlpha,char* sIsoCountryAlpha)
+{
+
+   EXEC SQL BEGIN DECLARE SECTION;
+	  char	   sLine[MAX_LINE_TRC];
+        char	   T_CountryCodeVisa[2 +1 ];
+        char	   T_CountryCodeIso [3 +1 ];
+        int        result;
+
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GetCountryCodeAlphaVISA()", PROCESSING);
+
+   memset(T_CountryCodeVisa,0,sizeof(T_CountryCodeVisa));
+   memset(T_CountryCodeIso,0,sizeof(T_CountryCodeIso));
+   
+   strncpy (T_CountryCodeVisa, sVisaCountryAlpha,2);
+
+
+   
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_cntry_code_visa_iso_err;
+   EXEC SQL EXECUTE
+   BEGIN
+		:result := PCRD_GENERAL_TOOLS_5.GET_COUNTRY_VISA_ISO_ALPHA ( :T_CountryCodeVisa,:T_CountryCodeIso);
+   END;
+   END-EXEC;
+
+
+   if (result == OK)
+   {
+	  memcpy(sIsoCountryAlpha,T_CountryCodeIso,3); 
+	  
+	  sprintf(sLine,"End GetCountryCodeAlphaVISA(OK) sVisaCountryAlpha,sIsoCountryAlpha [%s],[%s]",sVisaCountryAlpha,sIsoCountryAlpha);
+	  trace_event (sLine, PROCESSING);
+      return (OK) ;
+   }
+   else
+   {
+      trace_event ("End GetCountryCodeAlphaVISA(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_cntry_code_visa_iso_err:
+      sprintf(sLine, "%s", sqlca.sqlerrm.sqlerrmc);
+      trace_event(sLine, FATAL);
+
+      trace_event ("End GetCountryCodeAlphaVISA (ERROR)", PROCESSING);
+      return (NOK);
+}
+/****************************************************************************/
+/* NAB20032020 SIA  - GET_COUNTRY_CODE_MC*/
+/****************************************************************************/
+
+int  GetCountryCodeMC (int  nIndexCtx, char * sCountryCodeMC,char* sCountryCode,char* sCountryAlpha)/*NAB20032020*/
+{
+
+   EXEC SQL BEGIN DECLARE SECTION;
+		char	   sLine[MAX_LINE_TRC];
+        char	   T_CountryCodeMC[3 +1 ];
+        char	   T_CountryCode[3 +1 ];
+		char	   T_CountryCodeAlpha[3 +1 ];/*NAB20032020*/
+        int        result;
+
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GetCountryCodeMC()", PROCESSING);
+
+   memset(T_CountryCodeMC,0,sizeof(T_CountryCodeMC));
+   memset(T_CountryCode,0,sizeof(T_CountryCode));
+   memset(T_CountryCodeAlpha,0,sizeof(T_CountryCodeAlpha));/*NAB20032020*/
+   
+   strncpy (T_CountryCodeMC, sCountryCodeMC,3);
+
+
+   
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_cntry_code_mc_err;
+   EXEC SQL EXECUTE
+   BEGIN
+		:result := PCRD_GENERAL_TOOLS_5.GET_COUNTRY_CODE_MC ( :T_CountryCodeMC,:T_CountryCode ,:T_CountryCodeAlpha);
+   END;
+   END-EXEC;
+
+
+   if (result == OK)
+   {
+      memcpy(sCountryCode,T_CountryCode,3); 
+	  memcpy(sCountryAlpha,T_CountryCodeAlpha,3); /*NAB20032020*/
+	  
+	  sprintf(sLine,"End GetCountryCodeMC(OK) sCountryCode,sCountryAlpha [%s][%s]",sCountryCode,sCountryAlpha);
+	  trace_event (sLine, PROCESSING);
+      return (OK) ;
+   }
+   else
+   {
+      trace_event ("End GetCountryCodeMC(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_cntry_code_mc_err:
+      sprintf(sLine, "%s", sqlca.sqlerrm.sqlerrmc);
+      trace_event(sLine, FATAL);
+
+      trace_event ("End GetCountryCodeMC (ERROR)", PROCESSING);
+      return (NOK);
+}
+
+/****************************************************************************/
+
+int  GetCountryCodeAlpha (int  nIndexCtx, char * sCountryCode,char* sCountryCodeAlpha)
+{
+
+   EXEC SQL BEGIN DECLARE SECTION;
+		char	   sLine[MAX_LINE_TRC];
+        char	   T_CountryCode[3 +1 ];
+        char	   T_CountryCodeAlpha[3 +1 ];
+        int        result;
+
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GetCountryCodeAlpha()", PROCESSING);
+
+   memset (T_CountryCode,0,sizeof(T_CountryCode));
+   memset(T_CountryCodeAlpha,0,sizeof(T_CountryCodeAlpha));
+
+   strncpy (T_CountryCode, sCountryCode,3);
+
+   
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_cntry_code_alpha_err;
+   EXEC SQL EXECUTE
+   BEGIN
+		:result := PCRD_GENERAL_TOOLS_5.GET_COUNTRY_CODE_ALPHA ( :T_CountryCode,:T_CountryCodeAlpha);
+   END;
+   END-EXEC;
+
+
+   if (result == OK)
+   {
+      memcpy(sCountryCodeAlpha,T_CountryCodeAlpha,3); 
+	  sprintf(sLine,"End GetCountryCodeAlpha(OK)[%s]",sCountryCodeAlpha);
+      trace_event (sLine, PROCESSING);
+      return (OK) ;
+   }
+   else
+   {
+      trace_event ("End GetCountryCodeAlpha(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_cntry_code_alpha_err:
+      sprintf(sLine, "%s", sqlca.sqlerrm.sqlerrmc);
+      trace_event(sLine, FATAL);
+      trace_event ("End GetCountryCodeAlpha (ERROR)", PROCESSING);
+      return (NOK);
+}
+
+/****************************************************************************/
+/****************************************************************************/
+
+int  GetCountryCode (int  nIndexCtx, char * sCountryCodeAlpha,char* sCountryCode)
+{
+
+   EXEC SQL BEGIN DECLARE SECTION;
+		char	   sLine[MAX_LINE_TRC];
+        char	   T_CountryCode[3 +1 ];
+        char	   T_CountryCodeAlpha[3 +1 ];
+        int        result;
+
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GetCountryCode()", PROCESSING);
+
+   memset (T_CountryCode,0,sizeof(T_CountryCode));
+   memset(T_CountryCodeAlpha,0,sizeof(T_CountryCodeAlpha));
+
+   strncpy (T_CountryCodeAlpha, sCountryCodeAlpha,3);
+
+   
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_cntry_code_err;
+   EXEC SQL EXECUTE
+   BEGIN
+		:result := PCRD_GENERAL_TOOLS_5.GET_COUNTRY_CODE ( :T_CountryCodeAlpha,:T_CountryCode);
+   END;
+   END-EXEC;
+
+
+   if (result == OK)
+   {
+      memcpy(sCountryCode,T_CountryCode,3); 
+	  sprintf(sLine,"End GetCountryCode(OK)[%s]",sCountryCode);
+      trace_event (sLine, PROCESSING);
+      return (OK) ;
+   }
+   else
+   {
+      trace_event ("End GetCountryCode(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_cntry_code_err:
+      sprintf(sLine, "%s", sqlca.sqlerrm.sqlerrmc);
+      trace_event(sLine, FATAL);
+      trace_event ("End GetCountryCode (ERROR)", PROCESSING);
+      return (NOK);
+}
+
+
+/****************************************************************************/
+/****************************************************************************/
+
+int  GetCountryCodeByRegion (int  nIndexCtx, char * sRegionCodeAlpha,char* sCountryCode)
+{
+
+   EXEC SQL BEGIN DECLARE SECTION;
+		char	   sLine[MAX_LINE_TRC];
+        char	   T_CountryCode[3 +1 ];
+        char	   T_RegionCodeAlpha[2 +1 ];
+        int        result;
+
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GetCountryCodeByRegion()", PROCESSING);
+
+   memset (T_CountryCode,0,sizeof(T_CountryCode));
+   memset(T_RegionCodeAlpha,0,sizeof(T_RegionCodeAlpha));
+
+   strncpy (T_RegionCodeAlpha, sRegionCodeAlpha,2);
+
+   
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_cntry_code_err;
+   EXEC SQL EXECUTE
+   BEGIN
+		:result := PCRD_GENERAL_TOOLS_5.GET_COUNTRY_CODE_BY_REG ( :T_RegionCodeAlpha,:T_CountryCode);
+   END;
+   END-EXEC;
+
+
+   if (result == OK)
+   {
+      memcpy(sCountryCode,T_CountryCode,3); 
+	  sprintf(sLine,"End GetCountryCodeByRegion(OK)[%s]",sCountryCode);
+      trace_event (sLine, PROCESSING);
+      return (OK) ;
+   }
+   else
+   {
+      trace_event ("End GetCountryCodeByRegion(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_cntry_code_err:
+      sprintf(sLine, "%s", sqlca.sqlerrm.sqlerrmc);
+      trace_event(sLine, FATAL);
+      trace_event ("End GetCountryCodeByRegion (ERROR)", PROCESSING);
+      return (NOK);
+}
+/****************************************************************************/
+/****************************************************************************/
+/*NAB05042021 PLUTONL-2944*/
+int  GetMcEpiArea (int  nIndexCtx, char * sAcqCountry,char* sMcEpiArea)
+{
+
+   EXEC SQL BEGIN DECLARE SECTION;
+                char       sLine[MAX_LINE_TRC];
+        char       T_AcqCountry         [3+1];
+        char       T_Mc_Area_Code       [4+1];
+        int        result;
+
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GetMciEpiArea()", PROCESSING);
+
+   memset(T_AcqCountry,0,sizeof(T_AcqCountry));
+   memset(T_Mc_Area_Code,0,sizeof(T_Mc_Area_Code));
+
+   strncpy (T_AcqCountry, sAcqCountry,3);
+
+
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO get_area_code_mc_err;
+   EXEC SQL EXECUTE
+   BEGIN
+                :result := PCRD_GENERAL_TOOLS_5.GET_AREA_CODE_MC ( :T_AcqCountry,:T_Mc_Area_Code);
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+      memcpy(sMcEpiArea,T_Mc_Area_Code,1);
+
+          sprintf(sLine,"End GetMciEpiArea(OK) sMcEpiArea[%s]",sMcEpiArea);
+          trace_event (sLine, PROCESSING);
+      return (OK) ;
+   }
+   else
+   {
+      trace_event ("End GetMciEpiArea(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+get_area_code_mc_err:
+      sprintf(sLine, "%s", sqlca.sqlerrm.sqlerrmc);
+      trace_event(sLine, FATAL);
+
+      trace_event ("End GetMciEpiArea (ERROR)", PROCESSING);
+      return (NOK);
+}

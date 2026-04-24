@@ -1,0 +1,895 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      dbl_watch_config.pc                                                    */
+/*                                                                             */
+/* Description                                                                 */
+/*      MAJ Watch config Tools Management                                      */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <dblcmd.h>
+#include <define.h>
+#include <dblconfig.h>
+#include <dbl_param.h>
+#include <atmcmd.h>
+#include <ascii.h>
+
+#include <param_ctx.h>
+
+  /***********************************************************************
+  **  nom	: GetConfigFlags()					**
+  **  desc	: chargement des flags de la configuration		**
+  **  entree	: pTerminalConfig	-> identification de la config	**
+  **  sortie	: pTerminalConfig	-> flags de la config		**
+  **  retour	: OK	-> si c'est OK					**
+  **		  NOK	-> si pas de configuration pour ce terminal	**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (05 Jan 1999)				**
+  **			(c) 1999 Hightech Payment Systems		**
+  ***********************************************************************/
+int	GetConfigFlags(nIndexCtx,pTerminalConfig)
+int			nIndexCtx;
+dbl_config	*pTerminalConfig;
+{
+   char  sLine[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+
+	VARCHAR hTerminalNumber [15];
+        varchar	hAcqBank	[6+1];/*ICH270715*/ 
+    	int     hProcessId;
+    	char    hEventCode;
+    	char    hConfigId   [ 5];
+    	char    hLoadStateTableFlag;
+    	char    hLoadScreenFlag;
+    	char    hLoadConfigParamFlag;
+    	char    hLoadFitFlag;
+    	char    hLoadDateFlag;
+    	char    hLoadFormatTamplateFlag;
+    	char    hLoadMasterKeyFlag;
+    	char    hLoadCommsKeyFlag;
+    	char    hLoadConfigIdFlag;
+    	char    hCmdGoInServiceFlag;
+    	char    hCmdGoOutServiceFlag;
+    	char    hCmdCloseVandalAllowFlag;
+    	char    hCmdOpenVandalDisallowFlag;
+    	char    hCmdRunSelfTestFlag;
+    	char    hCmdCondGoOutServiceFlag;
+    	char	hSendConfigInfoFlag;
+    	char    hSendSupplyCountersFlag;
+    	char    hSendClearSupplyCtrFlag;
+    	char    hSendEnhSupplyCtrFlag;
+    	char    hSendClearEnhSupplyCtrFlag;
+    	int     hResponseCode;
+	
+EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start GetConfigFlags(%.15s,%.6s,%c)", pTerminalConfig->fTerminalNumber, pTerminalConfig->fAcqBank/*ICH270715*/, pTerminalConfig->fEventCode);
+	trace_event(sLine, PROCESSING);
+
+    	/* - memset des chaines ------------------------------------------------- */
+    	memset(&hTerminalNumber.arr,	0, sizeof(hTerminalNumber.arr)	);
+    	memset(hAcqBank.arr,			0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    	memset(&hConfigId,			    0, sizeof(hConfigId)		);
+
+
+    	/* - initialisation ----------------------------------------------------- */
+    	memcpy(hTerminalNumber.arr, pTerminalConfig->fTerminalNumber, strlen(pTerminalConfig->fTerminalNumber));
+    	hTerminalNumber.len = strlen(pTerminalConfig->fTerminalNumber);
+    	
+	    memcpy(hAcqBank.arr,	pTerminalConfig->fAcqBank, strlen(pTerminalConfig->fAcqBank));/*ICH270715*/
+		hAcqBank.len	= strlen(pTerminalConfig->fAcqBank);
+	
+    	hEventCode = pTerminalConfig->fEventCode;
+
+
+    	/* - capture des exception ---------------------------------------------- */
+    	EXEC SQL WHENEVER SQLERROR GOTO getConfigFlagsErr;
+    	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+
+    	/* - execution de la fonction PL/SQL ------------------------------------ */
+    	EXEC SQL EXECUTE
+    	DECLARE
+        	enr_dbl_watch_config	DBL_WATCH_CONFIG%ROWTYPE;
+    	BEGIN
+      		-- initialisation de enr_dbl_watch_config
+      		enr_dbl_watch_config.terminal_atm_number := :hTerminalNumber;
+      		enr_dbl_watch_config.bank_code   	   := :hAcqBank;
+      		enr_dbl_watch_config.event_code   	   := :hEventCode;
+
+      		-- appel de la fonction PL/SQL
+      		:hResponseCode:=PCRD_DBL_WATCH_CONFIG.GET_CONFIG(enr_dbl_watch_config);
+
+      		-- recuperation des champs de dbl_watch_config
+      		IF :hResponseCode = DECLARATION_CST.OK
+      		THEN
+	
+			:hProcessId     :=NVL(enr_dbl_watch_config.process_id, 0);
+        		:hConfigId      :=NVL(enr_dbl_watch_config.config_id, '9999');
+        		:hLoadStateTableFlag    :=NVL(enr_dbl_watch_config.load_state_table_flag, '0');
+        		:hLoadScreenFlag    :=NVL(enr_dbl_watch_config.load_screen_flag, '0');
+        		:hLoadConfigParamFlag   :=NVL(enr_dbl_watch_config.load_config_param_flag, '0');
+        		:hLoadFitFlag       :=NVL(enr_dbl_watch_config.load_fit_flag, '0');
+        		:hLoadDateFlag      :=NVL(enr_dbl_watch_config.load_date_flag, '0');
+        		:hLoadFormatTamplateFlag:=NVL(enr_dbl_watch_config.load_format_tamplate_flag, '0');
+        		:hLoadMasterKeyFlag :=NVL(enr_dbl_watch_config.load_master_key_flag, '0');
+        		:hLoadCommsKeyFlag  :=NVL(enr_dbl_watch_config.load_comms_key_flag, '0');
+        		:hLoadConfigIdFlag  :=NVL(enr_dbl_watch_config.load_config_id_flag, '0');
+        		:hCmdGoInServiceFlag    :=NVL(enr_dbl_watch_config.cmd_go_in_service_flag, '0');
+        		:hCmdGoOutServiceFlag   :=NVL(enr_dbl_watch_config.cmd_go_out_service_flag, '0');
+        		:hCmdCloseVandalAllowFlag :=NVL(enr_dbl_watch_config.cmd_close_vandal_allow_flag, '0');
+        		:hCmdOpenVandalDisallowFlag :=NVL(enr_dbl_watch_config.cmd_open_vandal_disallow_flag, '0');
+        		:hCmdRunSelfTestFlag    :=NVL(enr_dbl_watch_config.cmd_run_self_test_flag, '0');
+        		:hCmdCondGoOutServiceFlag :=NVL(enr_dbl_watch_config.cmd_cond_go_out_service_flag, '0');
+        		:hSendConfigInfoFlag    :=NVL(enr_dbl_watch_config.send_config_id_flag, '0');
+        		:hSendSupplyCountersFlag:=NVL(enr_dbl_watch_config.send_supply_counters_flag, '0');
+        		:hSendClearSupplyCtrFlag:=NVL(enr_dbl_watch_config.send_clear_supply_ctr_flag, '0');
+        		:hSendEnhSupplyCtrFlag  :=NVL(enr_dbl_watch_config.send_enh_supply_ctr_flag, '0');
+        		:hSendClearEnhSupplyCtrFlag :=NVL(enr_dbl_watch_config.send_clear_enh_supply_ctr_flag, '0');
+
+      		END IF;
+    	END;
+    	END-EXEC;
+
+
+    	/* - examen du retour de la fonction PL/SQL ----------------------------- */
+    	if(hResponseCode != OK) {
+        	trace_event("End   GetConfigFlags(NOK)", PROCESSING);
+        	return (hResponseCode);
+    	}
+
+
+sprintf(sLine, "==> hConfigId=[%s], hLoadMasterKeyFlag=[%c], hLoadCommsKeyFlag=[%c]", 
+               hConfigId, hLoadMasterKeyFlag, hLoadCommsKeyFlag);
+trace_event(sLine, FATAL);
+
+    	/* - recuperation du resultat ------------------------------------------- */
+	pTerminalConfig->fProcessId         = hProcessId;
+    	memcpy(pTerminalConfig->fConfigId,      hConfigId, 4);
+    	pTerminalConfig->fLoadStateTableFlag    = hLoadStateTableFlag;
+    	pTerminalConfig->fLoadScreenFlag        = hLoadScreenFlag;
+    	pTerminalConfig->fLoadConfigParamFlag   = hLoadConfigParamFlag;
+    	pTerminalConfig->fLoadFitFlag       = hLoadFitFlag;
+    	pTerminalConfig->fLoadDateFlag      = hLoadDateFlag;
+    	pTerminalConfig->fLoadFormatTamplateFlag    = hLoadFormatTamplateFlag;
+    	pTerminalConfig->fLoadMasterKeyFlag     = hLoadMasterKeyFlag;
+    	pTerminalConfig->fLoadCommsKeyFlag      = hLoadCommsKeyFlag;
+    	pTerminalConfig->fLoadConfigIdFlag      = hLoadConfigIdFlag;
+    	pTerminalConfig->fCmdGoInServiceFlag    = hCmdGoInServiceFlag;
+    	pTerminalConfig->fCmdGoOutServiceFlag   = hCmdGoOutServiceFlag;
+    	pTerminalConfig->fCmdCloseVandalAllowFlag   = hCmdCloseVandalAllowFlag;
+    	pTerminalConfig->fCmdOpenVandalDisallowFlag = hCmdOpenVandalDisallowFlag;
+    	pTerminalConfig->fCmdRunSelfTestFlag    = hCmdRunSelfTestFlag;
+    	pTerminalConfig->fCmdCondGoOutServiceFlag   = hCmdCondGoOutServiceFlag;
+    	pTerminalConfig->fSendConfigInfoFlag    = hSendConfigInfoFlag;
+    	pTerminalConfig->fSendSupplyCountersFlag    = hSendSupplyCountersFlag;
+    	pTerminalConfig->fSendClearSupplyCtrFlag    = hSendClearSupplyCtrFlag;
+    	pTerminalConfig->fSendEnhSupplyCtrFlag  = hSendEnhSupplyCtrFlag;
+    	pTerminalConfig->fSendClearEnhSupplyCtrFlag = hSendClearEnhSupplyCtrFlag;
+
+
+	sprintf(sLine, "End   GetConfigFlags(OK)");
+	trace_event(sLine, PROCESSING);
+	return (OK);
+
+getConfigFlagsErr:
+   	sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    	trace_event(sLine, ERROR);
+    	trace_event("End   GetConfigFlags(ERROR)", ERROR);
+    	return (ERROR);
+}
+
+
+  /***********************************************************************
+  **  nom	: EventProcessing()					**
+  **  desc	: traitement des evenements POWER_UP, SUPER_EXIT	**
+  **  entree	: pTerminalConfig	-> identification de la config	**
+  **  sortie	: pTerminalConfig	-> flags de la config		**
+  **  retour	: OK	-> si c'est OK					**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (05 Jan 1999)				**
+  **			(c) 1999 Hightech Payment Systems		**
+  ***********************************************************************/
+int	EventProcessing(nIndexCtx,pTerminalConfig)
+int			nIndexCtx;
+dbl_config	*pTerminalConfig;
+{
+   	char   sLine[MAX_LINE_TRC];
+	char		lConfigId	[ 5];
+	int		retour;
+	char     DBLBufferOut[LG_MAX];
+	int	loffset;
+	int	nFdConnect;
+
+	sprintf(sLine, "Start EventProcessing(%s,%c,%.4s)", pTerminalConfig->fTerminalNumber, pTerminalConfig->fEventCode, pTerminalConfig->fConfigId);
+	trace_event(sLine, PROCESSING);
+
+    	/* - initialisation ----------------------------------------------------- */
+    	memset(lConfigId,	0, sizeof(lConfigId));
+    	memcpy(lConfigId,	pTerminalConfig->fConfigId, 4);
+
+    	memset(pTerminalConfig->fConfigId, 0, sizeof(pTerminalConfig->fConfigId));
+
+
+    	/* - chargement des flags ----------------------------------------------- */
+    	retour = GetConfigFlags(nIndexCtx,pTerminalConfig);
+    	if ( retour != OK ) {
+        	trace_event("End   EventProcessing(NOK)", PROCESSING);
+        	return (retour);
+    	}    
+
+
+	if(pTerminalConfig->fCmdGoOutServiceFlag == '1') {
+        	if (pTerminalConfig->fEventCode == EVN_POWER_UP) {
+            		retour = Go_Out_Of_Service(nIndexCtx,POWER_UP_RECEIVED);
+        	} else { 
+			if (pTerminalConfig->fEventCode == EVN_SUPER_EXIT) {
+            			retour = Go_Out_Of_Service(nIndexCtx,SUPER_EXIT_RECEIVED);
+        		} else { 
+				if (pTerminalConfig->fEventCode == EVN_ATM_MNG_CMD) {
+            				retour = Go_Out_Of_Service(nIndexCtx,USER_REQUEST);
+        			} else {
+            				retour = Go_Out_Of_Service(nIndexCtx,USER_REQUEST);
+				}
+			}
+		}
+        	if(retour != OK) {
+            		trace_event("End   EventProcessing(NOK)", PROCESSING);
+            		return (NOK);
+        	}
+    	}
+
+    	/* - commande run self test ----------------------------------------- */
+    	/*if(pTerminalConfig->fCmdRunSelfTestFlag == '1') {
+        	retour = UpdateSelfTestFlag(pTerminalConfig->fTerminalNumber , '2');
+        	retour = RunSelfTest(pTerminalConfig->fTerminalNumber);
+        	if(retour != OK) {
+            		trace_event("End   EventProcessing(NOK)", PROCESSING);
+            		return (NOK);
+        	}
+    	} else {
+		if(pTerminalConfig->fCmdRunSelfTestFlag == '2') {
+        		retour = UpdateSelfTestFlag(pTerminalConfig->fTerminalNumber , '1');
+		}
+    	}*/
+
+	/* - Send config id ------------------------------------------------- */
+    	if(pTerminalConfig->fSendConfigInfoFlag == '1') {
+        	retour = Send_Terminal_Command(nIndexCtx, SEND_CONFIG_INFO, pTerminalConfig->fTerminalNumber,pTerminalConfig->fAcqBank/*ICH270715*/, lConfigId);
+        	if(retour != OK) {
+            		trace_event("End   EventProcessing(SEND_CONFIG_INFO : NOK)", PROCESSING);
+            		return (NOK);
+        	}
+    	}
+
+    	sprintf(sLine, "local config id     : %.4s", pTerminalConfig->fConfigId);
+    	trace_event(sLine, PROCESSING);
+    	sprintf(sLine, "atm config id       : %.4s", lConfigId);
+    	trace_event(sLine, PROCESSING);
+
+
+    	if ( memcmp(pTerminalConfig->fConfigId, lConfigId, 4) != 0 ) {
+        	/* - load table des states ------------------------------------------ */
+        	if(pTerminalConfig->fLoadStateTableFlag == '1') {
+            		retour = Send_Terminal_State(nIndexCtx, pTerminalConfig->fTerminalNumber,pTerminalConfig->fAcqBank);
+            		if(retour != OK) {
+                		trace_event("End   EventProcessing(NOK)", PROCESSING);
+                		return (NOK);
+            		}
+		}
+
+        	/* - load table des screens ----------------------------------------- */
+        	if(pTerminalConfig->fLoadScreenFlag == '1') {
+            		retour = Send_Terminal_Screen(nIndexCtx, pTerminalConfig->fTerminalNumber,pTerminalConfig->fAcqBank);
+            		if(retour != OK) {
+                		trace_event("End   EventProcessing(NOK)", PROCESSING);
+                		return (NOK);
+            		}
+        	}
+
+
+                        /** *********************************** **/
+                        /** -- Sending EMV Parameters           **/
+                        /** *********************************** **/
+
+                        /** . Sending the Diebold EMV States **/
+                        retour = FctSendEmvParams(nIndexCtx, pTerminalConfig->fTerminalNumber, pTerminalConfig->fAcqBank/*ICH270715*/, GN_DBL_EMV_STATES);
+                        if(retour != OK) 
+                        {
+                           trace_event("End   EventProcessing(NOK) <ERROR ON FctSendEmvParams(GN_DBL_EMV_STATES)>", FATAL);
+                           return (NOK);
+                        }
+
+                        /** . Sending the Diebold AIDs Parameters **/
+                        retour = FctSendEmvParams(nIndexCtx, pTerminalConfig->fTerminalNumber, pTerminalConfig->fAcqBank/*ICH270715*/, GN_DBL_EMV_AIDS);
+                        if(retour != OK) 
+                        {
+                           trace_event("End   EventProcessing(NOK) <ERROR ON FctSendEmvParams(GN_DBL_EMV_AIDS)>", FATAL);
+                           return (NOK);
+                        }
+
+
+                        /** . Sending the Diebold Scheme Specific Parameters **/
+                        retour = FctSendEmvParams(nIndexCtx, pTerminalConfig->fTerminalNumber, pTerminalConfig->fAcqBank/*ICH270715*/, GN_DBL_EMV_SCHEME_TAGS);
+                        if(retour != OK)
+                        {
+                           trace_event("End   EventProcessing(NOK) <ERROR ON FctSendEmvParams(GN_DBL_EMV_SCHEME_TAGS)>", FATAL);
+                           return (NOK);
+                        }
+
+        	/* - load parametres de configuration ------------------------------- */
+        	if(pTerminalConfig->fLoadConfigParamFlag == '1') {
+            		retour = Send_Terminal_Parameter(nIndexCtx, pTerminalConfig->fTerminalNumber, pTerminalConfig->fAcqBank/*ICH270715*/);
+            		if(retour != OK) {
+                		trace_event("End   EventProcessing(NOK)", PROCESSING);
+            	    		return (NOK);
+            		}
+        	}
+
+        	/* - load table des fits -------------------------------------------- */
+        	if(pTerminalConfig->fLoadFitFlag == '1') {
+            		retour = Send_Terminal_Fits(nIndexCtx, pTerminalConfig->fTerminalNumber,pTerminalConfig->fAcqBank);
+            		if(retour != OK) {
+                		trace_event("End   EventProcessing(NOK)", PROCESSING);
+                		return (NOK);
+            		}
+        	}
+
+        	/* - load date et heure ---------------------------------------------- */
+        	if(pTerminalConfig->fLoadDateFlag == '1') {
+            		retour = Send_Terminal_Date(nIndexCtx,pTerminalConfig->fTerminalNumber,pTerminalConfig->fAcqBank);
+            		if(retour != OK) {
+                		trace_event("End   EventProcessing(NOK)", PROCESSING);
+                		return (NOK);
+            		}
+        	}
+
+		/* - load format template ------------------------------------------- */
+        	if(pTerminalConfig->fLoadFormatTamplateFlag == '1') {
+            		retour = Send_Terminal_Template(nIndexCtx, pTerminalConfig->fTerminalNumber,pTerminalConfig->fAcqBank);
+            		if(retour != OK) {
+                		trace_event("End   EventProcessing(TEMPLATE : NOK)", PROCESSING);
+                		return (NOK);
+            		}
+        	}
+    	}
+
+
+    	/* - load cle maitresse ---------------------------------------------- */
+sprintf(sLine, "==> fLoadMasterKeyFlag=[%c]. fLoadCommsKeyFlag=[%c]", 
+              pTerminalConfig->fLoadMasterKeyFlag,
+              pTerminalConfig->fLoadCommsKeyFlag);
+trace_event(sLine, FATAL);
+    	if(pTerminalConfig->fLoadMasterKeyFlag == '1') {
+        	retour = Send_Terminal_Key(nIndexCtx,pTerminalConfig->fTerminalNumber, TMK_UNDER_ZMK);
+        	if(retour != OK) {
+            		trace_event("End   EventProcessing(NOK)", PROCESSING);
+            		return (NOK);
+        	}
+
+        	/* - maj de dbl_watch_config -------------- */
+		/*Adil HMAMI*/
+        	retour = UpdateMasterKeyFlag(nIndexCtx, pTerminalConfig->fTerminalNumber, "0" ,pTerminalConfig->fAcqBank);
+        	if(retour != OK) {
+            		trace_event("UPDATE DBL_WATCH_CONFIG NOT PROCESSED", ERROR);
+            		trace_event("End   EventProcessing(NOK)", PROCESSING);
+            		return (NOK);
+        	}
+    	}
+ 
+
+    	/* - load cle de communication --------------------------------------- */
+    	if(pTerminalConfig->fLoadCommsKeyFlag == '1') {
+        	retour = Send_Terminal_Key(nIndexCtx,pTerminalConfig->fTerminalNumber, TPK_UNDER_TMK);
+        	if(retour != OK) {
+            		trace_event("End   EventProcessing(NOK)", PROCESSING);
+            		return (NOK);
+        	}
+    	}
+ 
+
+    	/* - send supplies counters ----------------------------------------- */
+    	/*if(pTerminalConfig->fSendSupplyCountersFlag == '1') {
+		trace_event("Start SEND_SUPPLY_COUNTER", PROCESSING);
+        	retour = Send_Terminal_Command(nIndexCtx,SEND_SUPPLY_COUNTER, pTerminalConfig->fTerminalNumber,pTerminalConfig->fAcqBank);
+        	*retour = Send_Terminal_Command(nIndexCtx, SEND_ENH_SUPPLY_CTR, pTerminalConfig->fTerminalNumber,pTerminalConfig->fAcqBank);*
+		trace_event("End  SEND_SUPPLY_COUNTER", PROCESSING);
+        	if(retour != OK) {
+            		trace_event("End   EventProcessing(SEND_SUPPLY_COUNTER : NOK)", PROCESSING);
+            		return (NOK);
+        	}
+    	}
+
+
+	* - send and clear supplies counters --------------------------------- *
+    	if(pTerminalConfig->fSendClearSupplyCtrFlag == '1') {
+		trace_event("Start SEND_CLEAR_SUPPLY_CTR", PROCESSING);
+        	retour = Send_Terminal_Command(nIndexCtx, SEND_CLEAR_SUPPLY_CTR, pTerminalConfig->fTerminalNumber,pTerminalConfig->fAcqBank);
+		trace_event("End  SEND_CLEAR_SUPPLY_CTR", PROCESSING);
+        	if(retour != OK) {
+            		trace_event("End   EventProcessing(SEND_CLEAR_SUPPLY_CTR : NOK)", PROCESSING);
+            		return (NOK);
+        	}
+    	}
+
+        * - send enh supply counters ----------------------------- *
+        if(pTerminalConfig->fSendEnhSupplyCtrFlag == '1') {
+                trace_event("Start SEND_ENH_SUPPLY_CTR", PROCESSING);
+                retour = Send_Terminal_Command(nIndexCtx, SEND_ENH_SUPPLY_CTR, pTerminalConfig->fTerminalNumber,pTerminalConfig->fAcqBank);
+                trace_event("End   SEND_ENH_SUPPLY_CTR", PROCESSING);
+                if(retour != OK) {
+                        trace_event("End   EventProcessing(SEND_CLEAR_ENH_SUPPLY_CTR: NOK)", PROCESSING);
+                        return (NOK);
+                }
+        }
+
+
+  	* - send and clear enh supply counters ----------------------------- *
+    	if(pTerminalConfig->fSendClearEnhSupplyCtrFlag == '1') {
+		trace_event("Start SEND_CLEAR_ENH_SUPPLY_CTR", PROCESSING);
+        	retour = Send_Terminal_Command(nIndexCtx, SEND_CLEAR_ENH_SUPPLY_CTR, pTerminalConfig->fTerminalNumber,pTerminalConfig->fAcqBanks);
+		trace_event("End   SEND_CLEAR_ENH_SUPPLY_CTR", PROCESSING);
+        	if(retour != OK) {
+            		trace_event("End   EventProcessing(SEND_CLEAR_ENH_SUPPLY_CTR: NOK)", PROCESSING);
+            		return (NOK);
+        	}
+    	}*/
+
+
+    	if ( memcmp(pTerminalConfig->fConfigId, lConfigId, 4) != 0 ) {
+        	/* - load config id ------------------------------------------------- */
+        	if(pTerminalConfig->fLoadConfigIdFlag == '1') {
+            		retour = Send_Terminal_Config_Id(nIndexCtx, pTerminalConfig->fConfigId, pTerminalConfig->fTerminalNumber);
+           		 if(retour != OK) {
+                		trace_event("End   EventProcessing(NOK)", PROCESSING);
+                		return (NOK);
+            		}
+        	}
+    	}
+	
+	if(pTerminalConfig->fCmdRunSelfTestFlag == '1') {
+        	/*retour = RunSelfTest(pTerminalConfig->fTerminalNumber);
+        	*/if(retour != OK) {
+            		trace_event("End   EventProcessing(NOK)", PROCESSING);
+            		return (NOK);
+        	}
+    	}
+
+
+    	/* - commande go in service ----------------------------------------- */
+    	if(pTerminalConfig->fCmdGoInServiceFlag == '1') {
+        	if (pTerminalConfig->fEventCode == EVN_POWER_UP) {
+            		retour = Go_In_Service(nIndexCtx,POWER_UP_RECEIVED);
+		}
+        	else { 
+			if (pTerminalConfig->fEventCode == EVN_SUPER_EXIT){
+            			retour = Go_In_Service(nIndexCtx,SUPER_EXIT_RECEIVED);
+        		} else { 
+				if (pTerminalConfig->fEventCode == EVN_ATM_MNG_CMD) {
+            				retour = Go_In_Service(nIndexCtx,USER_REQUEST);
+        			} else {
+            				retour = Go_In_Service(nIndexCtx,USER_REQUEST);
+				}
+			}
+		}
+        	if(retour != OK) {
+            		trace_event("End   EventProcessing(NOK)", PROCESSING);
+            		return (NOK);
+        	}
+    	}
+
+	sprintf(sLine, "End   EventProcessing(OK)");
+	trace_event(sLine, PROCESSING);
+	return (OK);
+}
+
+
+  /***********************************************************************
+  **  nom	: UpdateProcessID()					**
+  **  desc	: maj du process id					**
+  **  entree	: pTermNbr	-> numero du terminal			**
+  **		  pPID		-> id du process			**
+  **  sortie	: aucune						**
+  **  retour	: OK	-> si c'est OK					**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (02 Avr 1999)				**
+  **			(c) 1999 Hightech Payment Systems		**
+  ***********************************************************************/
+int	UpdateProcessID(nIndexCtx,pTermNbr, pAcqBank /*ICH270715*/, pPID)
+int		nIndexCtx;
+char	*pTermNbr;
+char	*pAcqBank;/*ICH270715*/
+int	pPID;
+{
+   char   sLine[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar	hTermNbr	[15+1];
+    varchar	hAcqBank	[6+1];/*ICH270715*/ 
+    int		hPID;
+    int		hRet;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateProcessID(%.8s,%.6s,%d)", pTermNbr,pAcqBank/*ICH270715*/, pPID);
+trace_event(sLine, PROCESSING);
+
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+
+    memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr));
+    hTermNbr.len	= strlen(pTermNbr);
+    hPID		= pPID;
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    EXEC SQL WHENEVER SQLERROR GOTO updateProcessIDErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    EXEC SQL EXECUTE
+    BEGIN
+        :hRet := PCRD_DBL_WATCH_CONFIG.UPDATE_PROCESS_ID(:hTermNbr,:hAcqBank/*ICH270715*/, :hPID);
+    END;
+    END-EXEC;
+
+    if(hRet != OK)
+    {
+        sprintf(sLine, "End   UpdateProcessID(%d)", hRet);
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateProcessID(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateProcessIDErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateProcessID(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: UpdateInServiceFlag()					**
+  **  desc	: maj du flag CMD_IN_SERVICE_FLAG			**
+  **  entree	: pTermNbr	-> numero du terminal			**
+  **		  pInServiceFlag-> nouvelle valeur du flag		**
+  **  sortie	: aucune						**
+  **  retour	: OK	-> si c'est OK					**
+  **		  ERROR	-> erreur fatal					**
+  **			(c) 1999 Hightech Payment Systems		**
+  ***********************************************************************/
+int	UpdateInServiceFlag(nIndexCtx,pTermNbr, pAcqBank /*ICH270715*/, pInServiceFlag)
+int 	nIndexCtx;
+char	*pTermNbr;
+char	*pAcqBank;/*ICH270715*/
+char	*pInServiceFlag;
+{
+   char  sLine[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar	hTermNbr		[15+1];
+    varchar	hAcqBank		[6+1];/*ICH270715*/ 
+    char	hInServiceFlag	[ 1+1];
+    int		hRet;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateInServiceFlag(%.15s,%.6s,%.1s)",
+                 pTermNbr,pAcqBank, pInServiceFlag);
+trace_event(sLine, PROCESSING);
+
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hInServiceFlag,	0, sizeof(hInServiceFlag));
+
+    memcpy(hInServiceFlag,	pInServiceFlag, strlen(pInServiceFlag)	);
+    memcpy(hTermNbr.arr,	pTermNbr, 	strlen(pTermNbr)	);
+    hTermNbr.len		= strlen(pTermNbr);
+    
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    EXEC SQL WHENEVER SQLERROR GOTO updateInServiceFlagErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    EXEC SQL EXECUTE
+    BEGIN
+        :hRet := PCRD_DBL_WATCH_CONFIG.UPDATE_IN_SERVICE_FLAG(:hTermNbr,
+        					:hAcqBank/*ICH270715*/,
+							:hInServiceFlag);
+    END;
+    END-EXEC;
+
+    if(hRet != OK)
+    {
+        sprintf(sLine, "End   UpdateInServiceFlag(%d)", hRet);
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateInServiceFlag(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateInServiceFlagErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateInServiceFlag(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: UpdateMasterKeyFlag()					**
+  **  desc	: maj du flag LOAD_MASTER_KEY_FLAG			**
+  **  entree	: pTermNbr	-> numero du terminal			**
+  **		  pMasterKeyFlag-> nouvelle valeur du flag		**
+  **  sortie	: aucune						**
+  **  retour	: OK	-> si c'est OK					**
+  **		  ERROR	-> erreur fatal					**
+  **			(c) 1999 Hightech Payment Systems		**
+  ***********************************************************************/
+int	UpdateMasterKeyFlag(nIndexCtx,pTermNbr, pAcqBank /*ICH270715*/, pMasterKeyFlag)
+int 	nIndexCtx;
+char	*pTermNbr;
+char	*pAcqBank;/*ICH270715*/
+char	*pMasterKeyFlag;
+{
+   char  sLine[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar	hTermNbr		[15+1];
+    varchar	hAcqBank		[6+1];/*ICH270715*/ 
+    char	hMasterKeyFlag	[ 1+1];
+    int		hRet;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start UpdateMasterKeyFlag(%.15s,%.6s,%.1s)",
+                 pTermNbr,pAcqBank/*ICH270715*/, pMasterKeyFlag);
+trace_event(sLine, PROCESSING);
+
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr));
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hMasterKeyFlag,	0, sizeof(hMasterKeyFlag));
+
+    memcpy(hMasterKeyFlag,	pMasterKeyFlag, strlen(pMasterKeyFlag)	);
+    memcpy(hTermNbr.arr,	pTermNbr, 	strlen(pTermNbr)	);
+    hTermNbr.len		= strlen(pTermNbr);
+
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	
+    EXEC SQL WHENEVER SQLERROR GOTO updateMasterKeyFlagErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    EXEC SQL EXECUTE
+    BEGIN
+        :hRet := PCRD_DBL_WATCH_CONFIG.UPDATE_MASTER_KEY_FLAG(:hTermNbr,:hAcqBank/*ICH270715*/,
+							:hMasterKeyFlag);
+    END;
+    END-EXEC;
+
+    if(hRet != OK)
+    {
+        sprintf(sLine, "End   UpdateMasterKeyFlag(%d)", hRet);
+        trace_event(sLine, PROCESSING);
+        return (NOK);
+    }
+
+sprintf(sLine, "End   UpdateMasterKeyFlag(OK)");
+trace_event(sLine, PROCESSING);
+return (OK);
+
+updateMasterKeyFlagErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   UpdateMasterKeyFlag(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: GetATMMngCmd()					**
+  **  desc	: chargement de la commande pour le GAB			**
+  **  entree	: fTerminalNumber	-> numero du terminal		**
+  **  sortie	: fCommand		-> commande pour le terminal	**
+  **		  fPurgeDate		-> date d'expiration de la cmd	**
+  **  retour	: OK	-> si c'est OK					**
+  **		  ERROR	-> erreur fatal					**
+  **			(c) 1999 Hightech Payment Systems		**
+  ***********************************************************************/
+int	GetATMMngCmd(nIndexCtx,pATMCommand)
+int 		nIndexCtx;
+atm_command	*pATMCommand;
+{
+   char  sLine[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar		hTermNbr	[15+1];
+    varchar		hAcqBank	[6+1];/*ICH270715*/ 
+    int			hCmdSeq;
+    varchar		hCmd		[30+1];
+    char		hPurgeDate	[12+1];
+    int			hRet;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start GetATMMngCmd(%.15s,%.6s)", pATMCommand->fTerminalNumber, pATMCommand->fAcqBank/*ICH270715*/);
+
+trace_event(sLine, PROCESSING);
+
+    /* - initilialisation des variables ------------------------------------- */
+    memset(pATMCommand->fPurgeDate,	0, sizeof(pATMCommand->fPurgeDate));
+    memset(pATMCommand->fCommand,	0, sizeof(pATMCommand->fCommand)  );
+    memset(hTermNbr.arr,		0, sizeof(hTermNbr.arr)		  );
+    memset(hAcqBank.arr,		0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hCmd.arr,			0, sizeof(hCmd.arr)		  );
+    memset(hPurgeDate,			0, sizeof(hPurgeDate)		  );
+    hTermNbr.len	= sizeof(hTermNbr.arr);
+    hAcqBank.len	= sizeof(hAcqBank.arr);/*ICH270715*/  
+    hCmd.len		= sizeof(hCmd.arr);
+
+    /* - renseignement des variables PL/SQL --------------------------------- */
+    memcpy(hTermNbr.arr,pATMCommand->fTerminalNumber,
+			strlen(pATMCommand->fTerminalNumber));
+    hTermNbr.len	= strlen(pATMCommand->fTerminalNumber);
+
+    memcpy(hAcqBank.arr,	pATMCommand->fAcqBank, strlen(pATMCommand->fAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pATMCommand->fAcqBank);
+	
+    /* - capture des exceptions PL/SQL -------------------------------------- */
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO getUserCommandErr;
+
+    /* - execution du traitement PL/SQL ------------------------------------- */
+    EXEC SQL EXECUTE
+    DECLARE
+        enr_atm_commands	ATM_COMMANDS%ROWTYPE;
+    BEGIN
+        -- preparation de l'enregistrement
+        enr_atm_commands.terminal_number := :hTermNbr;
+        enr_atm_commands.bank_code		 := :hAcqBank;/*ICH270715*/
+
+        -- execution du PL/SQL
+        :hRet := PCRD_ATM_MNG.GET_ATM_CMD(enr_atm_commands);
+
+        -- recuperation du resultat
+        IF :hRet = DECLARATION_CST.OK
+        THEN
+            :hCmd	:=enr_atm_commands.command;
+            :hCmdSeq	:=enr_atm_commands.cmd_seq;
+            :hPurgeDate :=TO_CHAR(enr_atm_commands.purge_date,'YYMMDDHH24MISS');
+        END IF;
+    END;
+    END-EXEC;
+
+    /* - examen du retour du traitement PL/SQL ------------------------------ */
+    if (hRet != OK)
+    {
+        sprintf(sLine, "End   GetATMMngCmd(%d)", hRet);
+        trace_event(sLine, PROCESSING);
+        return (hRet);
+    }
+
+    /* - recuperation du resultat du traitement PL/SQL ---------------------- */
+    memcpy(pATMCommand->fCommand,	hCmd.arr,	hCmd.len);
+    memcpy(pATMCommand->fPurgeDate,	hPurgeDate,	      12);
+    pATMCommand->fCmdSeq		= hCmdSeq;
+
+sprintf(sLine, "End   GetATMMngCmd(%d,%.30s,%.12s)",
+                 pATMCommand->fCmdSeq,
+                 pATMCommand->fCommand,
+                 pATMCommand->fPurgeDate);
+trace_event(sLine, PROCESSING);
+return (OK);
+
+getUserCommandErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   GetATMMngCmd(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: PutATMMngCmdRes()					**
+  **  desc	: avis a la table ATM_COMMANDS				**
+  **  entree	: fTerminalNumber	-> numero du terminal		**
+  **  sortie	: fCommand		-> commande pour le terminal	**
+  **  retour	: OK	-> si c'est OK					**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (02 Avr 1999)				**
+  **			(c) 1999 Hightech Payment Systems		**
+  ***********************************************************************/
+int	PutATMMngCmdRes(nIndexCtx,pATMCommand)
+int 		nIndexCtx;
+atm_command	pATMCommand;
+{
+   char  sLine[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar		hTermNbr	[15+1];
+    varchar		hAcqBank	[6+1];/*ICH270715*/ 
+    int			hCmdSeq;
+    varchar		hCmd		[30+1];
+    char		hPurgeDate	[12+1];
+    char		hStatus		[ 1+1];
+    int			hRet;
+EXEC SQL END DECLARE SECTION;
+
+sprintf(sLine, "Start PutATMMngCmdRes(%.15s,%.6s,%d,%.30s,%.12s,%.1s)",
+                pATMCommand.fTerminalNumber,
+                pATMCommand.fAcqBank,/*ICH270715*/
+                pATMCommand.fCmdSeq,
+                pATMCommand.fCommand,
+                pATMCommand.fPurgeDate,
+                pATMCommand.fStatus);
+trace_event(sLine, PROCESSING);
+
+    /* - initilialisation des variables ------------------------------------- */
+    memset(hTermNbr.arr,		0, sizeof(hTermNbr.arr)		);
+    memset(hAcqBank.arr,		0, sizeof(hAcqBank.arr));/*ICH270715*/     
+    memset(hCmd.arr,			0, sizeof(hCmd.arr)		);
+    memset(hPurgeDate,			0, sizeof(hPurgeDate)		);
+    memset(hStatus,				0, sizeof(hStatus)		);
+
+    /* - renseignement des variables PL/SQL --------------------------------- */
+    memcpy(hTermNbr.arr,pATMCommand.fTerminalNumber,
+			strlen(pATMCommand.fTerminalNumber));
+    hTermNbr.len	= strlen(pATMCommand.fTerminalNumber);
+    
+    memcpy(hAcqBank.arr,	pATMCommand.fAcqBank, strlen(pATMCommand.fAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pATMCommand.fAcqBank);
+    
+    memcpy(hCmd.arr,	pATMCommand.fCommand,
+			strlen(pATMCommand.fCommand));
+    hCmd.len		= strlen(pATMCommand.fCommand);
+    memcpy(hPurgeDate,	pATMCommand.fPurgeDate,
+			strlen(pATMCommand.fPurgeDate));
+    memcpy(hStatus,	pATMCommand.fStatus, 1);
+    hCmdSeq		= pATMCommand.fCmdSeq;
+
+
+    /* - capture des exceptions PL/SQL -------------------------------------- */
+    EXEC SQL WHENEVER SQLERROR GOTO getUserCommandErr;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+    /* - execution du traitement PL/SQL ------------------------------------- */
+
+    EXEC SQL EXECUTE
+    DECLARE
+        enr_atm_commands	ATM_COMMANDS%ROWTYPE;
+    BEGIN
+        -- preparation de l'enregistrement
+        enr_atm_commands.terminal_number	:= :hTermNbr;
+        enr_atm_commands.bank_code		:= :hAcqBank;/*ICH270715*/
+        enr_atm_commands.cmd_seq		:= :hCmdSeq;
+        enr_atm_commands.command		:= :hCmd;
+        enr_atm_commands.purge_date		:= TO_DATE(:hPurgeDate,'YYMMDDHH24MISS');
+        enr_atm_commands.status			:= :hStatus;
+
+        -- execution du PL/SQL
+        :hRet := PCRD_ATM_MNG.PUT_ATM_CMD_RES(enr_atm_commands);
+    END;
+    END-EXEC;
+
+
+    /* - examen du retour du traitement PL/SQL ------------------------------ */
+    if (hRet != OK)
+    {
+        sprintf(sLine, "End   PutATMMngCmdRes(%d)", hRet);
+        trace_event(sLine, PROCESSING);
+        return (hRet);
+    }
+
+sprintf(sLine, "End   PutATMMngCmdRes(%s)", pATMCommand.fCommand);
+trace_event(sLine, PROCESSING);
+return (OK);
+
+getUserCommandErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   PutATMMngCmdRes(ERROR)", ERROR);
+    return (ERROR);
+}
+

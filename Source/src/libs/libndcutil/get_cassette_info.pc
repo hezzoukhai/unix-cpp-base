@@ -1,0 +1,418 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_cassette_info.pc                                                   */
+/*                                                                             */
+/* Description                                                                 */
+/*      Trace And Dump Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+
+#include <define.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/******************************************************************************/
+/* Fonction select_cassettes_info.                                            */
+/* -----------------------------	                                      */
+/* Date/Auteur : 12/03/1996 Y .KAOUTAR                                        */
+/* Revision    :                                                              */
+/******************************************************************************/
+/*
+int    select_cassettes_info(
+							int			nIndexCtx,
+							char		*V_Terminal,
+							char 		*V_AcqBank,
+							char		*V_cassette1_status,
+							char		*V_cassette2_status,
+							char		*V_cassette3_status,
+							char		*V_cassette4_status,
+							int		*V_montant_1,
+							int		*V_montant_2,
+							int		*V_montant_3,
+							int		*V_montant_4)
+{
+	struct sqlca sqlca;
+	char    sLine[MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR         T_terminal_number[15+1];
+	VARCHAR      	    T_AcqBank  	 	 [6+1];
+	double          T_cassette1_amount;
+	double          T_cassette2_amount;
+	double          T_cassette3_amount;
+	double          T_cassette4_amount;
+	char            T_cassette1_status[1+1];
+	char            T_cassette2_status[1+1];
+	char            T_cassette3_status[1+1];
+	char            T_cassette4_status[1+1];
+	int				plRetour;
+	EXEC SQL END DECLARE SECTION;
+
+
+	trace_event("Debut select_cassettes_info()", PROCESSING);
+
+
+	memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+	memset(T_AcqBank.arr,		  0, sizeof(T_AcqBank.arr)); 
+	memset(T_cassette1_status, 0, sizeof(T_cassette1_status));
+	memset(T_cassette2_status, 0, sizeof(T_cassette2_status));
+	memset(T_cassette3_status, 0, sizeof(T_cassette3_status));
+	memset(T_cassette4_status, 0, sizeof(T_cassette4_status));
+
+	memcpy(T_terminal_number.arr, V_Terminal, strlen(V_Terminal));
+	T_terminal_number.len = strlen(V_Terminal);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));  
+	T_AcqBank.len = strlen(V_AcqBank); 
+
+	EXEC SQL WHENEVER SQLERROR GOTO select_cassette_error;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+	EXEC SQL EXECUTE
+
+		BEGIN
+
+		:plRetour := PCRD_NDC_CASSETTE_MNG.GET_INFO_CASSETTE(:T_terminal_number,
+		:T_AcqBank,
+		:T_cassette1_status,
+		:T_cassette2_status,
+		:T_cassette3_status,
+		:T_cassette4_status,
+		:T_cassette1_amount,
+		:T_cassette2_amount,
+		:T_cassette3_amount,
+		:T_cassette4_amount );
+	END;
+	END-EXEC;
+
+
+	if(plRetour == NOK)
+	{
+		trace_event("UNE OU PLUSIEURS CASSETTES SONT SANS INFOS", ERROR);
+		trace_event("End   select_cassettes_info(NOK)", PROCESSING);
+		return (NOK);
+	}
+	else if(plRetour == ERROR)
+	{
+		trace_event("ERREUR FATAL", ERROR);
+		trace_event("End   select_cassettes_info(ERROR)", PROCESSING);
+		return (ERROR);
+	}
+
+	memcpy(V_cassette1_status, T_cassette1_status,     1);
+	memcpy(V_cassette2_status, T_cassette2_status,     1);
+	memcpy(V_cassette3_status, T_cassette3_status,     1);
+	memcpy(V_cassette4_status, T_cassette4_status,     1);
+
+	*V_montant_1 = (int) T_cassette1_amount;
+	*V_montant_2 = (int) T_cassette2_amount;
+	*V_montant_3 = (int) T_cassette3_amount;
+	*V_montant_4 = (int) T_cassette4_amount;
+
+
+	trace_event("Fin  select_cassettes_info()", PROCESSING);
+	return(OK);
+
+select_cassette_error :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("Fin  select_cassettes_info() ",PROCESSING);
+	return(ERROR);
+
+}
+*/
+/***********************************************************************
+**  nom	: GetCassettesInfo					**
+**  desc	: chargement des informations sur les cassettes		**
+**  entree	: terminalNumber	-> numero terminal		**
+**  sortie	: cassette1_status	-> status de la cassette 1	**
+**		  cassette1_amount	-> montant dans la cassette 1	**
+**		  cassette1_currency	-> monnaie de la cassette 1	**
+**		  cassette1_note	-> valeur des billets 1		**
+**		  cassette2_status	-> status de la cassette 2	**
+**		  cassette2_amount	-> montant dans la cassette 2	**
+**		  cassette2_currency	-> monnaie de la cassette 2	**
+**		  cassette2_note	-> valeur des billets 2		**
+**		  cassette3_status	-> status de la cassette 3	**
+**		  cassette3_amount	-> montant dans la cassette 3	**
+**		  cassette3_currency	-> monnaie de la cassette 3	**
+**		  cassette3_note	-> valeur des billets 3		**
+**		  cassette4_status	-> status de la cassette 4	**
+**		  cassette4_amount	-> montant dans la cassette 4	**
+**		  cassette4_currency	-> monnaie de la cassette 4	**
+**		  cassette4_note	-> valeur des billets 4		**
+**  retour	: OK	-> fonction OK					**
+**		  NOK	-> pas de donnees pour une cassette		**
+**		  ERROER-> erreur fatal					**
+**  auteur	: Younes OUADI (02 Nov 1998)				**
+***********************************************************************/
+int GetCassettesInfo(
+	int			nIndexCtx,
+	char		*terminalNumber,
+	char		*pAcqBank,
+	char		*cassette1_status,
+	int			*cassette1_amount,
+	char		*cassette1_currency,
+	int			*cassette1_note,
+	char		*cassette2_status,
+	int			*cassette2_amount,
+	char		*cassette2_currency,
+	int			*cassette2_note,
+	char		*cassette3_status,
+	int			*cassette3_amount,
+	char		*cassette3_currency,
+	int			*cassette3_note,
+	char		*cassette4_status,
+	int			*cassette4_amount,
+	char		*cassette4_currency,
+	int			*cassette4_note,
+	int			*max_note_cassette)
+{
+	struct sqlca sqlca;
+	char    sLine[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	varchar	plTerminalNumber	[15+1];
+	VARCHAR		plAcqBank			[6+1];/*ICH270715*/ 
+	char		plCassette1Status	[ 1+1];
+	int		plCassette1Amount;
+	char		plCassette1Currency	[ 3+1];
+	int		plCassette1Note;
+	char		plCassette2Status	[ 1+1];
+	int		plCassette2Amount;
+	char		plCassette2Currency	[ 3+1];
+	int		plCassette2Note;
+	char		plCassette3Status	[ 1+1];
+	int		plCassette3Amount;
+	char		plCassette3Currency	[ 3+1];
+	int		plCassette3Note;
+	char		plCassette4Status	[ 1+1];
+	int		plCassette4Amount;
+	char		plCassette4Currency	[ 3+1];
+	int		plCassette4Note;
+	int		plMaxNoteCassette;
+	int		plRetour;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start GetCassettesInfo(%.8s,%s)", terminalNumber,pAcqBank);
+	trace_event(sLine, PROCESSING);
+
+	memset(plTerminalNumber.arr, 0, sizeof(plTerminalNumber.arr));
+	memset(plAcqBank.arr,	     0, sizeof(plAcqBank.arr));/*ICH270715*/     
+	memset(plCassette1Status, 	 0, sizeof(plCassette1Status));
+	memset(plCassette1Currency,  0, sizeof(plCassette1Currency));
+	memset(plCassette2Status,    0, sizeof(plCassette2Status));
+	memset(plCassette2Currency,  0, sizeof(plCassette2Currency));
+	memset(plCassette3Status,    0, sizeof(plCassette3Status));
+	memset(plCassette3Currency,  0, sizeof(plCassette3Currency));
+	memset(plCassette4Status,    0, sizeof(plCassette4Status));
+	memset(plCassette4Currency,  0, sizeof(plCassette4Currency));
+	/* initialisation des variables PL/SQL */
+	memcpy(plTerminalNumber.arr,	terminalNumber, 8);
+	plTerminalNumber.len = 8;
+
+	memcpy(plAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	plAcqBank.len	= strlen(pAcqBank);
+
+	/* execution de la fonction PL/SQL */
+	EXEC SQL WHENEVER SQLERROR GOTO get_cassette_info_error;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL EXECUTE
+		BEGIN
+		:plRetour := PCRD_NDC_CASSETTE_MNG.GET_INFO(:plTerminalNumber,
+		:plAcqBank,/*ICH270715*/ 
+		:plCassette1Status,
+		:plCassette1Amount,
+		:plCassette1Currency,
+		:plCassette1Note,
+		:plCassette2Status,
+		:plCassette2Amount,
+		:plCassette2Currency,
+		:plCassette2Note,
+		:plCassette3Status,
+		:plCassette3Amount,
+		:plCassette3Currency,
+		:plCassette3Note,
+		:plCassette4Status,
+		:plCassette4Amount,
+		:plCassette4Currency,
+		:plCassette4Note,
+		:plMaxNoteCassette);
+	END;
+	END-EXEC;
+
+	/* test de la valeur de retour de la fonction PL/SQL */
+	if(plRetour == NOK)
+	{
+		trace_event("UNE OU PLUSIEURS CASSETTES SONT SANS INFOS", ERROR);
+		trace_event("End   GetCassettesInfo(NOK)", PROCESSING);
+		return (NOK);
+	}
+	else if(plRetour == ERROR)
+	{
+		trace_event("ERREUR FATAL", ERROR);
+		trace_event("End   GetCassettesInfo(ERROR)", PROCESSING);
+		return (ERROR);
+	}
+
+	/* recuperation des variables PL/SQL */
+	memcpy(cassette1_status,	plCassette1Status,	1);
+	*cassette1_amount = plCassette1Amount;
+	memcpy(cassette1_currency,	plCassette1Currency,	3);
+	*cassette1_note = plCassette1Note;
+	memcpy(cassette2_status,	plCassette2Status,	1);
+	*cassette2_amount = plCassette2Amount;
+	memcpy(cassette2_currency,	plCassette2Currency,	3);
+	*cassette2_note = plCassette2Note;
+	memcpy(cassette3_status,	plCassette3Status,	1);
+	*cassette3_amount = plCassette3Amount;
+	memcpy(cassette3_currency,	plCassette3Currency,	3);
+	*cassette3_note = plCassette3Note;
+	memcpy(cassette4_status,	plCassette4Status,	1);
+	*cassette4_amount = plCassette4Amount;
+	memcpy(cassette4_currency,	plCassette4Currency,	3);
+	*cassette4_note = plCassette4Note;
+	*max_note_cassette = plMaxNoteCassette;
+
+	sprintf(sLine, "S|   AMOUNT   |CUR| VALUE");
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "%.1s|%012d|%.3s|%08d",
+		cassette1_status,
+		*cassette1_amount,
+		cassette1_currency,
+		*cassette1_note);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "%.1s|%012d|%.3s|%08d",
+		cassette2_status,
+		*cassette2_amount,
+		cassette2_currency,
+		*cassette2_note);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "%.1s|%012d|%.3s|%08d",
+		cassette3_status,
+		*cassette3_amount,
+		cassette3_currency,
+		*cassette3_note);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "%.1s|%012d|%.3s|%08d",
+		cassette4_status,
+		*cassette4_amount,
+		cassette4_currency,
+		*cassette4_note);
+	trace_event(sLine, PROCESSING);
+	sprintf(sLine, "MAX NOTE : %d", *max_note_cassette);
+	trace_event(sLine, PROCESSING);
+
+	trace_event("End   GetCassettesInfo(OK)", PROCESSING);
+	return (OK);
+
+get_cassette_info_error :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End  GetCassettesInfo(ERROR) ",PROCESSING);
+	return(ERROR);
+
+}
+/* H. YOUSFI : Gestion des Cassettes Notes */ /**Linux Intégré par MKB260907*/
+
+int GetCassetteNotes( 	int nIndexCtx,
+	char *terminalNumber, 
+	char *pAcqBank /*ICH270715*/,
+	char *cassette1_note, 
+	char *cassette2_note, 
+	char *cassette3_note, 
+	char *cassette4_note
+	)
+
+{
+	struct sqlca sqlca;
+	char    sLine[MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	varchar	plTerminalNumber	[15+1];
+	varchar	plAcqBank 		[6+1]/*ICH270715*/;
+	char		plCassette1Note 	[2 + 1];
+	char		plCassette2Note 	[2 + 1];
+	char		plCassette3Note 	[2 + 1];
+	char		plCassette4Note 	[2 + 1];
+	int		plRetour;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start GetCassetteNotes(%.8s,%.6s)", terminalNumber,pAcqBank);
+	trace_event(sLine, PROCESSING);
+
+	memset(plTerminalNumber.arr, 0, sizeof(plTerminalNumber.arr));
+	plTerminalNumber.len = 0;
+	memset(plAcqBank.arr, 0, sizeof(plAcqBank.arr));
+	plAcqBank.len = 0;
+	memset(plCassette1Note,  0, sizeof(plCassette1Note));
+	memset(plCassette2Note,  0, sizeof(plCassette2Note));
+	memset(plCassette3Note,  0, sizeof(plCassette3Note));
+	memset(plCassette4Note,  0, sizeof(plCassette4Note));
+
+	/* initialisation des variables PL/SQL */
+	memcpy(plTerminalNumber.arr,	terminalNumber, 8);
+	plTerminalNumber.len = 8;
+	memcpy(plAcqBank.arr, pAcqBank, strlen(pAcqBank));/*ICH270715*/    
+	plAcqBank.len = strlen(pAcqBank);
+
+	/* execution de la fonction PL/SQL */
+	EXEC SQL WHENEVER SQLERROR GOTO get_cassette_notes_error;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL EXECUTE
+		BEGIN
+		:plRetour := PCRD_NDC_CASSETTE_MNG.GET_NOTE_TYPES(:plTerminalNumber,
+		:plAcqBank,/*ICH270715*/  
+		:plCassette1Note,
+		:plCassette2Note,
+		:plCassette3Note,
+		:plCassette4Note
+		);
+	END;
+	END-EXEC;
+
+	/* test de la valeur de retour de la fonction PL/SQL */
+	if(plRetour != OK)
+	{
+		trace_event("ERREUR RECUPERATION PARAMETRES NOTES ", ERROR);
+		trace_event("End   GetCassetteNotes(NOK)", PROCESSING);
+		return (NOK);
+	}
+
+	memcpy(cassette1_note,	plCassette1Note,	2);
+	memcpy(cassette2_note,	plCassette2Note,	2);
+	memcpy(cassette3_note,	plCassette3Note,	2);
+	memcpy(cassette4_note,	plCassette4Note,	2);
+
+
+	sprintf(sLine, "Types : %s|%s|%s|%s",
+		plCassette1Note,
+		plCassette2Note,
+		plCassette3Note,
+		plCassette4Note);
+
+
+	trace_event(sLine, PROCESSING);
+	trace_event("End   GetCassetteNotes(OK)", PROCESSING);
+	return (OK);
+
+get_cassette_notes_error :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End  GetCassetteNotes(ERROR) ",PROCESSING);
+	return(ERROR);
+}
+
+

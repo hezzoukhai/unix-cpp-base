@@ -1,0 +1,249 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <tlv_autho.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+int CheckCardInquiry ( int nIndiceCtx, char 	*sCardNumber , char *sTrack2 )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+    char sEventCode [ 3 + 1];
+    int  nLength;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    
+ 	VARCHAR   	T_card_number [ 22 + 1 ];
+	VARCHAR			T_track_2	[ 4 + 1];
+  int					response_code;  
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start CheckCardInquiry() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    memset ( T_card_number.arr, 0, sizeof ( T_card_number.arr ));
+    T_card_number.len=0;
+    
+    memset ( T_track_2.arr, 0, sizeof ( T_track_2.arr ));
+		T_track_2.len=0;
+
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+    memcpy ( T_card_number.arr, sCardNumber, strlen ( sCardNumber ));
+    T_card_number.len =  strlen ( sCardNumber );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+
+	response_code = SYSTEM_MALFUNCTION;
+	
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_card_info;
+	EXEC SQL EXECUTE
+	BEGIN
+
+        :response_code := PCRD_ATM_TOOLS_1.CHECK_CARD_NUMBER( :T_card_number,
+        																											:T_track_2 );
+	END;
+	END-EXEC;
+
+	memset ( T_card_number.arr, 0, sizeof ( T_card_number.arr ));
+    if ( response_code == 0 )
+    {
+       	memcpy ( sTrack2, T_track_2.arr ,	T_track_2.len );
+     }
+
+ sprintf(sLine,"End CheckCardInquiry( %d ) ",response_code );
+ trace_event(sLine,PROCESSING);
+ return(response_code);
+
+ err_get_card_info :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	memset ( T_card_number.arr, 0, sizeof ( T_card_number.arr ));
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End CheckCardInquiry(SYSTEM_MALFUNCTION)", PROCESSING);
+ 	return( SYSTEM_MALFUNCTION );
+}
+
+
+int CheckSpecCardInq(   int nIndiceCtx, 
+						char *sCardNumber , 
+						char *sTrack2,
+						char *ShadowActLevel 
+ )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+    int  nLength;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    
+ 	VARCHAR   	T_card_number  		[ 22 + 1 ];
+	VARCHAR		T_track_2	   		[ 45 + 1];
+	VARCHAR		T_ShadowActLevel	[ 1 + 1];
+	int			response_code;  
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start CheckSpecCardInq() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    memset ( T_card_number.arr, 0, sizeof ( T_card_number.arr ));
+    T_card_number.len=0;
+    
+    memset ( T_track_2.arr, 0, sizeof ( T_track_2.arr ));
+		T_track_2.len=0;
+
+    memset ( T_ShadowActLevel.arr, 0, sizeof ( T_ShadowActLevel.arr ));
+		T_ShadowActLevel.len=0;
+		
+		
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+    memcpy ( T_card_number.arr, sCardNumber, strlen ( sCardNumber ));
+    T_card_number.len =  strlen ( sCardNumber );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+
+	response_code = SYSTEM_MALFUNCTION;
+	
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_card_info;
+	EXEC SQL EXECUTE
+	BEGIN
+
+        :response_code := PCRD_ATM_SPEC_TOOLS_1.CHECK_CARD_NUMBER( :T_card_number,
+																   :T_track_2,
+																   :T_ShadowActLevel
+																   );
+	END;
+	END-EXEC;
+
+	  memset ( T_card_number.arr, 0, sizeof ( T_card_number.arr ));
+    if ( response_code == 0 )
+    {
+       	memcpy ( sTrack2,  T_track_2.arr ,	T_track_2.len );
+		memcpy ( ShadowActLevel,  T_ShadowActLevel.arr ,	T_ShadowActLevel.len );
+     }
+
+ sprintf(sLine,"End CheckSpecCardInq( %d ) ",response_code );
+ trace_event(sLine,PROCESSING);
+ return(response_code);
+
+ err_get_card_info :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End CheckSpecCardInq(SYSTEM_MALFUNCTION)", PROCESSING);
+ 	return( SYSTEM_MALFUNCTION );
+}
+
+
+
+int CheckSpecAccountInq(   int nIndiceCtx, 
+						char *sAccountNumber ,
+						char *sCardNumber , 
+						char *sTrack2,
+						char *ShadowActLevel 
+ )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+    int  nLength;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    
+	VARCHAR   	T_account_number  	[ 24 + 1 ];
+ 	VARCHAR   	T_card_number  		[ 22 + 1 ];
+	VARCHAR		T_track_2	   		[ 45 + 1];
+	VARCHAR		T_ShadowActLevel	[ 1 + 1];
+	int			response_code;  
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start CheckSpecAccountInq() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    memset ( T_account_number.arr, 0, sizeof ( T_account_number.arr ));
+    T_account_number.len=0;
+	
+    memset ( T_card_number.arr, 0, sizeof ( T_card_number.arr ));
+    T_card_number.len=0;	
+    
+    memset ( T_track_2.arr, 0, sizeof ( T_track_2.arr ));
+		T_track_2.len=0;
+
+    memset ( T_ShadowActLevel.arr, 0, sizeof ( T_ShadowActLevel.arr ));
+		T_ShadowActLevel.len=0;
+		
+		
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+    memcpy ( T_card_number.arr, sCardNumber, strlen ( sCardNumber ));
+    T_card_number.len =  strlen ( sCardNumber );
+	
+    memcpy ( T_account_number.arr, sAccountNumber, strlen ( sAccountNumber ));
+    T_account_number.len =  strlen ( sAccountNumber );	
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+
+	response_code = SYSTEM_MALFUNCTION;
+	
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_card_info;
+	EXEC SQL EXECUTE
+	BEGIN
+
+        :response_code := PCRD_ATM_SPEC_TOOLS_1.CHECK_ACCOUNT_NUMBER( :T_account_number,
+																   :T_card_number,
+																   :T_track_2,
+																   :T_ShadowActLevel
+																   );
+	END;
+	END-EXEC;
+
+
+    if ( response_code == 0 )
+    {
+       	memcpy ( sCardNumber,  T_card_number.arr ,	T_card_number.len );
+		memcpy ( sTrack2,  T_track_2.arr ,	T_track_2.len );
+		memcpy ( ShadowActLevel,  T_ShadowActLevel.arr ,	T_ShadowActLevel.len );
+		trace_event("End CheckSpecAccountInq( OK )", PROCESSING);
+     }
+
+ memset ( T_card_number.arr, 0, sizeof ( T_card_number.arr ));
+ sprintf(sLine,"End CheckSpecAccountInq( %d ) ",response_code );
+ trace_event(sLine,PROCESSING);
+ return(response_code);
+
+ err_get_card_info :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	   memset ( T_card_number.arr, 0, sizeof ( T_card_number.arr ));
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End CheckSpecAccountInq(SYSTEM_MALFUNCTION)", PROCESSING);
+ 	return( SYSTEM_MALFUNCTION );
+}

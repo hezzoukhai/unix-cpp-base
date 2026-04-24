@@ -1,0 +1,20 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <define.h>
+#include <iso_hps.h> 
+#include <param_ctx.h> 
+
+/******************************************************************************/
+/* Fonction GetBicTerminalAddress                                            */
+/* --------------------------------	                                          */
+/* Description : Fonction qui recupere l adresse d un terminal donne          */
+/* Entree      : le numero du terminal			                		      */
+/* Sortie      : Adresse du terminal					                      */
+/* Retour      : OK						                                      */
+/*               NOK                   			                              */
+/*               MALFUNCTION                                                  */
+/* Date/Auteur : 16/09/2004 R.SAKOUTI                                           */
+/******************************************************************************/

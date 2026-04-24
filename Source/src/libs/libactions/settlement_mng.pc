@@ -1,0 +1,319 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <tlv_autho.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+/*******************************************************************************/
+/** Fonction   : InsertSettlement()                                           **/
+/** Description: Cette fonction permet d'inserer un settlement record on line **/
+/** Entree     : Un Tlv Buffer, et le type de reglement (ACQ ou ISS)          **/
+/** Auteur     : G.FAHMI le 18-02-03                                          **/
+/*******************************************************************************/  
+int InsertSettlement  ( int nIndiceCtx , char *sTlvBuffer, char *sSettlementType)
+{
+        struct sqlca sqlca;
+        char sLine               [ MAX_LINE_TRC];
+        int                             nRetCode;
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        char            T_settlement_type [ 4];
+        VARCHAR         T_tlv_auth        [ LG_MAX + 1];
+        VARCHAR         T_tlv_warning     [ 6 + 1];
+        int             response_code;
+        EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+    trace_event ( "Start InsertSettlement () ", PROCESSING );
+
+    PrintTlvBuffer (  sTlvBuffer );
+
+    /**********  INITIALISATION  ************/
+    memset(T_settlement_type        , 0, sizeof(T_settlement_type));
+
+    memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+    T_tlv_auth.len = 0;
+
+    memset ( T_tlv_warning.arr         ,  0  ,   sizeof(T_tlv_warning.arr )  );
+    T_tlv_warning.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+    memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+    T_tlv_auth.len = strlen(sTlvBuffer );
+
+    memcpy(T_settlement_type        , sSettlementType       , 4);
+
+    /***********   Appel PL/SQL  *************/
+    response_code = SYSTEM_MALFUNCTION;
+    EXEC SQL WHENEVER SQLERROR GOTO err_InsertSettlement;
+    EXEC SQL EXECUTE
+    BEGIN
+        :response_code := PCRD_P7_SETTLEMENT_MNG.INSERT_SETTLEMENT(:T_settlement_type,
+                                                                   :T_tlv_auth,
+                                                                   :T_tlv_warning);
+    END;
+    END-EXEC;
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+    sprintf(sLine,"End InsertSettlement (%d,%.6s)", response_code, T_tlv_warning.arr);
+    trace_event(sLine,PROCESSING);
+
+    return(response_code);
+
+err_InsertSettlement :
+        EXEC SQL WHENEVER SQLERROR CONTINUE;
+        sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+        trace_event (  sLine , ERROR );
+		memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+		/*PADSS*/
+		P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+        trace_event("End InsertSettlement (SYSTEM_MALFUNCTION)", PROCESSING);
+        return( SYSTEM_MALFUNCTION );
+}
+/*******************************************************************************/
+int UpdateSettlement  ( int nIndiceCtx , char *sTlvBuffer)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+	int				nRetCode;
+
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+ 	VARCHAR   	T_tlv_warning [ 6 + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+    trace_event ( "Start UpdateSettlement () ", PROCESSING );
+
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	memset ( T_tlv_warning.arr         ,  0  ,   sizeof(T_tlv_warning.arr )  );
+	T_tlv_warning.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UpdateSettlement;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response_code := PCRD_P7_SETTLEMENT_MNG.UPDATE_SETTLEMENT( 
+																:T_tlv_auth,
+																:T_tlv_warning); 
+	END;
+	END-EXEC;
+	
+	sprintf(sLine,"End UpdateSettlement (%d,%.6s)", response_code, T_tlv_warning.arr);
+	trace_event(sLine,PROCESSING);
+
+    if (response_code != OK)
+	{
+		PrintTlvBuffer ( T_tlv_auth.arr); 
+     }
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	return(response_code);
+
+err_UpdateSettlement :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	trace_event("End UpdateSettlement (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+int GetSettlementData  ( int nIndiceCtx , char *sTlvBuffer, char *sSettlementType, char *sResource)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+	int				nRetCode;
+
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  	[ LG_MAX + 1];
+ 	char       	T_resource_id   [ 6 + 1];
+ 	char       	T_sett_type     [ 3 + 1];
+ 	VARCHAR   	T_tlv_warning 	[ 6 + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+    trace_event ( "Start GetSettlementData () ", PROCESSING );
+
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	memset ( T_tlv_warning.arr         ,  0  ,   sizeof(T_tlv_warning.arr )  );
+	T_tlv_warning.len = 0;
+
+	memset(T_resource_id, 0, sizeof(T_resource_id));
+	memset(T_sett_type  , 0, sizeof(T_sett_type  ));
+
+
+	memcpy(T_resource_id, sResource, 6);
+	memcpy(T_sett_type  , sSettlementType, 3);
+
+	sprintf(sLine," Resource Id      : %s|",T_resource_id);
+	trace_event(sLine,TRACE);
+
+	sprintf(sLine," Sett Type        : %s|",T_sett_type);
+	trace_event(sLine,TRACE);
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_GetSettlementData;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response_code := PCRD_P7_SETTLEMENT_MNG.GET_SETTLEMENT_DATA(   :T_resource_id,
+																		:T_sett_type,
+																		:T_tlv_auth,
+																		:T_tlv_warning); 
+	END;
+	END-EXEC;
+	memcpy(sTlvBuffer, T_tlv_auth.arr, T_tlv_auth.len);
+	sTlvBuffer[T_tlv_auth.len] = '\0';
+
+    PrintTlvBuffer (  sTlvBuffer );
+	
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	sprintf(sLine,"End GetSettlementData (%d,%.6s)", response_code, T_tlv_warning.arr);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_GetSettlementData :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	trace_event("End GetSettlementData (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+int UpdateSettlementData  ( int nIndiceCtx , char *sTlvBuffer, char *sStatus, char *sSettlementType, char *sResource)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+	int				nRetCode;
+
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  	[ LG_MAX + 1];
+ 	char       	T_resource_id   [ 6 + 1];
+ 	char       	T_sett_type     [ 3 + 1];
+ 	char       	T_sett_status   [ 1 + 1];
+ 	VARCHAR   	T_tlv_warning 	[ 6 + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+    trace_event ( "Start UpdateSettlementData () ", PROCESSING );
+
+    PrintTlvBuffer (  sTlvBuffer );
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	memset ( T_tlv_warning.arr         ,  0  ,   sizeof(T_tlv_warning.arr )  );
+	T_tlv_warning.len = 0;
+
+	memset(T_resource_id, 0, sizeof(T_resource_id));
+	memset(T_sett_type  , 0, sizeof(T_sett_type  ));
+	memset(T_sett_status  , 0, sizeof(T_sett_status  ));
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+	memcpy(T_resource_id, sResource, 6);
+	memcpy(T_sett_type  , sSettlementType, 3);
+	memcpy(T_sett_status  , sStatus, 1);
+
+	sprintf(sLine," Resource Id      : %s|",T_resource_id);
+	trace_event(sLine,TRACE);
+
+	sprintf(sLine," Sett Type        : %s|",T_sett_type);
+	trace_event(sLine,TRACE);
+
+	sprintf(sLine," Status           : %s|",T_sett_status);
+	trace_event(sLine,TRACE);
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UpdateSettlementData;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response_code := PCRD_P7_SETTLEMENT_MNG.UPDATE_SETTLEMENT_DATA(    :T_resource_id,
+																			:T_sett_type,
+																			:T_sett_status,
+																			:T_tlv_auth,
+																			:T_tlv_warning); 
+	END;
+	END-EXEC;
+	
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	sprintf(sLine,"End UpdateSettlementData (%d,%.6s)", response_code, T_tlv_warning.arr);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_UpdateSettlementData :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	trace_event("End UpdateSettlementData (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

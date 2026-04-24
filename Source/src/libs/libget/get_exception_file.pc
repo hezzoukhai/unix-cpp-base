@@ -1,0 +1,195 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetExceptionFile  (int nIndiceCtx, TSExceptionFile *exception_file)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   CARD_NUMBER [ 22 ];
+ 	char   BANK_CODE [ 6 ];
+ 	char   EXCEPTION_START_DATE [ 8]; /* YYYYMMDD */
+ 	char   EXCEPTION_END_DATE [ 8]; /* YYYYMMDD */
+ 	char   ROUTING_CODE [ 2 ];
+ 	char   CODE_ACTION [ 3 ];
+ 	char   SERVICES_SETUP_INDEX [ 4 ];
+ 	char   VIP_RESPONSE_TRANSLATION [ 4 ];
+ 	char   LIMITS_INDEXES [ 4 ];
+        char   PERIODICITY_CODE [ 3 ];
+        char   CHK_EXP_DATE_OPT [ 1 ];
+        char   CHK_START_EXP_DATE_OPT [ 1 ];
+        char   CHK_PIN_OPT [ 1 ];
+ 	char   CHK_CVV1_OPT [ 1 ];
+ 	char   CHK_CVV2_OPT [ 1 ];
+ 	char   MARKUP_CODE [ 2 ];
+ 	char   SCENARIO_CODE [ 1 ];
+ 	char   AUT_LVL_CARD [ 1 ];
+ 	char   AUT_LVL_BANKING_ACCOUNT [ 1 ];
+ 	char   AUT_LVL_CLIENT [ 1 ];
+ 	char   AUT_LVL_SHADOW_ACCOUNT [ 1 ];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetExceptionFile() ", PROCESSING );
+ 	memset ( CARD_NUMBER.arr, 0, sizeof(CARD_NUMBER.arr));
+ 	memset ( BANK_CODE , 0,  6 );
+ 	memset ( EXCEPTION_START_DATE , 0 , 8 ); /* YYYYMMDD */
+ 	memset ( EXCEPTION_END_DATE , 0 , 8 ); /* YYYYMMDD */
+ 	memset ( ROUTING_CODE , 0,  2 );
+ 	memset ( CODE_ACTION , 0,  3 );
+ 	memset ( SERVICES_SETUP_INDEX , 0,  4 );
+ 	memset ( VIP_RESPONSE_TRANSLATION , 0,  4 );
+ 	memset ( LIMITS_INDEXES , 0,  4 );
+        memset ( PERIODICITY_CODE , 0,  3 );
+        memset ( CHK_EXP_DATE_OPT , 0,  1 );
+        memset ( CHK_START_EXP_DATE_OPT , 0,  1 );
+        memset ( CHK_PIN_OPT , 0,  1 );
+ 	memset ( CHK_CVV1_OPT , 0,  1 );
+ 	memset ( CHK_CVV2_OPT , 0,  1 );
+ 	memset ( MARKUP_CODE , 0,  2 );
+ 	memset ( SCENARIO_CODE , 0,  1 );
+ 	memset ( AUT_LVL_CARD , 0,  1 );
+ 	memset ( AUT_LVL_BANKING_ACCOUNT , 0,  1 );
+ 	memset ( AUT_LVL_CLIENT , 0,  1 );
+ 	memset ( AUT_LVL_SHADOW_ACCOUNT , 0,  1 );
+
+	memcpy ( CARD_NUMBER.arr, 
+			exception_file->card_number, 
+			strlen ( exception_file->card_number ));
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_exception_file;
+	EXEC SQL EXECUTE
+	    DECLARE T_EXCEPTION_FILE   EXCEPTION_FILE%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_DATA_CARD_ROWS.GET_EXCEPTION_FILE
+						(   :CARD_NUMBER, 
+	                                            T_EXCEPTION_FILE 
+	                                        );
+	    IF :response_code = 0 THEN
+
+	:BANK_CODE  		:= T_EXCEPTION_FILE.BANK_CODE;
+	:EXCEPTION_START_DATE  	:= 
+                TO_CHAR ( T_EXCEPTION_FILE.EXCEPTION_START_DATE , 'YYYYMMDD' );
+	:EXCEPTION_END_DATE  	:= 
+               TO_CHAR ( T_EXCEPTION_FILE.EXCEPTION_END_DATE , 'YYYYMMDD' );
+	:ROUTING_CODE  		:= T_EXCEPTION_FILE.ROUTING_CODE;
+	:CODE_ACTION  		:= T_EXCEPTION_FILE.CODE_ACTION;
+	:SERVICES_SETUP_INDEX  	:= T_EXCEPTION_FILE.SERVICES_SETUP_INDEX;
+  	:VIP_RESPONSE_TRANSLATION:= T_EXCEPTION_FILE.VIP_RESPONSE_TRANSLATION;
+	:LIMITS_INDEXES  	:= T_EXCEPTION_FILE.LIMITS_INDEXES;
+	:PERIODICITY_CODE  	:= T_EXCEPTION_FILE.PERIODICITY_CODE;
+	:CHK_EXP_DATE_OPT  	:= T_EXCEPTION_FILE.CHK_EXP_DATE_OPT;
+	:CHK_START_EXP_DATE_OPT  := T_EXCEPTION_FILE.CHK_START_EXP_DATE_OPT;
+	:CHK_PIN_OPT  		:= T_EXCEPTION_FILE.CHK_PIN_OPT;
+	:CHK_CVV1_OPT  		:= T_EXCEPTION_FILE.CHK_CVV1_OPT;
+	:CHK_CVV2_OPT  		:= T_EXCEPTION_FILE.CHK_CVV2_OPT;
+	:MARKUP_CODE  		:= T_EXCEPTION_FILE.MARKUP_CODE;
+	:SCENARIO_CODE  	:= T_EXCEPTION_FILE.SCENARIO_CODE;
+	:AUT_LVL_CARD  		:= T_EXCEPTION_FILE.AUT_LVL_CARD;
+	:AUT_LVL_BANKING_ACCOUNT:=T_EXCEPTION_FILE.AUT_LVL_BANKING_ACCOUNT;
+	:AUT_LVL_CLIENT  	:= T_EXCEPTION_FILE.AUT_LVL_CLIENT;
+	:AUT_LVL_SHADOW_ACCOUNT :=T_EXCEPTION_FILE.AUT_LVL_SHADOW_ACCOUNT;
+		
+	    END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+
+ 	memcpy ( exception_file->bank_code , BANK_CODE ,  6 );
+ 	memcpy ( exception_file->exception_start_date , 
+				EXCEPTION_START_DATE , 0 , 8 ); /* YYYYMMDD */
+ 	memcpy ( exception_file->exception_end_date , 
+				EXCEPTION_END_DATE , 0 , 8 ); /* YYYYMMDD */
+ 	memcpy ( exception_file->routing_code ,ROUTING_CODE,2);
+ 	memcpy ( exception_file->code_action ,CODE_ACTION , 3);
+ 	memcpy ( exception_file->services_setup_index , 
+						SERVICES_SETUP_INDEX ,  4 );
+ 	memcpy ( exception_file->vip_response_translation , 
+						VIP_RESPONSE_TRANSLATION ,  4 );
+ 	memcpy ( exception_file->limits_indexes , 
+						LIMITS_INDEXES ,  4 );
+        memcpy ( exception_file->periodicity_code , 
+						PERIODICITY_CODE ,  3 );
+        memcpy ( exception_file->chk_exp_date_opt , 
+						CHK_EXP_DATE_OPT ,  1 );
+        memcpy ( exception_file->chk_start_exp_date_opt ,
+						CHK_START_EXP_DATE_OPT ,  1 );
+        memcpy ( exception_file->chk_pin_opt , CHK_PIN_OPT ,1);
+ 	memcpy ( exception_file->chk_cvv1_opt , CHK_CVV1_OPT,1);
+ 	memcpy ( exception_file->chk_cvv2_opt,CHK_CVV2_OPT,1);
+ 	memcpy ( exception_file->markup_code, MARKUP_CODE,2);
+ 	memcpy ( exception_file->scenario_code,SCENARIO_CODE,1);
+ 	memcpy(exception_file->aut_lvl_card,AUT_LVL_CARD , 1 );
+ 	memcpy(exception_file->aut_lvl_banking_account , 
+						AUT_LVL_BANKING_ACCOUNT ,  1 );
+ 	memcpy(exception_file->aut_lvl_client,AUT_LVL_CLIENT,1);
+ 	memcpy(exception_file->aut_lvl_shadow_account,AUT_LVL_SHADOW_ACCOUNT,1);
+
+	        trace_event ( "End GetExceptionFile( OK ) ", PROCESSING );
+		return(OK);
+	}
+	trace_event ( "End GetExceptionFile( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_exception_file:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+
+ 	memcpy ( exception_file->bank_code , BANK_CODE ,  6 );
+ 	memcpy ( exception_file->exception_start_date , 
+				EXCEPTION_START_DATE , 0 , 8 ); /* YYYYMMDD */
+ 	memcpy ( exception_file->exception_end_date , 
+				EXCEPTION_END_DATE , 0 , 8 ); /* YYYYMMDD */
+ 	memcpy ( exception_file->routing_code ,ROUTING_CODE,2);
+ 	memcpy ( exception_file->code_action ,CODE_ACTION , 3);
+ 	memcpy ( exception_file->services_setup_index , 
+						SERVICES_SETUP_INDEX ,  4 );
+ 	memcpy ( exception_file->vip_response_translation , 
+						VIP_RESPONSE_TRANSLATION ,  4 );
+ 	memcpy ( exception_file->limits_indexes , 
+						LIMITS_INDEXES ,  4 );
+        memcpy ( exception_file->periodicity_code , 
+						PERIODICITY_CODE ,  3 );
+        memcpy ( exception_file->chk_exp_date_opt , 
+						CHK_EXP_DATE_OPT ,  1 );
+        memcpy ( exception_file->chk_start_exp_date_opt ,
+						CHK_START_EXP_DATE_OPT ,  1 );
+        memcpy ( exception_file->chk_pin_opt , CHK_PIN_OPT ,1);
+ 	memcpy ( exception_file->chk_cvv1_opt , CHK_CVV1_OPT,1);
+ 	memcpy ( exception_file->chk_cvv2_opt,CHK_CVV2_OPT,1);
+ 	memcpy ( exception_file->markup_code, MARKUP_CODE,2);
+ 	memcpy ( exception_file->scenario_code,SCENARIO_CODE,1);
+ 	memcpy(exception_file->aut_lvl_card,AUT_LVL_CARD , 1 );
+ 	memcpy(exception_file->aut_lvl_banking_account , 
+						AUT_LVL_BANKING_ACCOUNT ,  1 );
+ 	memcpy(exception_file->aut_lvl_client,AUT_LVL_CLIENT,1);
+ 	memcpy(exception_file->aut_lvl_shadow_account,AUT_LVL_SHADOW_ACCOUNT,1);
+	        trace_event ( "End GetExceptionFile( OK ) ", PROCESSING );
+		return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetExceptionFile( NOK ) ", PROCESSING );
+	return( NOK );
+}

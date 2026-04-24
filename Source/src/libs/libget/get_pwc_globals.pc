@@ -1,0 +1,66 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <iso_hps.h>
+#include <resources.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetGlobalsVar  (int nIndiceCtx, char *variable_name , char *variable_value)
+{
+        struct sqlca sqlca;
+        char detail [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR   VARIABLE_NAME[30 + 1];
+        VARCHAR   VARIABLE_VALUE[128 + 1];
+        int     response_code;
+        EXEC SQL END DECLARE SECTION;
+
+  EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+        printf("Start GetGlobalsVar() \n");
+        trace_event ( "Start GetGlobalsVar() ", PROCESSING );
+
+        VARIABLE_NAME.len=0;
+        VARIABLE_VALUE.len=0;
+        memset ( VARIABLE_NAME.arr      ,  0  ,   sizeof(VARIABLE_NAME.arr));
+        memset ( VARIABLE_VALUE.arr ,  0  ,   sizeof(VARIABLE_VALUE.arr));
+        VARIABLE_NAME.len=strlen(variable_name);
+        memcpy ( VARIABLE_NAME.arr , variable_name , strlen(variable_name));
+        response_code = 909;
+        EXEC SQL WHENEVER SQLERROR GOTO err_get_bank;
+        EXEC SQL EXECUTE
+        DECLARE T_GLOBALS_VAR   POWERCARD_GLOBALS%ROWTYPE;
+        BEGIN
+
+        :response_code := PCRD_GET_PARAM_GENERAL_ROWS_2.GET_POWERCARD_GLOBALS(:VARIABLE_NAME,T_GLOBALS_VAR);
+
+
+                IF :response_code = 0 THEN
+                        :VARIABLE_VALUE := T_GLOBALS_VAR.VARIABLE_VALUE;
+                END IF;
+        END;
+        END-EXEC;
+
+        if ( response_code == 0 )
+        {
+			memcpy(variable_value,VARIABLE_VALUE.arr,VARIABLE_VALUE.len);
+			trace_event ( "End GetGlobalsVar( OK ) ", PROCESSING );
+			return(OK);
+        }
+        trace_event ( "End GetGlobalsVar( NOK ) ", PROCESSING );
+        return(NOK);
+
+err_get_bank :
+        EXEC SQL WHENEVER SQLERROR CONTINUE;
+        sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+        
+        trace_event (  detail , ERROR );
+        trace_event ( "End GetGlobalsVar( NOK ) ", PROCESSING );
+        return( NOK );
+}

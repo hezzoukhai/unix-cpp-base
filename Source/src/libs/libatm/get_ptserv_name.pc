@@ -1,0 +1,95 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_ptserv_name.pc                                                     */
+/*                                                                             */
+/* Description                                                                 */
+/*       recuperation du nom du pointe service		                       */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <param_ctx.h>
+#include <define.h>
+
+
+
+/***********************************************************************
+**  nom	: GetPtServName()					**
+**  desc	: chargement des frais d'une transaction GAB		**
+**  entree	: pTermNbr	-> numero du terminal 			**
+**  sortie	: pPtServName	-> nom du point du service		**
+**  retour	:							**
+***********************************************************************/
+int	GetPtServName(
+	int		nIndexCtx,
+	char	*pTermNbr,
+	char    *pAcqBank,
+	char	*pPtServName)
+{
+	struct sqlca sqlca; /**Linux ***/
+	char		sLine  [MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	varchar		hTermNbr	[15];
+	varchar		hAcqBank	[6+1];/*ICH270715*/ 	
+	varchar		hPtServName	[30];
+	int			hRet;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start GetPtServName(%.15s,%.6s)", pTermNbr,pAcqBank);
+	trace_event(sLine, PROCESSING);
+
+	/* - initialisation des variables - */
+	memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr)		);
+	memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/
+	memset(hPtServName.arr,	0, sizeof(hPtServName.arr)	);
+
+	memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr)	);
+	hTermNbr.len	= strlen(pTermNbr);
+	memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+	hAcqBank.len	= strlen(pAcqBank);
+	hPtServName.len	= 30;
+
+
+	/* - capture des exceptions - */
+	EXEC SQL WHENEVER SQLERROR GOTO GetPtServNameErr;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+
+	/* - traitement PL/SQL - */
+	EXEC SQL EXECUTE
+		BEGIN
+		:hRet := PCRD_ATM_WATCH.GET_PTSERV_NAME(
+		:hTermNbr,
+		:hAcqBank/*ICH270715*/,
+		:hPtServName);
+	END;
+	END-EXEC;
+
+	if(hRet != OK) {
+		sprintf(sLine, "End   Get_PtServName(%d)", hRet);
+		trace_event(sLine, PROCESSING);
+		return (NOK);
+	}
+
+	/* - recuperation du resultat du traitement PL/SQL - */
+	memcpy(pPtServName,		hPtServName.arr, hPtServName.len);
+
+
+	sprintf(sLine, "End   GetPtServName(%.30s)", pPtServName);
+	trace_event(sLine, PROCESSING);
+	return (strlen(pPtServName));
+
+GetPtServNameErr :
+	sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   GetPtServName(ERROR)", ERROR);
+	return (ERROR);
+}
+
+

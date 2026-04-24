@@ -1,0 +1,81 @@
+
+#include <stdio.h>
+#include <define.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int  GetService (int  nIndexCtx, char * tlv_buffer, char *szServiceName, char* szServiceContainer, char* szServiceEntry)
+{
+      char     sLine[MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+		VARCHAR		T_tlv_buffer		[LG_MAX];
+        VARCHAR		T_service_name      [512];
+		VARCHAR		T_service_container	[512];
+		VARCHAR		T_service_entry		[512];
+        int			result;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GetService()",PROCESSING);
+   memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr)); T_tlv_buffer.len=0;
+   memset (T_service_name.arr,     0, sizeof(T_service_name.arr)); T_service_name.len=0;
+   memset (T_service_container.arr,     0, sizeof(T_service_container.arr)); T_service_container.len=0;
+   memset (T_service_entry.arr,     0, sizeof(T_service_entry.arr)); T_service_entry.len=0;
+   result = 909;
+
+
+   /*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(tlv_buffer)
+
+   memcpy(T_tlv_buffer.arr,tlv_buffer,strlen(tlv_buffer));
+   T_tlv_buffer.len = strlen(tlv_buffer);
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO get_service_err;
+   EXEC SQL EXECUTE
+   BEGIN
+		:result := PCRD_P7_SERVICES.GET_SERVICE(:T_tlv_buffer, :T_service_name, :T_service_container, :T_service_entry);
+   END;
+   END-EXEC;
+
+   /*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(tlv_buffer)
+
+   if (result == OK)
+   {
+      memcpy (szServiceName,  T_service_name.arr,  T_service_name.len);
+	  szServiceName[T_service_name.len]='\0';
+
+      memcpy (szServiceContainer,  T_service_container.arr,  T_service_container.len);
+	  szServiceContainer[T_service_container.len]='\0';
+
+      memcpy (szServiceEntry,  T_service_entry.arr,  T_service_entry.len);
+	  szServiceEntry[T_service_entry.len]='\0';
+
+	  memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr)); /* PCI */
+      sprintf (sLine, "End GetService(OK [%s])",szServiceName);
+      trace_event(sLine,PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr)); /* PCI */
+      trace_event ("End GetService(NOK)",PROCESSING);
+      return (NOK);
+   }
+
+get_service_err:
+	memset (T_tlv_buffer.arr,     0, sizeof(T_tlv_buffer.arr)); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(tlv_buffer)
+
+	sprintf (sLine, "End GetService(MALFUNCTION)|%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine,PROCESSING);
+	return (NOK);
+}
+

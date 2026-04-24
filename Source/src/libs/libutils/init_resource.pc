@@ -1,0 +1,265 @@
+#include <stdio.h>
+
+#include <define.h>
+#include <param_ctx.h>
+#include <queue.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+extern char ResourceStatus[ 3 + 1 ]; 
+
+/****************************************************************************/
+/*  ResetResource()                                                         */
+/*  Called during resource initialization. It initializes the resource pid, */
+/*  parent pid, internal id, resource_live = 'C', & processing_step = 'OFF' */
+/****************************************************************************/  
+int  ResetResource (int   nIndexCtx, 
+                    char *p_ResourceId,
+                    char *p_InternalId) 
+{
+
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_resource_id  [ 7];
+        VARCHAR    T_internal_id  [32];
+        int        T_resource_pid;
+        int        T_resource_ppid;
+
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  ResetResource()", PROCESSING);
+
+   memset (T_resource_id,       0, sizeof(T_resource_id));
+   memset (T_internal_id.arr,   0, sizeof(T_internal_id.arr));
+   T_internal_id.len = 0;
+
+   memcpy (T_resource_id, p_ResourceId, 6);
+   T_resource_pid  = getpid();
+   T_resource_ppid = getppid();
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+
+   EXEC SQL WHENEVER SQLERROR GOTO reset_resource_error;
+   EXEC SQL EXECUTE
+   BEGIN
+      :result := PCRD_P7_FUNCTION_TOOLS.RESET_RESOURCE (
+                                        :T_resource_id,
+                                        :T_resource_pid, 
+                                        :T_resource_ppid,
+                                        :T_internal_id);
+
+   END;
+   END-EXEC;
+
+   trace_event ("Start  ResetResource()", PROCESSING);
+   if (result == OK)
+   {
+      memcpy (p_InternalId, T_internal_id.arr, T_internal_id.len);
+      trace_event ("End ResetResource(OK)", PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      trace_event ("End ResetResource(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+   reset_resource_error:
+      trace_event ("End ResetResource (MALFUNCTION)", PROCESSING);
+      return (NOK);
+   
+}
+
+
+/****************************************************************************/
+/*  UpdateResource()                                                        */
+/*  Updates the resource live and processing step fields in the RESOURCES   */
+/*  table.                                                                  */
+/****************************************************************************/
+int  UpdateResource (int   nIndexCtx,
+                     char *p_ResourceId, 
+                     char *p_ResourceLive,
+                     char *p_ProcessingStep)
+{
+
+  char       sLine [ MAX_LINE_TRC ];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_resource_id     [7];
+        char       T_resource_live   [2];
+        char       T_processing_step [4];
+
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  UpdateResource()", PROCESSING);
+
+   memset (T_resource_id,     0, sizeof(T_resource_id));
+   memset (T_resource_live,   0, sizeof(T_resource_live));
+   memset (T_processing_step, 0, sizeof(T_processing_step));
+
+   memcpy (T_resource_id,     p_ResourceId,     6);
+   memcpy (T_resource_live,   p_ResourceLive,   1); 
+   memcpy (T_processing_step, p_ProcessingStep, 3);
+
+   sprintf ( sLine , "Resource Id     = %.6s ", p_ResourceId    );
+   trace_event ( sLine , PROCESSING );
+   sprintf ( sLine , "Resource Live   = %.1s ", p_ResourceLive  );
+   trace_event ( sLine , PROCESSING );
+   sprintf ( sLine , "Processing Step = %.3s ", p_ProcessingStep );
+   trace_event ( sLine , PROCESSING );
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO update_resource_error;
+   EXEC SQL EXECUTE
+   BEGIN
+      :result := PCRD_P7_FUNCTION_TOOLS.UPDATE_RESOURCE (
+                                        :T_resource_id,
+                                        :T_resource_live,
+                                        :T_processing_step);
+
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+      trace_event ("End UpdateResource(OK)", PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      trace_event ("End UpdateResource(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+   update_resource_error:
+	  sprintf(sLine,"%s",sqlca.sqlerrm.sqlerrmc);
+	  trace_event(sLine,TRACE);
+      trace_event ("End UpdateResource (MALFUNCTION)", PROCESSING);
+      return (NOK);
+
+}
+
+/*****************************************************************************/
+/*  ResourceActivity()                                                       */
+/*                                                                           */
+/*  Updates the start/stop date of the resource.                             */
+/*****************************************************************************/
+int  ResourceActivity ( int  nIndexCtx, char  *pResourceId,
+                        int  pActivity  /* START or STOP */
+                      )
+{
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_resource_id     [7];
+        int        T_activity;
+
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   memset (T_resource_id, 0, sizeof(T_resource_id));
+   memcpy (T_resource_id, pResourceId , 6 );
+   T_activity = pActivity;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO resource_activity_err;
+   EXEC SQL EXECUTE
+   BEGIN
+      :result := PCRD_P7_FUNCTION_TOOLS.RESOURCE_ACTIVITY ( :T_resource_id,
+                                                            :T_activity);
+   END;
+   END-EXEC;
+
+   if ( result == OK )
+   {
+      trace_event ( "END ResourceActivity (OK) ", PROCESSING );
+      return ( OK );
+   }
+   else
+   {
+      trace_event ( "END ResourceActivity (NOK) ", PROCESSING );
+      return ( NOK );
+   }
+
+   resource_activity_err:
+      trace_event ( "END ResourceActivity (MALFUNCTION) ", PROCESSING );
+         return (NOK);
+
+}
+
+/*****************************************************************************/
+/*  ResourceStatusSignOn()                                                   */
+/*                                                                           */
+/*  Indicates whether a resource status is sign-on or sign-off.              */
+/*****************************************************************************/
+int ResourceStatusSignOn() 
+{
+    char       sLine [ MAX_LINE_TRC ];
+    sprintf(sLine,"Start ResourceStatusSignOn(%s)",ResourceStatus);
+    trace_event(sLine,TRACE);
+    if ( memcmp ( ResourceStatus , SIGNON , 3 ) == 0 )
+    {
+    	trace_event("End   ResourceStatusSignOn(OK)",TRACE);
+         return ( OK );
+    }
+    	trace_event("End   ResourceStatusSignOn(NOK)",TRACE);
+         return ( NOK );
+}
+
+
+/*****************************************************************************/
+/*  IncResourceActivity()                                                    */
+/*                                                                           */
+/*  Increments a resource activity counter.                                  */
+/*  Input: resource Id,                                                      */
+/*         activity counter (echo test, approval, decline, ...)              */
+/*****************************************************************************/
+/* EBE140412: No more used in V3
+int  IncResourceActivity ( int   nIndexCtx,
+                           char  *p_ResourceId,
+                           int   pActivityCounter)
+{
+
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_resource_id  [ 7];
+        int        T_activity_counter;
+
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  IncResourceActivity()", PROCESSING);
+
+   memset (T_resource_id,       0, sizeof(T_resource_id));
+
+   memcpy (T_resource_id, p_ResourceId, 6);
+   T_activity_counter = pActivityCounter;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+
+   EXEC SQL WHENEVER SQLERROR GOTO inc_resource_activity_err;
+   EXEC SQL EXECUTE
+   BEGIN
+      :result := PCRD_P7_FUNCTION_TOOLS.INC_RESOURCE_ACTIVITY (
+                                        :T_resource_id,
+                                        :T_activity_counter);
+
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+      trace_event ("End IncResourceActivity(OK)", PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      trace_event ("End IncResourceActivity(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+   inc_resource_activity_err:
+      trace_event ("End IncResourceActivity(MALFUNCTION)", PROCESSING);
+      return (NOK);
+}
+*/
+

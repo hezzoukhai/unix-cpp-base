@@ -1,0 +1,255 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetLimitsSetup  (int nIndiceCtx, TSLimitsSetup *limits_setup)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	char   LIMIT_INDEX [ 4 ];
+ 	char   LIMITS_ID [ 1 ];
+ 	char   CURRENCY_CODE [ 3 ];
+ 	char   HOST_SCENARIO_PROCESSING [ 1 ];
+ 	double OFF_DAILY_ONUS_AMNT ;  
+ 	int    OFF_DAILY_ONUS_NBR ;  
+ 	double OFF_DAILY_NAT_AMNT ;  
+ 	int    OFF_DAILY_NAT_NBR ;  
+ 	double OFF_DAILY_INTERNAT_AMNT ;  
+ 	int    OFF_DAILY_INTERNAT_NBR ;  
+ 	double OFF_DAILY_TOT_AMNT ;  
+ 	long   OFF_DAILY_TOT_NBR ;  
+ 	double OFF_PER_ONUS_AMNT ;  
+ 	int    OFF_PER_ONUS_NBR ;  
+ 	double OFF_PER_NAT_AMNT ;  
+ 	int    OFF_PER_NAT_NBR ;  
+ 	double OFF_PER_INTERNAT_AMNT ;  
+ 	int    OFF_PER_INTERNAT_NBR ;  
+ 	double OFF_PER_TOT_AMNT ;  
+ 	long   OFF_PER_TOT_NBR ;  
+ 	double ON_DAILY_ONUS_AMNT ;  
+ 	int    ON_DAILY_ONUS_NBR ;  
+ 	double ON_DAILY_NAT_AMNT ;  
+ 	int    ON_DAILY_NAT_NBR ;  
+ 	double ON_DAILY_INTERNAT_AMNT ;  
+ 	int    ON_DAILY_INTERNAT_NBR ;  
+ 	double ON_DAILY_TOT_AMNT ;  
+ 	long   ON_DAILY_TOT_NBR ;  
+ 	double ON_PER_ONUS_AMNT ;  
+ 	int    ON_PER_ONUS_NBR ;  
+ 	double ON_PER_NAT_AMNT ;  
+ 	int    ON_PER_NAT_NBR ;  
+ 	double ON_PER_INTERNAT_AMNT ;  
+ 	int    ON_PER_INTERNAT_NBR ;  
+ 	double ON_PER_TOT_AMNT ;  
+ 	long   ON_PER_TOT_NBR ;  
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetLimitsSetup() ", PROCESSING );
+ 	memset (   LIMIT_INDEX 		, 0, 4  );
+ 	memset (   LIMITS_ID 		, 0, 1  );
+ 	memset (   CURRENCY_CODE 	, 0, 3  );
+ 	memset (   HOST_SCENARIO_PROCESSING , 0, 1  );
+ 	OFF_DAILY_ONUS_AMNT 	= 0.0; 
+ 	OFF_DAILY_ONUS_NBR 	= 0; 
+ 	OFF_DAILY_NAT_AMNT 	= 0.0; 
+ 	OFF_DAILY_NAT_NBR 	= 0; 
+ 	OFF_DAILY_INTERNAT_AMNT = 0.0; 
+ 	OFF_DAILY_INTERNAT_NBR = 0; 
+ 	OFF_DAILY_TOT_AMNT 	= 0.0; 
+ 	OFF_DAILY_TOT_NBR 	= 0; 
+ 	OFF_PER_ONUS_AMNT 	= 0.0; 
+ 	OFF_PER_ONUS_NBR 	= 0; 
+ 	OFF_PER_NAT_AMNT 	= 0.0; 
+ 	OFF_PER_NAT_NBR 	= 0; 
+ 	OFF_PER_INTERNAT_AMNT = 0.0; 
+ 	OFF_PER_INTERNAT_NBR = 0; 
+ 	OFF_PER_TOT_AMNT 	= 0.0; 
+ 	OFF_PER_TOT_NBR 	= 0; 
+ 	ON_DAILY_ONUS_AMNT 	= 0.0; 
+ 	ON_DAILY_ONUS_NBR 	= 0; 
+ 	ON_DAILY_NAT_AMNT 	= 0.0; 
+ 	ON_DAILY_NAT_NBR 	= 0; 
+ 	ON_DAILY_INTERNAT_AMNT = 0.0; 
+ 	ON_DAILY_INTERNAT_NBR = 0; 
+ 	ON_DAILY_TOT_AMNT 	= 0.0; 
+ 	ON_DAILY_TOT_NBR 	= 0; 
+ 	ON_PER_ONUS_AMNT 	= 0.0; 
+ 	ON_PER_ONUS_NBR 	= 0; 
+ 	ON_PER_NAT_AMNT 	= 0.0; 
+ 	ON_PER_NAT_NBR 	= 0; 
+ 	ON_PER_INTERNAT_AMNT = 0.0; 
+ 	ON_PER_INTERNAT_NBR 	= 0; 
+ 	ON_PER_TOT_AMNT 	= 0.0; 
+ 	ON_PER_TOT_NBR 	= 0; 
+
+	memcpy ( LIMIT_INDEX,limits_setup->limit_index,4);
+	memcpy ( LIMITS_ID  ,limits_setup->limits_id  ,1);
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_card;
+	EXEC SQL EXECUTE
+	    DECLARE T_P7_LIMITS_SETUP   P7_LIMITS_SETUP%ROWTYPE;
+
+
+      BEGIN
+
+       :response_code := PCRD_GET_PARAM_AUTHO_ROWS.GET_P7_LIMITS_SETUP
+						(   :LIMIT_INDEX,
+						    :LIMITS_ID,
+	                                            T_P7_LIMITS_SETUP 
+	                                        );
+
+
+	IF :response_code = 0 THEN
+	:LIMIT_INDEX    := T_P7_LIMITS_SETUP.LIMIT_INDEX;
+	:LIMITS_ID      := T_P7_LIMITS_SETUP.LIMITS_ID;
+	:CURRENCY_CODE  := T_P7_LIMITS_SETUP.CURRENCY_CODE;
+ 	:HOST_SCENARIO_PROCESSING := T_P7_LIMITS_SETUP.HOST_SCENARIO_PROCESSING;
+ 	:OFF_DAILY_ONUS_AMNT      := T_P7_LIMITS_SETUP.OFF_DAILY_ONUS_AMNT;
+ 	:OFF_DAILY_ONUS_NBR 	:= T_P7_LIMITS_SETUP.OFF_DAILY_ONUS_NBR;
+ 	:OFF_DAILY_NAT_AMNT 	:= T_P7_LIMITS_SETUP.OFF_DAILY_NAT_AMNT;
+ 	:OFF_DAILY_NAT_NBR 	:= T_P7_LIMITS_SETUP.OFF_DAILY_NAT_NBR;
+ 	:OFF_DAILY_INTERNAT_AMNT:= T_P7_LIMITS_SETUP.OFF_DAILY_INTERNAT_AMNT;
+ 	:OFF_DAILY_INTERNAT_NBR := T_P7_LIMITS_SETUP.OFF_DAILY_INTERNAT_NBR;
+ 	:OFF_DAILY_TOT_AMNT 	:= T_P7_LIMITS_SETUP.OFF_DAILY_TOT_AMNT;
+ 	:OFF_DAILY_TOT_NBR 	:= T_P7_LIMITS_SETUP.OFF_DAILY_TOT_NBR;
+ 	:OFF_PER_ONUS_AMNT 	:= T_P7_LIMITS_SETUP.OFF_PER_ONUS_AMNT;
+ 	:OFF_PER_ONUS_NBR 	:= T_P7_LIMITS_SETUP.OFF_PER_ONUS_NBR;
+ 	:OFF_PER_NAT_AMNT 	:= T_P7_LIMITS_SETUP.OFF_PER_NAT_AMNT;
+ 	:OFF_PER_NAT_NBR 	:= T_P7_LIMITS_SETUP.OFF_PER_NAT_NBR;
+ 	:OFF_PER_INTERNAT_AMNT  := T_P7_LIMITS_SETUP.OFF_PER_INTERNAT_AMNT;
+ 	:OFF_PER_INTERNAT_NBR  	:= T_P7_LIMITS_SETUP.OFF_PER_INTERNAT_NBR;
+ 	:OFF_PER_TOT_AMNT 	:= T_P7_LIMITS_SETUP.OFF_PER_TOT_AMNT;
+ 	:OFF_PER_TOT_NBR 	:= T_P7_LIMITS_SETUP.OFF_PER_TOT_NBR;
+ 	:ON_DAILY_ONUS_AMNT 	:= T_P7_LIMITS_SETUP.ON_DAILY_ONUS_AMNT;
+ 	:ON_DAILY_ONUS_NBR 	:= T_P7_LIMITS_SETUP.ON_DAILY_ONUS_NBR;
+ 	:ON_DAILY_NAT_AMNT 	:= T_P7_LIMITS_SETUP.ON_DAILY_NAT_AMNT;
+ 	:ON_DAILY_NAT_NBR 	:= T_P7_LIMITS_SETUP.ON_DAILY_NAT_NBR;
+ 	:ON_DAILY_INTERNAT_AMNT := T_P7_LIMITS_SETUP.ON_DAILY_INTERNAT_AMNT;
+ 	:ON_DAILY_INTERNAT_NBR 	:= T_P7_LIMITS_SETUP.ON_DAILY_INTERNAT_NBR;
+ 	:ON_DAILY_TOT_AMNT 	:= T_P7_LIMITS_SETUP.ON_DAILY_TOT_AMNT;
+ 	:ON_DAILY_TOT_NBR 	:= T_P7_LIMITS_SETUP.ON_DAILY_TOT_NBR;
+ 	:ON_PER_ONUS_AMNT 	:= T_P7_LIMITS_SETUP.ON_PER_ONUS_AMNT;
+ 	:ON_PER_ONUS_NBR 	:= T_P7_LIMITS_SETUP.ON_PER_ONUS_NBR;
+ 	:ON_PER_NAT_AMNT 	:= T_P7_LIMITS_SETUP.ON_PER_NAT_AMNT;
+ 	:ON_PER_NAT_NBR 	:= T_P7_LIMITS_SETUP.ON_PER_NAT_NBR;
+ 	:ON_PER_INTERNAT_AMNT 	:= T_P7_LIMITS_SETUP.ON_PER_INTERNAT_AMNT;
+ 	:ON_PER_INTERNAT_NBR 	:= T_P7_LIMITS_SETUP.ON_PER_INTERNAT_NBR;
+ 	:ON_PER_TOT_AMNT 	:= T_P7_LIMITS_SETUP.ON_PER_TOT_AMNT;
+ 	:ON_PER_TOT_NBR 	:= T_P7_LIMITS_SETUP.ON_PER_TOT_NBR;
+	END IF;
+      END;
+      END-EXEC;
+
+      if ( response_code == 0 )
+      {
+
+ 	memcpy ( limits_setup->currency_code, CURRENCY_CODE, 3);
+ 	memcpy ( limits_setup->host_scenario_processing,   
+				HOST_SCENARIO_PROCESSING , 1  );
+
+ 	limits_setup->off_daily_onus_amnt = OFF_DAILY_ONUS_AMNT;
+ 	limits_setup->off_daily_onus_nbr = OFF_DAILY_ONUS_NBR;
+ 	limits_setup->off_daily_nat_amnt =  OFF_DAILY_NAT_AMNT;
+ 	limits_setup->off_daily_nat_nbr  =  OFF_DAILY_NAT_NBR;
+        limits_setup->off_daily_internat_amnt=OFF_DAILY_INTERNAT_AMNT;
+        limits_setup->off_daily_internat_nbr= OFF_DAILY_INTERNAT_NBR;
+ 	limits_setup->off_daily_tot_amnt = OFF_DAILY_TOT_AMNT;
+ 	limits_setup->off_daily_tot_nbr =  OFF_DAILY_TOT_NBR;
+ 	limits_setup->off_per_onus_amnt =  OFF_PER_ONUS_AMNT;
+ 	limits_setup->off_per_onus_nbr  =  OFF_PER_ONUS_NBR;
+ 	limits_setup->off_per_nat_amnt  =  OFF_PER_NAT_AMNT;
+ 	limits_setup->off_per_nat_nbr   = OFF_PER_NAT_NBR;
+        limits_setup->off_per_internat_amnt=OFF_PER_INTERNAT_AMNT;
+ 	limits_setup->off_per_internat_nbr=OFF_PER_INTERNAT_NBR;
+ 	limits_setup->off_per_tot_amnt = OFF_PER_TOT_AMNT ;
+ 	limits_setup->off_per_tot_nbr  = OFF_PER_TOT_NBR;
+
+ 	limits_setup->on_daily_onus_amnt = ON_DAILY_ONUS_AMNT;
+ 	limits_setup->on_daily_onus_nbr =  ON_DAILY_ONUS_NBR;
+ 	limits_setup->on_daily_nat_amnt =  ON_DAILY_NAT_AMNT;
+ 	limits_setup->on_daily_nat_nbr= ON_DAILY_NAT_NBR;
+        limits_setup->on_daily_internat_amnt=ON_DAILY_INTERNAT_AMNT;
+        limits_setup->on_daily_internat_nbr=ON_DAILY_INTERNAT_NBR ;
+ 	limits_setup->on_daily_tot_amnt =   ON_DAILY_TOT_AMNT;
+ 	limits_setup->on_daily_tot_nbr =  ON_DAILY_TOT_NBR;
+ 	limits_setup->on_per_onus_amnt =  ON_PER_ONUS_AMNT;
+ 	limits_setup->on_per_onus_nbr  =  ON_PER_ONUS_NBR;
+ 	limits_setup->on_per_nat_amnt  =  ON_PER_NAT_AMNT ;
+ 	limits_setup->on_per_nat_nbr   = ON_PER_NAT_NBR 	;
+ 	limits_setup->on_per_internat_amnt=ON_PER_INTERNAT_AMNT;
+ 	limits_setup->on_per_internat_nbr = ON_PER_INTERNAT_NBR ;
+ 	limits_setup->on_per_tot_amnt = ON_PER_TOT_AMNT 	;
+ 	limits_setup->on_per_tot_nbr = ON_PER_TOT_NBR 	;
+
+	     trace_event ( "End GetLimitsSetup( OK ) ", PROCESSING );
+	     return(OK);
+      }
+
+	trace_event ( "End GetLimitsSetup( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_card :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+     if (memcmp(detail,"ORA-01405",9) == 0)
+     {
+ 	memcpy ( limits_setup->currency_code, CURRENCY_CODE, 3);
+ 	memcpy ( limits_setup->host_scenario_processing,   
+				HOST_SCENARIO_PROCESSING , 1  );
+
+ 	limits_setup->off_daily_onus_amnt = OFF_DAILY_ONUS_AMNT;
+ 	limits_setup->off_daily_onus_nbr = OFF_DAILY_ONUS_NBR;
+ 	limits_setup->off_daily_nat_amnt =  OFF_DAILY_NAT_AMNT;
+ 	limits_setup->off_daily_nat_nbr  =  OFF_DAILY_NAT_NBR;
+        limits_setup->off_daily_internat_amnt=OFF_DAILY_INTERNAT_AMNT;
+        limits_setup->off_daily_internat_nbr= OFF_DAILY_INTERNAT_NBR;
+ 	limits_setup->off_daily_tot_amnt = OFF_DAILY_TOT_AMNT;
+ 	limits_setup->off_daily_tot_nbr =  OFF_DAILY_TOT_NBR;
+ 	limits_setup->off_per_onus_amnt =  OFF_PER_ONUS_AMNT;
+ 	limits_setup->off_per_onus_nbr  =  OFF_PER_ONUS_NBR;
+ 	limits_setup->off_per_nat_amnt  =  OFF_PER_NAT_AMNT;
+ 	limits_setup->off_per_nat_nbr   = OFF_PER_NAT_NBR;
+        limits_setup->off_per_internat_amnt=OFF_PER_INTERNAT_AMNT;
+ 	limits_setup->off_per_internat_nbr=OFF_PER_INTERNAT_NBR;
+ 	limits_setup->off_per_tot_amnt = OFF_PER_TOT_AMNT ;
+ 	limits_setup->off_per_tot_nbr  = OFF_PER_TOT_NBR;
+
+ 	limits_setup->on_daily_onus_amnt = ON_DAILY_ONUS_AMNT;
+ 	limits_setup->on_daily_onus_nbr =  ON_DAILY_ONUS_NBR;
+ 	limits_setup->on_daily_nat_amnt =  ON_DAILY_NAT_AMNT;
+ 	limits_setup->on_daily_nat_nbr= ON_DAILY_NAT_NBR;
+        limits_setup->on_daily_internat_amnt=ON_DAILY_INTERNAT_AMNT;
+        limits_setup->on_daily_internat_nbr=ON_DAILY_INTERNAT_NBR ;
+ 	limits_setup->on_daily_tot_amnt =   ON_DAILY_TOT_AMNT;
+ 	limits_setup->on_daily_tot_nbr =  ON_DAILY_TOT_NBR;
+ 	limits_setup->on_per_onus_amnt =  ON_PER_ONUS_AMNT;
+ 	limits_setup->on_per_onus_nbr  =  ON_PER_ONUS_NBR;
+ 	limits_setup->on_per_nat_amnt  =  ON_PER_NAT_AMNT ;
+ 	limits_setup->on_per_nat_nbr   = ON_PER_NAT_NBR 	;
+ 	limits_setup->on_per_internat_amnt=ON_PER_INTERNAT_AMNT;
+ 	limits_setup->on_per_internat_nbr = ON_PER_INTERNAT_NBR ;
+ 	limits_setup->on_per_tot_amnt = ON_PER_TOT_AMNT 	;
+ 	limits_setup->on_per_tot_nbr = ON_PER_TOT_NBR 	;
+       }
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetLimitsSetup( NOK ) ", PROCESSING );
+	return( NOK );
+}

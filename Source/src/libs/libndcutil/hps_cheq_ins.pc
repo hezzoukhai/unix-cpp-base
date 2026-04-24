@@ -1,0 +1,128 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      hps_cheq_ins.pc                                                                 */
+/*                                                                             */
+/* Description                                                                 */
+/*      Insertion Cheque Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#include <account.h>
+#include <paramdef.h>
+#include <iso_hps.h>
+#include <param_ctx.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <stdio.h>
+
+
+  /***********************************************************************
+  **  nom	: InsChequeReq()					**
+  **  desc	: insertion d'une demande de releve			**
+  **  entree	: pAccountNbr	-> numero de compte			**
+  **		  pCardNbr	-> numero de carte			**
+  **		  pStartingDate	-> date de debut du releve		**
+  **		  pEnd Date	-> date de fin du releve demande	**
+  **		  pDeliveryMode	-> mode de livraison du releve		**
+  **  sortie	: aucune						**
+  **  retour	: OK	-> insertion bien terminee			**
+  **		  NOK	-> insertion mal terminee			**
+  **		  ERROE	-> erreur fatal					**
+  **  auteur	: Younes OUADI (09 Dec 1998)				**
+  ***********************************************************************/
+int	InsChequeReq(	nIndexCtx,
+					pAccountNbr, 
+					pCardNbr, 
+					pTerminalNbr, 
+					pChequeNbr)
+
+int			nIndexCtx;
+char		pAccountNbr	[25];
+char		pCardNbr	[23];
+char		pTerminalNbr[16];
+int			pChequeNbr;
+{
+   struct sqlca sqlca;
+char		sLine[80];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar	vAccountNbr	[24];
+    varchar	vCardNbr	[22];
+    varchar	vTerminalNbr	[16];
+    int		vChequeNbr;
+    int		vRetour;
+EXEC SQL END DECLARE SECTION;
+	/*MKB060309 PCI Norme Integration */
+	if (debug_option == 1)
+		sprintf(sLine, "Start InsChequeReq(%.25s,%.23s,%.16s,%d)", pAccountNbr,pCardNbr,pTerminalNbr,pChequeNbr);
+	else
+		sprintf(sLine, "Start InsChequeReq()");
+	trace_event(sLine, PROCESSING);
+
+    memset(vAccountNbr.arr,		0, sizeof(vAccountNbr.arr)	);
+    memset(vCardNbr.arr,		0, sizeof(vCardNbr.arr)		);
+    memset(vTerminalNbr.arr,	0, sizeof(vTerminalNbr.arr)	);
+
+
+    memcpy(vAccountNbr.arr,	pAccountNbr,	strlen(pAccountNbr)	);
+    sprintf(sLine, "vAccountNbr           = %.24s", vAccountNbr.arr	);
+    trace_event(sLine,  TRACE);
+
+    memcpy(vCardNbr.arr,	pCardNbr,	strlen(pCardNbr)	);
+	/*MKB060309 PCI Norme Integration */
+	if (debug_option == 1)
+	{
+    		sprintf(sLine, "vCardNbr              = %.22s", vCardNbr.arr	);
+    		trace_event(sLine,  TRACE);
+	}
+    memcpy(vTerminalNbr.arr,	pTerminalNbr,	strlen(pTerminalNbr)	);
+    sprintf(sLine, "vTerminalNbr          = %.22s", vTerminalNbr.arr	);
+    trace_event(sLine,  TRACE);
+
+    vChequeNbr = pChequeNbr;
+    sprintf(sLine, "vChequeNbr            = %d", vChequeNbr		);
+    trace_event(sLine,  TRACE);
+
+    vAccountNbr.len	= strlen(pAccountNbr);
+    vCardNbr.len	= strlen(pCardNbr);
+    vTerminalNbr.len	= strlen(pTerminalNbr);
+
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO insStatReqErr;
+
+
+    EXEC SQL EXECUTE
+        BEGIN
+            :vRetour := PCRD_ATM_TOOLS_1.INS_CHEQUE_REQ(
+														:vAccountNbr,
+														:vCardNbr,
+														:vTerminalNbr,
+														'1',
+														:vChequeNbr,
+														'1',
+														SYSDATE);
+        END;
+    END-EXEC;
+
+memset(vAccountNbr.arr,		0, sizeof(vAccountNbr.arr)	);
+memset(vCardNbr.arr,		0, sizeof(vCardNbr.arr)		);
+	
+sprintf(sLine, "End   InsChequeReq(%d)", vRetour);
+trace_event(sLine, PROCESSING);
+return (vRetour);
+
+insStatReqErr :
+    memset(vAccountNbr.arr,		0, sizeof(vAccountNbr.arr)	);
+    memset(vCardNbr.arr,		0, sizeof(vCardNbr.arr)		);
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   InsChequeReq(ERROR)", ERROR);
+    return (ERROR);
+}
+

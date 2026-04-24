@@ -1,0 +1,235 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      hps_atm_cutoff.pc                                                                 */
+/*                                                                             */
+/* Description                                                                 */
+/*      ATM CUTOFF Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <string.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <define.h>
+#include <ndc_param.h>
+#include <param_ctx.h>
+
+
+
+
+  /***********************************************************************
+  **  nom	: GetAtmReconcData()					**
+  **  desc	: recuperation des donnees de reconcilliation GAB	**
+  **  entree	: pTermNbr	-> numero du terminal			**
+  **  sortie	: pReconcData	-> donnees de reconcilliation au format	**
+  **		PowerSEVEN						**
+  **  retour	: OK	-> donnees recuperees				**
+  **		  NOK	-> pas de donnees				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (09 Sep 1999)				**
+  **		(C) 1997 - 2001 : Hightech Payment Systems		**
+  ***********************************************************************/
+int	GetAtmReconcData(
+int		nIndexCtx,
+char	*pTermNbr,
+char    *pAcqBank/*ICH270715*/,
+char	*pReconcData
+)
+{
+   struct sqlca sqlca;
+    char	detail [MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar	hTermNbr	[  15+1];
+    VARCHAR        hAcqBank	[6+1];/*ICH270715*/ 
+    varchar	hReconcData	[1024+1];
+    int		hRet;
+EXEC SQL End  DECLARE SECTION;
+
+sprintf(detail, "Start GetAtmReconcData(%.15s)", pTermNbr);
+trace_event(detail, PROCESSING);
+
+    /* - Raz des variables ------------------------------------------------- */
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr));
+    hTermNbr.len = 2;
+    memset(hAcqBank.arr,	 0, sizeof(hAcqBank.arr));/*ICH270715*/     
+   memset(hReconcData.arr,	0, sizeof(hReconcData.arr));
+    hReconcData.len = 2;
+
+    /* - Init des variables ------------------------------------------------- */
+    memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr));
+    hTermNbr.len = strlen(pTermNbr);
+
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+    hAcqBank.len	= strlen(pAcqBank);
+    /* - Capture des exceptions -------------------------------------------- */
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO GetAtmReconcDataErr;
+
+
+    /* - Traitement PL/SQL ------------------------------------------------- */
+    EXEC SQL EXECUTE
+    BEGIN
+        :hRet := PCRD_ATM_RECON.GET_RECONC_DATA(:hTermNbr, :hAcqBank/*ICH270715*/, :hReconcData);
+    END;
+    END-EXEC;
+
+    /* - Examen du retour PL/SQL ------------------------------------------- */
+    if (hRet != OK)
+    {
+        trace_event("End   GetAtmReconcData(NOK)", PROCESSING);
+        return (NOK);
+    }
+
+    /* - Recuperation du resultat PL/SQL ------------------------------------ */
+    memcpy(pReconcData, hReconcData.arr, hReconcData.len);
+
+sprintf(detail, "End   GetAtmReconcData(%.45s)", pReconcData);
+trace_event(detail, PROCESSING);
+return (OK);
+GetAtmReconcDataErr:
+    sprintf(detail, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(detail, ERROR);
+    trace_event("End   GetAtmReconcData(ERROR)", ERROR);
+    return (ERROR);
+}
+
+  /***********************************************************************
+  **  nom	: SetAtmReconcData()					**
+  **  desc	: recuperation des donnees de reconcilliation GAB	**
+  **  entree	: pTermNbr	-> numero du terminal			**
+  **		: pReconcId	-> id de la reconcilliation		**
+  **  sortie	: aucune						**
+  **  retour	: OK	-> donnees recuperees				**
+  **		  NOK	-> pas de donnees				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (10 Sep 1999)				**
+  **		(C) 1997 - 2001 : Hightech Payment Systems		**
+  ***********************************************************************/
+int	SetAtmReconcData(
+int		nIndexCtx,
+char	pTermNbr[],
+char   *pAcqBank/*ICH270715*/,
+long	pReconcId
+)
+{
+   struct sqlca sqlca;
+    char detail[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar	hTermNbr	[  15+1];
+    VARCHAR        hAcqBank	[6+1];/*ICH270715*/ 
+    long	hReconcId;
+    int		hRet;
+EXEC SQL End  DECLARE SECTION;
+
+sprintf(detail, "Start SetAtmReconcData(%.15s,%ld)", pTermNbr, pReconcId);
+trace_event(detail, PROCESSING);
+
+    /* - Raz des variables ------------------------------------------------- */
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr));
+    hTermNbr.len = 2;
+
+    memset(hAcqBank.arr,	 0, sizeof(hAcqBank.arr));/*ICH270715*/     
+
+    /* - Init des variables ------------------------------------------------- */
+    memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr));
+    hTermNbr.len	= strlen(pTermNbr);
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+    hAcqBank.len	= strlen(pAcqBank);
+    hReconcId		= pReconcId;
+
+    /* - Capture des exceptions -------------------------------------------- */
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL WHENEVER SQLERROR GOTO SetAtmReconcDataErr;
+
+
+    /* - Traitement PL/SQL ------------------------------------------------- */
+    EXEC SQL EXECUTE
+    BEGIN
+        :hRet := PCRD_ATM_RECON.SET_RECONC_DATA(:hTermNbr, :hAcqBank/*ICH270715*/, :hReconcId);
+    END;
+    END-EXEC;
+
+    /* - Examen du retour PL/SQL ------------------------------------------- */
+    if (hRet != OK)
+    {
+        trace_event("End   SetAtmReconcData(NOK)", PROCESSING);
+        return (NOK);
+    }
+
+sprintf(detail, "End   SetAtmReconcData(OK)");
+trace_event(detail, PROCESSING);
+return (OK);
+SetAtmReconcDataErr:
+    sprintf(detail, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(detail, ERROR);
+    trace_event("End   SetAtmReconcData(ERROR)", ERROR);
+    return (ERROR);
+}
+/*==============================================================================================*/
+/*==============================================================================================*/
+/*==============================================================================================*/
+/*==============================================================================================*/
+int	CheckReconcData (
+			int	nIndexCtx,
+			char	*pTermNbr,
+			char    *pAcqBank/*ICH270715*/
+
+			)
+{
+   struct sqlca sqlca;
+char	sLine [MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar	hTermNbr	[  15+1];
+    VARCHAR        hAcqBank	[6+1];/*ICH270715*/ 
+    int		hRet;
+EXEC SQL End  DECLARE SECTION;
+
+sprintf(sLine, "Start CheckReconcData(%.15s)", pTermNbr);
+trace_event(sLine, PROCESSING);
+
+    /* - Raz des variables ------------------------------------------------- */
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr));
+    hTermNbr.len = 0;
+    memset(hAcqBank.arr,	 0, sizeof(hAcqBank.arr));/*ICH270715*/     
+
+    /* - Init des variables ------------------------------------------------- */
+    memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr));
+    hTermNbr.len = strlen(pTermNbr);
+
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));/*ICH270715*/
+    hAcqBank.len	= strlen(pAcqBank);
+    
+    /* - Capture des exceptions -------------------------------------------- */
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO CheckReconcDataErr;
+
+    /* - Traitement PL/SQL ------------------------------------------------- */
+    EXEC SQL EXECUTE
+    BEGIN
+        :hRet := PCRD_ATM_RECON.CHECK_RECONC_DATA(:hTermNbr, :hAcqBank/*ICH270715*/);
+    END;
+    END-EXEC;
+
+    /* - Examen du retour PL/SQL ------------------------------------------- */
+    if (hRet != OK)
+    {
+        trace_event("End   CheckReconcData(NOK)", PROCESSING);
+        return (NOK);
+    }
+
+trace_event("End   CheckReconcData ( OK )", PROCESSING);
+return (OK);
+CheckReconcDataErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   CheckReconcData(ERROR)", ERROR);
+    return (ERROR);
+}
+

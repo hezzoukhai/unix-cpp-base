@@ -1,0 +1,150 @@
+#include <stdio.h>
+#include <errno.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <param_ctx.h>
+#include <define.h>
+#include <card.h>
+
+
+int GetTrackIIRecord(int nIndiceCtx, char *sCardNumber, TSTrckIIRecord *record )
+{
+
+   struct sqlca sqlca;
+   char sLine [ MAX_LINE_TRC];
+
+   /*char *CardTrunc[22 +1]; */
+   char CardTrunc[22 +1]; /***SKO180509**/
+   
+   memset(CardTrunc, 0, sizeof(CardTrunc));
+
+
+    /* Declare Table TRACKII_INFO columns, PL/SQL GET_TRACKII_INFO_RECORD return value, and oracle index context*/
+
+	EXEC SQL BEGIN DECLARE SECTION;
+           int  response_code;
+     	   VARCHAR v_card_number [22 + 1];
+           VARCHAR MIN_CARD_RANGE [22 + 1]  ;
+     	   VARCHAR MAX_CARD_RANGE [22 + 1]  ;
+           int FIELD_SEPARATOR_OFFSET   ;
+           int COUNTRY_CODE_OFFSET  ;
+           int EXPIRY_DATE_OFFSET   ;
+           int SERVICE_CODE_OFFSET   ;
+           int PVKI_OFFSET ;
+           int PVV_OFFSET  ;
+           int CVV_OFFSET ;  
+           int LANGUAGE_CODE_OFFSET ;   
+	EXEC SQL END DECLARE SECTION;
+
+      
+      /* Use the following oracle context*/
+      EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+ 
+      /*trace start of execution of the current function in trace file*/
+      trace_event ( "Start GetTrackIIRecord() ", PROCESSING );
+
+ 
+      /*allocate memory and intialize needed variables*/     
+      memset ( MIN_CARD_RANGE.arr, 0, sizeof(MIN_CARD_RANGE.arr));
+      memset ( MAX_CARD_RANGE.arr, 0, sizeof(MAX_CARD_RANGE.arr));
+      memset ( v_card_number.arr, 0, sizeof(v_card_number.arr));
+
+      memcpy(v_card_number.arr, sCardNumber, strlen(sCardNumber));
+      v_card_number.len =  strlen(sCardNumber);
+	/*MKB060309 PCI Norme Integration */
+     	if (debug_option == 1)
+	  	sprintf(sLine," Card number            :|%s|", v_card_number.arr);
+      	else
+	{
+	  	TrunCard(v_card_number.arr, CardTrunc);
+	  	sprintf(sLine," Card number            :|%s|", CardTrunc);
+      	}
+        trace_event(sLine,TRACE);
+
+      response_code = 909;
+
+      /*Print error message if sql error occurs*/
+      EXEC SQL WHENEVER SQLERROR GOTO err_get_track_info;
+
+
+      /* call the PL/SQL functin GET_TRACKII_INFO_RECORD() */
+ 
+      EXEC SQL EXECUTE
+            DECLARE T_TRACKII_INFO   TRACKII_INFO%ROWTYPE;
+      BEGIN
+           :response_code := PCRD_FO_P7_GENERAL_TOOLS.GET_TRACKII_INFO_RECORD
+                                                                 ( :v_card_number, 
+                                                                   T_TRACKII_INFO     
+                                                                  );
+           IF :response_code = 0 THEN
+
+              :MIN_CARD_RANGE 				:= T_TRACKII_INFO.MIN_CARD_RANGE ;
+              :MAX_CARD_RANGE 				:= T_TRACKII_INFO.MAX_CARD_RANGE ;
+              :FIELD_SEPARATOR_OFFSET 		:= T_TRACKII_INFO.FIELD_SEPARATOR_OFFSET ;
+              :COUNTRY_CODE_OFFSET 			:= T_TRACKII_INFO.COUNTRY_CODE_OFFSET  ;
+              :EXPIRY_DATE_OFFSET  			:= T_TRACKII_INFO.EXPIRY_DATE_OFFSET  ;
+              :SERVICE_CODE_OFFSET 			:= T_TRACKII_INFO.SERVICE_CODE_OFFSET ;
+              :PVKI_OFFSET 					:= T_TRACKII_INFO.PVKI_OFFSET  ;
+              :PVV_OFFSET 					:= T_TRACKII_INFO.PVV_OFFSET  ;
+              :CVV_OFFSET 					:= T_TRACKII_INFO.CVV_OFFSET ;
+              :LANGUAGE_CODE_OFFSET			:= T_TRACKII_INFO.LANGUAGE_CODE_OFFSET;   
+ 
+          END IF;     
+
+        
+      END;
+      END-EXEC;
+      memset ( v_card_number.arr, 0, sizeof(v_card_number.arr)); /* PCI*/
+      if ( response_code == 0 )
+      {
+           memcpy(record->min_card_range, MIN_CARD_RANGE.arr , MIN_CARD_RANGE.len );
+           memcpy(record->max_card_range, MAX_CARD_RANGE.arr , MAX_CARD_RANGE.len );
+           record->field_separator_offset = FIELD_SEPARATOR_OFFSET ;
+           record->country_code_offset = COUNTRY_CODE_OFFSET ;
+           record->expiry_date_offset  = EXPIRY_DATE_OFFSET   ;
+           record->service_code_offset  = SERVICE_CODE_OFFSET   ;
+           record->pvki_offset = PVKI_OFFSET;
+           record->pvv_offset = PVV_OFFSET;
+           record->cvv_offset = CVV_OFFSET;
+           record->language_code_offset = LANGUAGE_CODE_OFFSET;
+
+			memset ( MIN_CARD_RANGE.arr, 0, sizeof(MIN_CARD_RANGE.arr));      /* PCI*/
+			memset ( MAX_CARD_RANGE.arr, 0, sizeof(MAX_CARD_RANGE.arr));      /* PCI*/
+
+	  		/*sprintf(sLine," Field Sep              :|%d|", record->field_separator_offset);
+	  		trace_event(sLine,TRACE);
+	  		sprintf(sLine," Country Code           :|%d|", record->country_code_offset);
+	  		trace_event(sLine,TRACE);
+	  		sprintf(sLine," Expiry Date            :|%d|", record->expiry_date_offset);
+	  		trace_event(sLine,TRACE);
+	  		sprintf(sLine," Service code           :|%d|", record->service_code_offset);
+	  		trace_event(sLine,TRACE);
+	  		sprintf(sLine," Pvki                   :|%d|", record->pvki_offset);
+	  		trace_event(sLine,TRACE);
+	  		sprintf(sLine," pvv                    :|%d|", record->pvv_offset);
+	  		trace_event(sLine,TRACE);
+	  		sprintf(sLine," cvv                    :|%d|", record->cvv_offset);
+	  		trace_event(sLine,TRACE);
+	  		sprintf(sLine," Language code          :|%d|", record->language_code_offset);
+	  		trace_event(sLine,TRACE);*/ /** HM - 09022010 - PA_DSS **/
+           trace_event ( "End GetTrackIIRecord(OK) ", PROCESSING );
+           return(OK);
+      }
+      
+
+      trace_event ( "End GetTrackIIRecord(NOK) ", PROCESSING );
+      return (NOK);
+
+      err_get_track_info:
+          EXEC SQL WHENEVER SQLERROR CONTINUE;
+		  
+          sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+          trace_event (  sLine , ERROR );
+		  memset ( v_card_number.arr, 0, sizeof(v_card_number.arr)); /* PCI*/
+          trace_event ( "End GetTrackIIRecord(NOK) ", PROCESSING );
+          return( NOK );
+
+      
+}
+

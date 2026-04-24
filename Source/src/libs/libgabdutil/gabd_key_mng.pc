@@ -1,0 +1,181 @@
+  /***********************************************************************
+  ** nom	: gabd_key_mng.pc					**
+  **  desc	: gestion des cles GABD 			**
+  **			(C) 1999 : Hightech Payment Systems		**
+  ***********************************************************************/
+#include <stdio.h>
+#include <string.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <define.h>
+#include <param_ctx.h>
+
+/*****************************************************************************/
+/* GetGAK                                                                    */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere les cles A' de GABD.                    */
+/*  Entree   : L'identificateur du terminal.                                 */
+/*  Sortie   : La cle A'.                                                    */
+/*****************************************************************************/
+
+int     GetGAK( int nIndiceCtx , char *terminal_nbr,  char *V_AcqBank /*ICH270715*/, char *GAK)
+{
+
+	EXEC SQL BEGIN DECLARE SECTION;
+		char sLine [ MAX_LINE_TRC];
+        int              response;
+        VARCHAR          T_terminal_nbr     [15 + 1];
+    	VARCHAR      	     T_AcqBank  	 	[6+1];/*ICH270715*/ 
+        char             T_GABD_A           [22 + 1];
+        char             T_BIDON            [22 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start GetGAK(%.15s)", terminal_nbr);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_GABD_A,         		0, sizeof(T_GABD_A));
+	memset(T_BIDON,         		0, sizeof(T_BIDON));
+	memset(T_terminal_nbr.arr, 	0, sizeof(T_terminal_nbr.arr));
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+    T_terminal_nbr.len =8;
+
+	memcpy(T_terminal_nbr.arr, terminal_nbr, strlen(terminal_nbr));
+	T_terminal_nbr.len = strlen(terminal_nbr);
+
+	sprintf(sLine, " TERMINAL : %s longuer %d", T_terminal_nbr.arr,T_terminal_nbr.len);
+	trace_event(sLine, PROCESSING);
+
+   
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank); 
+	
+	response = SYSTEM_MALFUNCTION ;
+	EXEC SQL WHENEVER SQLERROR GOTO tmk_key_exception;
+	EXEC SQL EXECUTE
+    DECLARE
+	L_BIDON			GABD_KEY_MEMBER.key1_value%TYPE;
+	L_GABD_A		GABD_KEY_MEMBER.key1_value%TYPE;
+	BEGIN
+         	:response := PCRD_GABD_TERMINAL_CONFIG.GET_GABD_A_KEY (	:T_terminal_nbr,
+         															:T_AcqBank/*ICH270715*/,
+                                                 					L_GABD_A,
+                                                 		 			L_BIDON
+                                                					);
+	IF (L_BIDON IS NULL) THEN
+    	:T_BIDON := '   ';
+	ELSE
+    	:T_BIDON := L_BIDON;
+	END IF;
+
+	IF (L_GABD_A IS NULL) THEN
+    	:T_GABD_A := '   ';
+	ELSE
+    	:T_GABD_A := L_GABD_A;
+	END IF;
+
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(GAK, T_GABD_A, strlen(T_GABD_A) );
+        /*sprintf(sLine, "End   GetGAK(OK,%.22s)", GAK);
+        trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("End   GetGAK(OK)", PROCESSING);
+        return(OK);
+	}
+
+	sprintf(sLine, "End   GetGAK(NOK)");
+	trace_event(sLine, PROCESSING);
+	return(NOK);
+
+	tmk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetGAK (MALFUNCTION)", PROCESSING);
+    return(SYSTEM_MALFUNCTION);
+
+}
+/*****************************************************************************/
+/* GetGBK                                                                    */
+/*----------------                                                           */
+/*  Fonction : fonction qui recupere les cles B' de GABD.                    */
+/*  Entree   : L'identificateur du terminal.                                 */
+/*  Sortie   : La cle A'.                                                    */
+/*****************************************************************************/
+
+int     GetGBK( int nIndiceCtx , char *terminal_nbr,char *V_AcqBank /*ICH270715*/, char *GBK)
+{
+
+	EXEC SQL BEGIN DECLARE SECTION;
+		char sLine [ MAX_LINE_TRC];
+        int              response;
+        VARCHAR          T_terminal_nbr     [15 + 1];
+    	VARCHAR      	     T_AcqBank  	 	[6+1];/*ICH270715*/ 
+        char             T_GABD_B           [22 + 1];
+        char             T_BIDON            [22 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start GetGBK(%.15s)", terminal_nbr);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_GABD_B,		0, sizeof(T_GABD_B));
+	memset(T_BIDON,  		0, sizeof(T_BIDON));
+	memset(T_terminal_nbr.arr, 	0, sizeof(T_terminal_nbr.arr));
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+
+	memcpy(T_terminal_nbr.arr, terminal_nbr, strlen(terminal_nbr));
+	T_terminal_nbr.len = strlen(terminal_nbr);
+	
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+	response = SYSTEM_MALFUNCTION ;
+	EXEC SQL WHENEVER SQLERROR GOTO tmk_key_exception;
+	EXEC SQL EXECUTE
+    DECLARE
+	L_BIDON			GABD_KEY_MEMBER.key1_value%TYPE;
+	L_GABD_B		GABD_KEY_MEMBER.key1_value%TYPE;
+	BEGIN
+        	:response := PCRD_GABD_TERMINAL_CONFIG.GET_GABD_B_KEY (	:T_terminal_nbr,
+ 											 						:T_AcqBank/*ICH270715*/,
+                                                 					L_GABD_B,
+                                                 					L_BIDON
+                                                					);
+	IF (L_BIDON IS NULL) THEN
+    	:T_BIDON := '   ';
+	ELSE
+    	:T_BIDON := L_BIDON;
+	END IF;
+
+	IF (L_GABD_B IS NULL) THEN
+    	:T_GABD_B := '   ';
+	ELSE
+    	:T_GABD_B := L_GABD_B;
+	END IF;
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(GBK, T_GABD_B, strlen(T_GABD_B) );
+        sprintf(sLine, "End   GetGBK(%.22s)", GBK);
+        /*trace_event(sLine, PROCESSING);*/ /** HM - 09022010 - PA_DSS **/
+        trace_event("End   GetGBK(OK)", PROCESSING);
+        return(OK);
+	}
+
+	sprintf(sLine, "End   GetGBK(NOK)");
+	trace_event(sLine, PROCESSING);
+	return(NOK);
+
+	tmk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetGBK (MALFUNCTION)", PROCESSING);
+    return(SYSTEM_MALFUNCTION);
+}

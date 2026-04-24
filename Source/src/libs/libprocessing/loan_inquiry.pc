@@ -1,0 +1,81 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*                                                                             */
+/*                                                                             */
+/* Description                                                                 */
+/*                                                                             */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initial Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int Get_LoanInquiry  ( int nIndiceCtx , char *sTlvBuffer )
+{
+	struct 			sqlca sqlca;
+	char 			sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_bal	  [ LG_MAX + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    trace_event ( "Start Get_LoanInquiry () ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  );
+	T_tlv_bal.len = 0;
+
+	memcpy ( T_tlv_bal.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_bal.len = strlen(sTlvBuffer );
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UpdateBalance;
+	EXEC SQL EXECUTE
+	BEGIN
+
+		--:response_code := PCRD_ATM_TOOLS_1.GET_AVAILABL(
+                                                          --:T_tlv_bal 
+														  --); 
+		:response_code := declaration_cst.OK;
+	END;
+	END-EXEC;
+	
+    tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+	sprintf(sLine,"End Get_LoanInquiry (%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_UpdateBalance :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+    tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End Get_LoanInquiry (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+

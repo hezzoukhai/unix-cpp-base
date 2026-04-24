@@ -1,0 +1,115 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2007                                          */
+/*******************************************************************************/
+#include <stdio.h>
+#include <define.h>
+#include <iso_hps.h>
+#include <sys/time.h>
+#include <define.h>
+#include <list_thr.h>
+#include <hsm_inc.h>
+#include <param_ctx.h>
+
+#include <iso_hps.h>
+#include <tlv_fields.h>
+#include <tlv_autho.h>
+
+#include <tlv_privfields.h>
+#include <tlv_private.h>
+
+#include <security_data.h>
+#include <security_flags.h>
+#include <security_results.h>
+
+#include <resources.h>
+#include <service.h>
+#include <event_auth.h>
+#include <maj_card_activity.h>
+
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+
+extern char  ResourceId         [ 6 +1];
+
+
+/****************************************************************************/
+
+int FctEmvTopUp  ( int nIndiceCtx , char *sTlvBuffer)
+{
+struct sqlca        sqlca                          ;
+char                sLine           [ MAX_LINE_TRC];
+
+EXEC SQL BEGIN DECLARE SECTION;
+VARCHAR             T_tlv_auth        [ LG_MAX + 1];
+VARCHAR             T_tlv_warning          [ 6 + 1];
+int                 response_code                  ;
+EXEC SQL END DECLARE SECTION;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+   trace_event ("START FctEmvTopUp ()", PROCESSING );
+
+
+/****************************************************************************/
+/** Init of Vars **/
+/****************************************************************************/
+
+
+   memset ( T_tlv_auth.arr,               0,   sizeof(T_tlv_auth.arr) );
+   T_tlv_auth.len = 0;
+
+   memset ( T_tlv_warning.arr,            0,   sizeof(T_tlv_warning.arr) );
+   T_tlv_warning.len = 0;
+
+
+   /*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+	
+
+   memcpy ( T_tlv_auth.arr,      sTlvBuffer,   strlen(sTlvBuffer) );
+   T_tlv_auth.len = strlen(sTlvBuffer) ;
+
+/****************************************************************************/
+/** Calling the PL/SQL Fct                                                 **/
+/****************************************************************************/
+   response_code = SYSTEM_MALFUNCTION;
+   EXEC SQL WHENEVER SQLERROR GOTO plsql_error_tag;
+   EXEC SQL EXECUTE
+   BEGIN
+      :response_code := PCRD_P7_EMV_AUTH_TOOLS.FCT_EMV_OFFLINE_LIM_TOPUP ( :T_tlv_auth );
+   END;
+   END-EXEC;
+
+
+   if (response_code != OK)
+   {
+      PrintTlvBuffer ( T_tlv_auth.arr);
+   }
+
+   memset ( T_tlv_auth.arr,               0,   sizeof(T_tlv_auth.arr) ); /* PCI */
+
+   /*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+   sprintf(sLine,"END   FctEmvTopUp (%d,%.50s)", response_code, T_tlv_warning.arr);
+
+   trace_event(sLine,PROCESSING);
+
+   return(response_code);
+
+plsql_error_tag :
+        EXEC SQL WHENEVER SQLERROR CONTINUE;
+        sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+        trace_event (  sLine , ERROR );
+	   memset ( T_tlv_auth.arr,               0,   sizeof(T_tlv_auth.arr) );  /* PCI */
+	   /*PADSS*/
+		P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+        trace_event("END   FctEmvTopUp(SYSTEM_MALFUNCTION)", PROCESSING);
+        return( SYSTEM_MALFUNCTION );
+}
+
+

@@ -1,0 +1,194 @@
+#include <stdio.h>
+#include <define.h>
+#include <visa_param.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+/****************************************************************************/
+/*  GetVisaParams()                                                         */
+/*  Reads BASEI parameters from table.                                      */
+/****************************************************************************/
+int  GetVisaParams (int  nIndexCtx, char  *pResourceId)
+{
+	char	sLine[MAX_LINE_TRC];
+	struct sqlca sqlca;
+   EXEC SQL BEGIN DECLARE SECTION;
+        char    T_resource_id     [7];
+        char       T_station_id      [7];
+        VARCHAR    T_acquirer_id    [12];
+        char       T_country_code    [4];
+        char       T_alpha_country2  [3];
+        char       T_alpha_country3  [4];
+        VARCHAR    T_bank_location  [12];
+
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   fprintf (stderr, "Start  GetVisaParams()");
+
+   memset (T_resource_id,       0, sizeof(T_resource_id));
+   memset (T_station_id,        0, sizeof(T_station_id));
+   memset (T_country_code,      0, sizeof(T_country_code));
+   memset (T_alpha_country2,    0, sizeof(T_alpha_country2));
+   memset (T_alpha_country3,    0, sizeof(T_alpha_country3));
+   memset (T_acquirer_id.arr,   0, sizeof(T_acquirer_id.arr));
+   memset (T_bank_location.arr, 0, sizeof(T_bank_location.arr));
+   T_acquirer_id.len = 0;
+   T_bank_location.len = 0;
+
+   memcpy (T_resource_id, pResourceId, 6);
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO resource_params_error;
+   EXEC SQL EXECUTE
+       DECLARE    
+              T_base1_params  P7_BASE1_RESOURCE_PARAM%ROWTYPE;
+   BEGIN
+      :result := PCRD_SWI_RESOURCES_PARAM.GET_BASE1_PARAMS (
+                                        :T_resource_id,
+                                         T_base1_params);
+
+      IF (:result = 0) THEN
+         :T_station_id     := T_base1_params.station_id;
+         :T_country_code   := T_base1_params.country_code;
+         :T_alpha_country2 := T_base1_params.alpha_country_code2;
+         :T_alpha_country3 := T_base1_params.alpha_country_code3;
+         :T_acquirer_id    := T_base1_params.acquirer_id;
+         :T_bank_location  := T_base1_params.bank_location; 
+      END IF;
+
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+      memcpy (StationId,     T_station_id, 6);
+      memcpy (CountryCode,   T_country_code, 3);
+      memcpy (AlphaCode2,    T_alpha_country2, 2);
+      memcpy (AlphaCode3,    T_alpha_country3, 3);
+      memcpy (AcquirerId,    T_acquirer_id.arr,   T_acquirer_id.len);
+      memcpy (BankLocation,  T_bank_location.arr, T_bank_location.len);
+ 
+      fprintf (stderr, "End GetVisaParams(OK)");
+      return (OK);
+   }
+   else
+   {
+      fprintf (stderr, "End GetVisaParams(NOK)");
+      return (NOK);
+   }
+
+resource_params_error:
+	sprintf (sLine, "End GetVisaParams(MALFUNCTION)|%s",sqlca.sqlerrm.sqlerrmc);
+    fprintf(stderr,sLine);
+	return (NOK);
+}
+
+void DumpVisaGlobals ( )
+{
+   fprintf(stderr,"\n Comms Id ........= %.2s ", CommsId );
+   fprintf ( stderr,"\n trace_file.....= %s ", trace_file  );
+   fprintf ( stderr,"\n trace_level....= %d ", trace_level );
+   fprintf(stderr,"\n Acquirer Timer ............= %d ", nTimerAcq );
+   fprintf(stderr,"\n Delta Time Acquirer/Issuer = %d ", nIssAcqDelta);
+   fprintf(stderr,"\n Nbr Max Threads  ...= %d ", max_thread  );
+   fprintf(stderr,"\n Nbr User Threads ...= %d ", nUserThread );
+   fprintf(stderr,"\n Max Request      ...= %d ", max_request );
+   fprintf(stderr,"\n Protocol ID .....= %.2s ",  ProtocolId );
+   fprintf(stderr,"\n Device Name .....= %.15s ",  DeviceName );
+   fprintf(stderr,"\n Remote Application Name = %.15s ",  RemoteAppName );
+   fprintf(stderr,"\n Remote Application Id   = %.15s ",  RemoteAppId   );
+   fprintf(stderr,"\n Local  Application Name = %.15s ",  LocalAppName );
+   fprintf(stderr,"\n Local  Application Id   = %.15s ",  LocalAppId );
+   fprintf(stderr,"\n Station Id ....= %.6s ", StationId );
+   fprintf(stderr,"\n Country Code...= %.3s ",  CountryCode );
+   fprintf(stderr,"\n Alpha Code2....= %.2s ", AlphaCode2 );   
+   fprintf(stderr,"\n Alpha Code3....= %.3s ",  AlphaCode3 ); 
+   fprintf(stderr,"\n Acq Inst Id....= %.11s ",  AcquirerId );
+   fprintf(stderr,"\n Bank Location..= %.11s ", BankLocation );
+   fprintf(stderr,"\n Acquirer Bank .= %.6s ", AcquirerBank );
+
+   fprintf ( stderr,"\n");
+}
+
+int GetMaxSafCounter() 
+{
+   return ( 10 );
+}
+
+GetAdviceInterval ( char *ResourceId )
+{
+   return ( 2 );
+}
+
+char GetDeclineAdvicesFlag ( char * Resource )
+{
+  return ( 'N' );
+}
+
+/****************************************************************************/
+/*  GetVisaAquirer()                                                        */
+/*  Get Aquirer_bin from bank_network table.                                */
+/****************************************************************************/
+/*EBE141110: will use libactions/get_acquirer_bin instead. Acquirer bank should be a mandatory field in P7 ISO
+int  GetVisaAquirer (int  nIndexCtx, char  *pBankNetword, char  *pOutletNumber , char * pAquirerBin)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+	
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_bank_network     [6 + 1];
+        char       T_outlet_number     [15 + 1];
+        VARCHAR    T_acquirer_bin    [12 + 1];
+       
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  GetVisaAquirer()", PROCESSING);
+
+   memset (T_bank_network,       0, sizeof(T_bank_network));
+   memset (T_outlet_number,        0, sizeof(T_outlet_number));
+   memset (T_acquirer_bin.arr,   0, sizeof(T_acquirer_bin.arr));
+
+   T_acquirer_bin.len = 0;
+
+   memcpy (T_bank_network, pBankNetword, 6);
+   memcpy (T_outlet_number, pOutletNumber, 15);
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO visa_aquirer_error;
+   EXEC SQL EXECUTE  
+   BEGIN
+      :result := PCRD_FO_P7_FUNCTION_TOOLS.GET_ACQUIRER_BIN (
+															:T_bank_network,
+															:T_outlet_number,
+															:T_acquirer_bin);
+
+   END;
+   END-EXEC;
+
+   if (result == OK)
+   {
+      memcpy (pAquirerBin,    T_acquirer_bin.arr,   T_acquirer_bin.len);
+      trace_event ("End GetVisaAquirer(OK)", PROCESSING);
+      return (OK);
+   }
+   else
+   {
+      trace_event ("End GetVisaAquirer(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+visa_aquirer_error:   
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event ("End GetVisaAquirer (NOK)", PROCESSING);
+	return (NOK);
+}
+*/
+

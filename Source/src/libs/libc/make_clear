@@ -1,0 +1,14 @@
+TARGET          =ClearQueue.exe
+
+
+all :   CLEARQUEUE
+
+OBJS = ClearQueue.o
+
+
+.c.o :
+	g++ -c -I../../inc $<
+
+CLEARQUEUE : $(OBJS)
+	g++ -o $(TARGET) $(OBJS) 
+

@@ -1,0 +1,574 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <hsm_inc.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+/*YK2007:DUKPT*/
+/*ZKO13092018: Function NOT Used*/
+/*
+int     GetBDK( int nIndiceCtx , char *terminal_nbr, char *BDK1 ,char * bank_code)
+{
+
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_terminal_nbr     [15 + 1];
+		VARCHAR          T_bank_code     	[6 + 1];
+        varchar             T_BDK1          [256 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start GetBDK(%.15s)", terminal_nbr);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_BDK1.arr,         		0, sizeof(T_BDK1.arr));
+	memset(T_terminal_nbr.arr, 	0, sizeof(T_terminal_nbr.arr));
+	memset(T_bank_code.arr, 	0, sizeof(T_bank_code.arr));/*SNO270715 *
+	
+	memcpy(T_terminal_nbr.arr, terminal_nbr, strlen(terminal_nbr));
+	T_terminal_nbr.len = strlen(terminal_nbr);
+
+	/* Start SNO270715 *
+	memcpy(T_bank_code.arr, bank_code, strlen(bank_code));
+	T_bank_code.len = strlen(bank_code);
+	/* End SNO270715 *
+	
+	response = HSM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO bdk_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+        :response := PCRD_POS_DUKPT_KEY_MNG.GET_BDK_KEY(:T_terminal_nbr,
+														:T_bank_code,/*SNO270715 *
+                                                        :T_BDK1
+                                                       );
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        memcpy(BDK1, T_BDK1.arr, T_BDK1.len );
+        sprintf(sLine, "End   GetBDK(  %.32s)", BDK1);
+        trace_event(sLine, PROCESSING);
+        return(OK);
+	}
+
+  sprintf(sLine, "End   GetBDK(NOK)");
+	trace_event(sLine, PROCESSING);
+	return(NOK);
+
+
+	bdk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetBDK (MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+int	SavePosIsoBDKKey(int nIndiceCtx,char *pTermNbr, char *pBdkLmk, char *pBdkZmk, char *pCheckValue ,char *pOutlet)
+
+{
+struct sqlca sqlca;
+char 	detail[MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar		hTermNbr	[15+1];
+	varchar		hOutlet	[15+1];
+    char		hBdkLmk		[256+1];
+    char		hBdkZmk		[256+1];
+    char		hCheck		[256+1];
+    int			hRet;
+EXEC SQL END DECLARE SECTION;
+
+	
+	if (debug_option == 1)
+	{
+		sprintf(detail, "Start SavePosIsoBDKKey(%s,%s,%s,%s,%s)", pTermNbr, pBdkLmk, pBdkZmk,pCheckValue , pOutlet );
+		trace_event(detail, PROCESSING);
+	}
+	else
+	{
+		sprintf(detail, "Start SavePosIsoBDKKey(%s,%s)", pTermNbr, pCheckValue);
+		trace_event(detail, PROCESSING);
+	}
+    
+	memset(hOutlet.arr,	0, sizeof(hOutlet.arr)	);
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr)	);
+    hTermNbr.len		= 2;
+
+    memset(hBdkLmk,		0, sizeof(hBdkLmk)	);
+    memset(hBdkZmk,		0, sizeof(hBdkZmk)	);
+    memset(hCheck,		0, sizeof(hCheck)	);
+    memcpy(hTermNbr.arr,	pTermNbr, 	strlen(pTermNbr));
+    hTermNbr.len		= strlen(pTermNbr); 
+	
+    memcpy(hOutlet.arr,	pOutlet, 	strlen(pOutlet));
+    hOutlet.len		= strlen(pOutlet); 
+	
+    memcpy(hBdkLmk,		pBdkLmk, 	strlen(pBdkLmk));
+    memcpy(hBdkZmk,		pBdkZmk, 	strlen(pBdkZmk));
+    memcpy(hCheck,		pCheckValue, 	strlen(pCheckValue));
+    
+    EXEC SQL WHENEVER SQLERROR GOTO saveBDKKeyErr;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+
+    EXEC SQL EXECUTE
+    BEGIN
+        :hRet := PCRD_POS_DUKPT_KEY_MNG.SAVE_BDK_KEY(:hTermNbr,:hOutlet , :hBdkLmk, :hBdkZmk, :hCheck);
+    END;
+    END-EXEC;
+
+    memset(hBdkLmk,		0, sizeof(hBdkLmk)	);  
+    memset(hBdkZmk,		0, sizeof(hBdkZmk)	);  
+	memset(hCheck,		0, sizeof(hCheck)	);  
+
+    if(hRet != OK)
+    {
+        sprintf(detail, "End   SavePosIsoBDKKey(NOK)");
+        trace_event(detail, PROCESSING);
+        return (hRet);
+    }
+
+sprintf(detail, "End   SavePosIsoBDKKey(OK)");
+trace_event(detail, PROCESSING);
+return (OK);
+
+saveBDKKeyErr :
+    sprintf(detail, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(detail, ERROR);
+    memset(hBdkLmk,		0, sizeof(hBdkLmk)	); 
+    memset(hBdkZmk,		0, sizeof(hBdkZmk)	);
+	memset(hCheck,		0, sizeof(hCheck)	);
+    trace_event("End   SavePosIsoBDKKey(ERROR)", ERROR);
+    return (ERROR);
+}
+*/
+
+
+
+/*ZKO: Start 13092018:add OutletNbr for getting BankCode*/
+int GetBDK (   		int nIndiceCtx,
+                        char *terminal_nbr,
+						char *sOutlet,
+                        char *sResourceId,
+                        char *sBDK
+                         )
+{
+
+    	struct sqlca sqlca;
+    	char sLine [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_terminal_nbr  [15 + 1];
+        VARCHAR          T_resource_id   [ 6 + 1 ];
+        VARCHAR          T_BDK           [256 + 1];
+		VARCHAR     	 T_Outlet   [ 15 + 1 ];
+		
+		EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+        sprintf(sLine, "Start GetBDK(%d,%s,%s,%s)", nIndiceCtx ,terminal_nbr,sOutlet , sResourceId);
+        trace_event(sLine, PROCESSING);
+
+        memset(T_terminal_nbr.arr , 0, sizeof(T_terminal_nbr.arr));
+        T_terminal_nbr.len = 15;
+        memset(T_resource_id.arr , 0, sizeof(T_resource_id.arr));
+        T_resource_id.len = 6;
+		memset(T_Outlet.arr , 0, sizeof(T_Outlet.arr));
+        T_Outlet.len = 6;
+
+        memcpy(T_Outlet.arr, sOutlet, strlen(sOutlet));
+        T_Outlet.len = strlen(sOutlet);
+		
+       
+
+        memcpy(T_terminal_nbr.arr, terminal_nbr, strlen(terminal_nbr));
+        T_terminal_nbr.len = strlen(terminal_nbr);
+
+        memcpy(T_resource_id.arr, sResourceId , strlen(sResourceId));
+        T_resource_id.len = strlen(sResourceId);
+
+
+        sprintf(sLine, "GetBDK(%d,%s,%s,%s)", nIndiceCtx ,T_terminal_nbr.arr ,T_Outlet.arr, T_resource_id.arr);
+        trace_event(sLine, PROCESSING);
+        sprintf(sLine, "GetBDKLen(%d,%d,%d,%d)", nIndiceCtx ,T_terminal_nbr.len ,T_Outlet.len, T_resource_id.len);
+        trace_event(sLine, PROCESSING);
+
+
+        memset(T_BDK.arr,                      0, sizeof(T_BDK.arr));
+		T_BDK.len = 0;
+
+        response = HSM_MALFUNCTION;
+        EXEC SQL WHENEVER SQLERROR GOTO bdk_key_exception;
+        EXEC SQL EXECUTE
+        BEGIN
+        :response := PCRD_POS_GET_HSM_KEY.GET_BDK(	:T_terminal_nbr   ,
+														:T_Outlet,
+                                                        :T_resource_id  ,
+                                                        :T_BDK  );
+
+        END;
+        END-EXEC;
+
+        if (response == OK)
+        {
+        memcpy(sBDK, T_BDK.arr, T_BDK.len );
+        sprintf(sLine, "End   GetBDK(  %s)", sBDK);
+        trace_event(sLine, PROCESSING);
+        return(OK);
+        }
+
+        sprintf(sLine, "End   GetBDK(NOK)");
+        trace_event(sLine, PROCESSING);
+        return(NOK);
+
+
+        bdk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetBDK (MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+/*ZKO: End 13092018:add OutletNbr for getting BnkCode*/
+
+
+int	SaveTermPinKey(
+int		nIndiceCtx,
+char	*pTermNbr,
+char	*pAcqBank,
+char	*pTpkLmk,
+char	*pTpkTmk,
+char	*sKCV)
+{
+struct sqlca sqlca;
+char 	detail[LG_MAX];
+EXEC SQL BEGIN DECLARE SECTION;
+    varchar		hTermNbr	[15+1];
+    varchar		hAcqBank	[6+1];
+    char		hTpkLmk		[256+1];
+    char		hTpkTmk		[256+1];
+	VARCHAR		hKCV		[32+1];
+    int			hRet;
+EXEC SQL END DECLARE SECTION;
+
+	if (debug_option == 1)
+	{
+		sprintf(detail, "Start SaveTermPinKey(%s,%s,%s,%s,%s)", pTermNbr,pAcqBank, pTpkLmk, pTpkTmk,sKCV);
+	}
+	else
+	{
+		sprintf(detail, "Start SaveTermPinKey(%s,%s,%s)", pTermNbr,pAcqBank,sKCV);
+	}
+
+	trace_event(detail, PROCESSING);
+	
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr)	);
+    hTermNbr.len		= 0;
+
+    memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));
+    
+    memset(hTpkLmk,		0, sizeof(hTpkLmk)	);
+    memset(hTpkTmk,		0, sizeof(hTpkTmk)	);
+
+	memset(hKCV.arr,	0, sizeof(hKCV.arr)); hKCV.len = 0;
+
+
+    memcpy(hTermNbr.arr,	pTermNbr, 	strlen(pTermNbr));
+    hTermNbr.len		= strlen(pTermNbr); 
+
+    memcpy(hAcqBank.arr,	pAcqBank, strlen(pAcqBank));
+	hAcqBank.len	= strlen(pAcqBank);
+	
+
+	memcpy(hKCV.arr,	sKCV, strlen(sKCV));
+	hKCV.len	= strlen(sKCV);
+
+
+    memcpy(hTpkLmk,		pTpkLmk, 	strlen(pTpkLmk));
+    memcpy(hTpkTmk,		pTpkTmk, 	strlen(pTpkTmk));
+
+    EXEC SQL WHENEVER SQLERROR GOTO saveTPKKeyErr;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+
+    EXEC SQL EXECUTE
+    BEGIN
+        --:hRet := PCRD_POS_GET_HSM_KEY.SAVE_TPK_KEY(:hTermNbr,:hAcqBank, :hTpkLmk, :hTpkTmk, :hKCV);
+		:hRet := -1;
+    END;
+    END-EXEC;
+
+
+	memset(hTpkLmk,		0, sizeof(hTpkLmk)	);   /*PCI*/
+	memset(hTpkTmk,		0, sizeof(hTpkTmk)	);   /*PCI*/
+
+    if(hRet != OK)
+    {
+		sprintf(detail, "Start SaveTermPinKey(%s,%s,%s)", pTermNbr,pAcqBank,sKCV);
+    }
+
+	sprintf(detail, "End   SaveTermPinKey(OK)");
+	trace_event(detail, PROCESSING);
+	return (OK);
+
+saveTPKKeyErr :
+    sprintf(detail, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(detail, ERROR);
+	memset(hTpkLmk,		0, sizeof(hTpkLmk)	);
+	memset(hTpkTmk,		0, sizeof(hTpkTmk)	);
+    trace_event("End   SaveTermPinKey(ERROR)", ERROR);
+    return (ERROR);
+}
+
+int     GetTermPinKey( int nIndiceCtx , char *terminal_nbr,char *V_AcqBank, char *TPK1, char *TPK2)
+{
+
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_terminal_nbr     [15 + 1];
+        VARCHAR      		 T_AcqBank  	 	[6+1];
+       	varchar             T_TPK1          [256 + 1];
+        varchar             T_TPK2          [256 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start GetTermPinKey(|%.15s,%.6s|)", terminal_nbr,V_AcqBank);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_TPK1.arr,         		0, sizeof(T_TPK1.arr));
+	T_TPK1.len = 0;
+	memset(T_TPK2.arr,         		0, sizeof(T_TPK2.arr));
+	T_TPK2.len = 0;
+	memset(T_terminal_nbr.arr, 	0, sizeof(T_terminal_nbr.arr));
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));
+
+	memcpy(T_terminal_nbr.arr, terminal_nbr, strlen(terminal_nbr));
+	T_terminal_nbr.len = strlen(terminal_nbr);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+	response = HSM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO tpk_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+		
+        :response := PCRD_POS_GET_HSM_KEY.GET_TPK_KEY(:T_terminal_nbr,
+        										 :T_AcqBank,
+                                                 :T_TPK1,
+                                                 :T_TPK2
+                                                );
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        	memcpy(TPK1, T_TPK1.arr, T_TPK1.len );
+        	memcpy(TPK2, T_TPK2.arr, T_TPK2.len );
+		
+		memset(T_TPK1.arr,         		0, sizeof(T_TPK1.arr));
+		memset(T_TPK2.arr,         		0, sizeof(T_TPK2.arr));
+		if (debug_option == 1)
+        		sprintf(sLine, "End   GetTermPinKey(  %.32s,%.32s)", TPK1, TPK2);
+		else
+			sprintf(sLine, "End   GetTermPinKey(OK)");
+                trace_event(sLine, PROCESSING);
+		
+        	return(OK);
+	}
+	memset(T_TPK1.arr,         		0, sizeof(T_TPK1.arr)); 
+	memset(T_TPK2.arr,         		0, sizeof(T_TPK2.arr)); 
+    sprintf(sLine, "End   GetTermPinKey(NOK)");
+	trace_event(sLine, PROCESSING);
+	return(NOK);
+
+
+	tpk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+	memset(T_TPK1.arr,         		0, sizeof(T_TPK1.arr));
+	memset(T_TPK2.arr,         		0, sizeof(T_TPK2.arr));
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetTermPinKey (MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+
+int     GetTermMasterKey( int nIndiceCtx , char *terminal_nbr,char *V_AcqBank , char *TMK1, char *TMK2)
+{
+
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+        int              response;
+        VARCHAR          T_terminal_nbr     [15 + 1];
+        VARCHAR      			T_AcqBank  	 	[6+1];
+        varchar             T_TMK1          [256 + 1];
+        varchar             T_TMK2          [256 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+	sprintf(sLine, "Start GetTermMasterKey(|%.15s,%.6s|)", terminal_nbr,V_AcqBank);
+	trace_event(sLine, PROCESSING);
+
+	memset(T_TMK1.arr,    		0, sizeof(T_TMK1.arr));
+	T_TMK1.len = 0;
+	memset(T_TMK2.arr,    		0, sizeof(T_TMK2.arr));
+	T_TMK2.len = 0;
+	memset(T_terminal_nbr.arr, 	0, sizeof(T_terminal_nbr.arr));
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));
+
+	memcpy(T_terminal_nbr.arr, terminal_nbr, strlen(terminal_nbr));
+	T_terminal_nbr.len = strlen(terminal_nbr);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+	
+	response = HSM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO tmk_key_exception;
+	EXEC SQL EXECUTE
+	BEGIN
+		/*
+        :response := PCRD_POS_GET_HSM_KEY.GET_TMK_KEY(:T_terminal_nbr,
+        										 :T_AcqBank,
+                                                 :T_TMK1,
+                                                 :T_TMK2
+                                                );*/
+		:response := -1;
+	END;
+	END-EXEC;
+
+	if (response == OK)
+	{
+        	memcpy(TMK1, T_TMK1.arr, T_TMK1.len );
+        	memcpy(TMK2, T_TMK2.arr, T_TMK2.len  );
+		
+		memset(T_TMK1.arr,    		0, sizeof(T_TMK1.arr));
+		memset(T_TMK2.arr,    		0, sizeof(T_TMK2.arr));
+		if (debug_option == 1)
+        		sprintf(sLine, "End   GetTermMasterKey(%.32s,%.32s)", TMK1, TMK2);
+		else
+        		sprintf(sLine, "End   GetTermMasterKey()");
+        	trace_event(sLine, PROCESSING);
+        	
+        	return(OK);
+	}
+
+	memset(T_TMK1.arr,    		0, sizeof(T_TMK1.arr));
+	memset(T_TMK2.arr,    		0, sizeof(T_TMK2.arr));
+	sprintf(sLine, "End   GetTermMasterKey(NOK)");
+	trace_event(sLine, PROCESSING);
+	return(NOK);
+
+tmk_key_exception :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+	memset(T_TMK1.arr,    		0, sizeof(T_TMK1.arr));
+	memset(T_TMK2.arr,    		0, sizeof(T_TMK2.arr));
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End  GetTermMasterKey (MALFUNCTION)", PROCESSING);
+    return(HSM_MALFUNCTION);
+
+}
+
+
+/*ZKO:StartPROD00059856*/
+/*****************************************************************************/
+/* GetTerminalZPK                                                      */
+/*------------                                                               */
+/*****************************************************************************/
+
+int GetTerminalZPK( int nIndiceCtx,
+			  char *terminal_nbr,
+			  char *sOutlet,	
+              char *sResourceId,	
+ 			  char *sZPK )
+{
+struct sqlca sqlca;
+char sLine [ MAX_LINE_TRC];
+
+EXEC SQL BEGIN DECLARE SECTION;
+   int              response;
+   char             T_Host      [64];
+   VARCHAR          T_terminal_nbr  [15 + 1];
+   VARCHAR          T_resource_id   [ 6 + 1 ];
+   VARCHAR     	 	T_Outlet   [ 15 + 1 ];
+   VARCHAR          T_ZPK  [256 + 1];
+   
+EXEC SQL END DECLARE SECTION;
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+        sprintf(sLine, "Start GetTerminalZPK(%d,%s,%s,%s)", nIndiceCtx ,terminal_nbr ,sOutlet, sResourceId);
+        trace_event(sLine, PROCESSING);
+
+        memset (T_Host,       0, sizeof(T_Host)      );
+        memset(T_terminal_nbr.arr , 0, sizeof(T_terminal_nbr.arr));
+        T_terminal_nbr.len = 15;
+        memset(T_resource_id.arr , 0, sizeof(T_resource_id.arr));
+        T_resource_id.len = 6;
+		memset(T_Outlet.arr , 0, sizeof(T_Outlet.arr));
+        T_Outlet.len = 6;
+
+        memcpy(T_Outlet.arr, sOutlet, strlen(sOutlet));
+        T_Outlet.len = strlen(sOutlet);
+
+        memcpy(T_terminal_nbr.arr, terminal_nbr, strlen(terminal_nbr));
+        T_terminal_nbr.len = strlen(terminal_nbr);
+
+        memcpy(T_resource_id.arr, sResourceId , strlen(sResourceId));
+        T_resource_id.len = strlen(sResourceId);
+
+
+        gethostname(T_Host, 64);
+
+        memset(T_ZPK.arr , 0, sizeof(T_ZPK.arr));
+        T_ZPK.len = 0;
+
+        response = 909;
+        EXEC SQL WHENEVER SQLERROR GOTO t_error_tag;
+        EXEC SQL EXECUTE
+        BEGIN
+           :response := PCRD_POS_GET_HSM_KEY.GET_TERMINAL_ZPK(      	:T_terminal_nbr   ,
+																		:T_Outlet, 
+																		:T_resource_id  , 
+																		:T_ZPK );
+        END;
+        END-EXEC;
+
+        if (response == OK)
+        {
+        memcpy(sZPK, T_ZPK.arr, T_ZPK.len);
+        sprintf(sLine, "End   GetTerminalZPK(%.50s)", sZPK);
+        trace_event(sLine, PROCESSING);
+        return(OK);
+        }
+        trace_event("End   GetTerminalZPK(NOK)", PROCESSING);
+        return(NOK);
+
+t_error_tag :
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+      sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+      trace_event(sLine, ERROR);
+      trace_event("End  GetTerminalZPK(MALFUNCTION)", PROCESSING);
+      return(NOK);
+}
+/*ZKO:ENDPROD00059856*/

@@ -1,0 +1,403 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*                                                                             */
+/*                                                                             */
+/* Description                                                                 */
+/*                                                                             */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initial Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <string.h>
+
+#include <define.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+/***************************************************************************/
+/*     LogEvent()                                                         */
+/*                                                                         */
+/*  Description: inserts events in table event_log. Could be used by       */
+/*               any resource.                                             */ 
+/*  Input      : resource Id, event Id, terminal number,                   */
+/*               error code 1, error code 2, message                       */
+/*  Output     : OK if insertion was successful, NOK otherwise             */
+/***************************************************************************/
+int LogEvent  (  int      nIndexCtx,
+                 char    *ResourceId,
+                 char    *TerminalId,
+                 char    *EventId,
+                 char    *SysErrno,
+                 char    *ApiErrno1,
+                 char    *ApiErrno2,
+                 char    *ApiPid,
+                 char    *ApiPpid)
+{
+
+   char     sLine[MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+	    char	  T_resource_id   [ 7];
+	    char	  T_event_id      [ 5];
+	    VARCHAR   T_terminal_id   [16];
+	    VARCHAR   T_sys_errno     [ 9];
+	    VARCHAR   T_api_errno_1   [ 9];
+	    VARCHAR   T_api_errno_2   [ 9];
+	    VARCHAR   T_api_pid       [ 9];
+	    VARCHAR   T_api_ppid      [ 9];
+	    VARCHAR   T_action        [ 1];
+
+	    int	      response;
+   EXEC SQL END DECLARE SECTION;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+
+
+
+   sprintf(sLine, "Start LogEvent(%.6s,%.4s,%.15s)",
+           ResourceId, EventId, TerminalId);
+   trace_event(sLine, PROCESSING);
+
+   memset(T_resource_id,      0, sizeof(T_resource_id));
+   memset(T_event_id,         0, sizeof(T_event_id));
+   memset(T_terminal_id.arr,  0, sizeof(T_terminal_id.arr));
+   memset(T_sys_errno.arr,    0, sizeof(T_sys_errno.arr));
+   memset(T_api_errno_1.arr,  0, sizeof(T_api_errno_1.arr));
+   memset(T_api_errno_2.arr,  0, sizeof(T_api_errno_2.arr));
+   memset(T_api_pid.arr,      0, sizeof(T_api_pid.arr));
+   memset(T_api_ppid.arr,     0, sizeof(T_api_ppid.arr));
+   memset(T_action.arr,     0, sizeof(T_action.arr));
+
+   T_terminal_id.len  = 15;
+   T_sys_errno.len    = 8;
+   T_api_errno_1.len  = 8;
+   T_api_errno_2.len  = 8;
+   T_api_pid.len      = 8;
+   T_api_ppid.len     = 8;
+   T_action.len       = 0;
+
+
+   memcpy(T_resource_id, ResourceId, 6);
+
+   memcpy(T_event_id, EventId, 4);
+
+   if (TerminalId == NULL)
+   {
+      /* we insert a ## just to indicate that this field is NULL */
+      /* because a NULL in C is not a NULL in PL/SQL */
+      memcpy (T_terminal_id.arr, "##", 2);
+      T_terminal_id.len = 2;
+   }
+   else
+   {
+      memcpy(T_terminal_id.arr, TerminalId, strlen(TerminalId));
+      T_terminal_id.len = strlen(TerminalId);
+   }
+
+   if (ApiErrno1 == NULL)
+   {
+      memcpy(T_api_errno_1.arr, "##", 2);
+      T_api_errno_1.len = 2;
+   }
+   else
+   {
+      memcpy(T_api_errno_1.arr, ApiErrno1, strlen(ApiErrno1));
+      T_api_errno_1.len = strlen(ApiErrno1);
+   }
+
+   if (ApiErrno2 == NULL) 
+   {
+      memcpy(T_api_errno_2.arr, "##", 2);
+      T_api_errno_2.len = 2;
+   }
+   else
+   {
+      memcpy(T_api_errno_2.arr, ApiErrno2, strlen(ApiErrno2));
+      T_api_errno_2.len = strlen(ApiErrno2);
+   }
+
+   memcpy(T_api_pid.arr, ApiPid, 8);
+   T_api_pid.len = 8;
+
+   memcpy(T_api_ppid.arr, ApiPpid, 8);
+   T_api_ppid.len = 8;
+
+   if (SysErrno == NULL)
+   {
+      memcpy (T_sys_errno.arr, "##", 2);
+      T_sys_errno.len = 2;
+   }
+   else
+   {
+      memcpy(T_sys_errno.arr, SysErrno, strlen(SysErrno));
+      T_sys_errno.len = strlen(SysErrno);
+   }
+
+
+   EXEC SQL WHENEVER SQLERROR GOTO LogEvent_error;
+   EXEC SQL EXECUTE
+   DECLARE
+       v_terminal_id    RESOURCE_EVENT_LOG.terminal_id%TYPE;
+       v_api_errno_1	RESOURCE_EVENT_LOG.api_errno_1%TYPE;
+       v_api_errno_2	RESOURCE_EVENT_LOG.api_errno_2%TYPE;
+       v_sys_errno      RESOURCE_EVENT_LOG.sys_errno%TYPE;
+   BEGIN
+
+       v_terminal_id   := :T_terminal_id;
+       v_api_errno_1   := :T_api_errno_1;
+       v_api_errno_2   := :T_api_errno_2;
+       v_sys_errno     := :T_sys_errno;
+
+
+       /* bring back the NULL values as indicated by ## */
+       /* a NULL in C is not a NULL in PL/SQL */
+       IF v_terminal_id = '##' THEN v_terminal_id := NULL; END IF;
+       IF v_api_errno_1 = '##' THEN v_api_errno_1 := NULL; END IF;
+       IF v_api_errno_2 = '##' THEN v_api_errno_1 := NULL; END IF;
+       IF v_sys_errno   = '##' THEN v_sys_errno   := NULL; END IF;
+	   
+       /*:response := PCRD_EVENT_MANAGE.INSERT_EVENT (:T_resource_id,*/
+	   :response := PCRD_RESOURCE_EVENT_MNG.INSERT_EVENT (	:T_resource_id,
+															NULL,
+															v_terminal_id,
+															NULL,
+															:T_event_id,
+															NULL,
+															v_sys_errno,
+															v_api_errno_1,
+															v_api_errno_2,
+															:T_api_pid,
+															:T_api_ppid,
+															:T_action);
+   END;
+   END-EXEC;
+
+   if (response == OK)
+   {
+	CommitOracle( nIndexCtx );
+	sprintf(sLine, "End  LogEvent(%d)", response);
+	trace_event("End   LogEvent(OK)", PROCESSING);
+	return(OK);
+   }
+   else
+   {
+	trace_event("End   LogEvent(NOK)", PROCESSING);
+	return(NOK);
+   }
+
+   LogEvent_error:
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine, ERROR);
+
+   trace_event("End   LogEvent(SYSTEM_MALFUNCTION)",PROCESSING);
+   return(SYSTEM_MALFUNCTION);
+}
+
+int LogEventData  (  int      nIndexCtx,
+					char    *ResourceId,
+					char    *NodeId,
+					char    *TerminalId,
+					char    *BankCode,
+					char    *EventId,
+					char    *EventData,
+					char    *SysErrno,
+					char    *ApiErrno1,
+					char    *ApiErrno2,
+					char    *ApiPid,
+					char    *ApiPpid,
+					char    *Action)
+{
+
+   char     sLine[MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+	    char	  T_resource_id   [ 7];
+	    char	  T_node_id       [ 5];
+	    char	  T_event_id      [ 5];
+	    char	  T_bank_code     [ 7];
+	    VARCHAR   T_terminal_id   [16];
+	    VARCHAR   T_event_data    [129];
+	    VARCHAR   T_sys_errno     [ 9];
+	    VARCHAR   T_api_errno_1   [ 9];
+	    VARCHAR   T_api_errno_2   [ 9];
+	    VARCHAR   T_api_pid       [ 9];
+	    VARCHAR   T_api_ppid      [ 9];
+	    VARCHAR   T_action        [ 1];
+
+	    int	      response;
+   EXEC SQL END DECLARE SECTION;
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+
+
+   sprintf(sLine, "Start LogEventData(%.6s,%.4s,%.4s,%.15s,%.6s)",
+           ResourceId,NodeId, EventId, TerminalId,BankCode);
+   trace_event(sLine, PROCESSING);
+
+   memset(T_resource_id,      0, sizeof(T_resource_id));
+   memset(T_node_id,      	  0, sizeof(T_node_id));
+   memset(T_event_id,         0, sizeof(T_event_id));
+   memset(T_bank_code,        0, sizeof(T_bank_code));
+   memset(T_terminal_id.arr,  0, sizeof(T_terminal_id.arr));
+   memset(T_event_data.arr,   0, sizeof(T_event_data.arr));
+   memset(T_sys_errno.arr,    0, sizeof(T_sys_errno.arr));
+   memset(T_api_errno_1.arr,  0, sizeof(T_api_errno_1.arr));
+   memset(T_api_errno_2.arr,  0, sizeof(T_api_errno_2.arr));
+   memset(T_api_pid.arr,      0, sizeof(T_api_pid.arr));
+   memset(T_api_ppid.arr,     0, sizeof(T_api_ppid.arr));
+   memset(T_action.arr,       0, sizeof(T_action.arr));
+
+   T_terminal_id.len  = 15;
+   T_event_data.len   = 128;
+   T_sys_errno.len    = 8;
+   T_api_errno_1.len  = 8;
+   T_api_errno_2.len  = 8;
+   T_api_pid.len      = 8;
+   T_api_ppid.len     = 8;
+   T_action.len       = 0;
+
+
+   memcpy(T_resource_id, ResourceId, 6);
+   memcpy(T_node_id, NodeId, 6);
+   memcpy(T_event_id, EventId, 4);
+   memcpy(T_bank_code, BankCode, 6);
+
+   if (TerminalId == NULL)
+   {
+      /* we insert a ## just to indicate that this field is NULL */
+      /* because a NULL in C is not a NULL in PL/SQL */
+      memcpy (T_terminal_id.arr, "##", 2);
+      T_terminal_id.len = 2;
+   }
+   else
+   {
+      memcpy(T_terminal_id.arr, TerminalId, strlen(TerminalId));
+      T_terminal_id.len = strlen(TerminalId);
+   }
+
+
+   if (EventData == NULL)
+     {
+        memcpy(T_event_data.arr, "##", 2);
+        T_event_data.len = 2;
+     }
+     else
+     {
+        memcpy(T_event_data.arr, EventData, strlen(EventData));
+        T_event_data.len = strlen(EventData);
+     }
+
+
+   if (ApiErrno1 == NULL)
+   {
+      memcpy(T_api_errno_1.arr, "##", 2);
+      T_api_errno_1.len = 2;
+   }
+   else
+   {
+      memcpy(T_api_errno_1.arr, ApiErrno1, strlen(ApiErrno1));
+      T_api_errno_1.len = strlen(ApiErrno1);
+   }
+
+   if (ApiErrno2 == NULL)
+   {
+      memcpy(T_api_errno_2.arr, "##", 2);
+      T_api_errno_2.len = 2;
+   }
+   else
+   {
+      memcpy(T_api_errno_2.arr, ApiErrno2, strlen(ApiErrno2));
+      T_api_errno_2.len = strlen(ApiErrno2);
+   }
+
+   memcpy(T_api_pid.arr, ApiPid, 8);
+   T_api_pid.len = 8;
+
+   memcpy(T_api_ppid.arr, ApiPpid, 8);
+   T_api_ppid.len = 8;
+
+   if (SysErrno == NULL)
+   {
+      memcpy (T_sys_errno.arr, "##", 2);
+      T_sys_errno.len = 2;
+   }
+   else
+   {
+      memcpy(T_sys_errno.arr, SysErrno, strlen(SysErrno));
+      T_sys_errno.len = strlen(SysErrno);
+   }
+
+
+   EXEC SQL WHENEVER SQLERROR GOTO LogEventData_error;
+   EXEC SQL EXECUTE
+   DECLARE
+       v_terminal_id    RESOURCE_EVENT_LOG.terminal_id%TYPE;
+   	   v_event_data   	RESOURCE_EVENT_LOG.event_data%TYPE;
+       v_api_errno_1	RESOURCE_EVENT_LOG.api_errno_1%TYPE;
+       v_api_errno_2	RESOURCE_EVENT_LOG.api_errno_2%TYPE;
+       v_sys_errno      RESOURCE_EVENT_LOG.sys_errno%TYPE;
+   BEGIN
+
+       v_terminal_id   := :T_terminal_id;
+       v_event_data    := :T_event_data;
+       v_api_errno_1   := :T_api_errno_1;
+       v_api_errno_2   := :T_api_errno_2;
+       v_sys_errno     := :T_sys_errno;
+
+
+       /* bring back the NULL values as indicated by ## */
+       /* a NULL in C is not a NULL in PL/SQL */
+       IF v_terminal_id = '##' THEN v_terminal_id := NULL; END IF;
+       IF v_event_data 	= '##' THEN v_event_data  := NULL; END IF;
+       IF v_api_errno_1 = '##' THEN v_api_errno_1 := NULL; END IF;
+       IF v_api_errno_2 = '##' THEN v_api_errno_1 := NULL; END IF;
+       IF v_sys_errno   = '##' THEN v_sys_errno   := NULL; END IF;
+
+       /*:response := PCRD_EVENT_MANAGE.INSERT_EVENT (:T_resource_id,*/
+	:response := PCRD_RESOURCE_EVENT_MNG.INSERT_EVENT (	:T_resource_id,
+														:T_node_id,
+														v_terminal_id,
+														:T_bank_code,
+														:T_event_id,
+														v_event_data,
+														v_sys_errno,
+														v_api_errno_1,
+														v_api_errno_2,
+														:T_api_pid,
+														:T_api_ppid,
+														:T_action);
+   END;
+   END-EXEC;
+
+   if (response == OK)
+   {
+	CommitOracle( nIndexCtx );
+	sprintf(sLine, "End  LogEventData(%d)", response);
+	trace_event("End   LogEventData(OK)", PROCESSING);
+	return(OK);
+   }
+   else
+   {
+	trace_event("End   LogEventData(NOK)", PROCESSING);
+	return(NOK);
+   }
+
+   LogEventData_error:
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine, ERROR);
+
+   trace_event("End   LogEventData(SYSTEM_MALFUNCTION)",PROCESSING);
+   return(SYSTEM_MALFUNCTION);
+}

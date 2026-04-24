@@ -1,0 +1,86 @@
+#include <stdio.h>
+#include <define.h>
+#include <sms_param.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/****************************************************************************/
+/*  GetNnsCalculatedFee ()                                                  */
+/*  Calculate NNS Fee                                                       */
+/****************************************************************************/
+int  GetNnsCalculatedFee (int  nIndexCtx, char  *pCardNumber,char *pTrxAmount,char *pTrxCurrency,char *pAcquirerBank,char *pCalcFee)
+{
+
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR      T_card_nbr       [19];
+        VARCHAR      T_TrxAmount      [19];
+        VARCHAR      T_TrxCurrency    [19];
+        char		T_AcquirerBank         [6 + 1];
+        VARCHAR      T_Calculated_fee [19];
+        char         sLine [MAX_LINE_TRC];
+        int        result;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf(sLine,"Start  GetNnsCalculatedFee(%s,%s,%s)", pTrxAmount,pTrxCurrency,pAcquirerBank);/*START TED PADSS*/
+   trace_event (sLine, PROCESSING);
+
+   memset (T_AcquirerBank             	, 0, sizeof(T_AcquirerBank    ));
+   memset (T_card_nbr.arr    			, 0, sizeof(T_card_nbr.arr    ));
+   memset (T_TrxAmount.arr   			, 0, sizeof(T_TrxAmount.arr   ));
+   memset (T_TrxCurrency.arr 			, 0, sizeof(T_TrxCurrency.arr ));
+   memset (T_Calculated_fee.arr			, 0, sizeof(T_Calculated_fee.arr      ));
+   
+   
+   T_card_nbr.len = 0;
+   T_TrxAmount.len = 0;
+	 T_TrxCurrency.len = 0;
+   
+   T_Calculated_fee.len = 0;
+    
+   memcpy (T_card_nbr.arr    ,  pCardNumber  , strlen(pCardNumber  )); T_card_nbr.len = strlen(pCardNumber  );
+   memcpy (T_TrxAmount.arr   ,  pTrxAmount   , strlen(pTrxAmount   )); T_TrxAmount.len = strlen(pTrxAmount  );
+   memcpy (T_TrxCurrency.arr ,  pTrxCurrency , strlen(pTrxCurrency )); T_TrxCurrency.len = strlen(pTrxCurrency  );
+   memcpy (T_AcquirerBank      ,  pAcquirerBank      , 6); 
+  
+   
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR GOTO nns_manage_error;
+   EXEC SQL EXECUTE
+   BEGIN
+      
+      :result := PCRD_SMS_NNS_TOOLS.CALCULATE_FEE_RATE (  :T_card_nbr,
+                                                          :T_TrxAmount,
+                                                          :T_TrxCurrency,
+                                                          :T_AcquirerBank,
+                                                          :T_Calculated_fee);
+
+ 
+   END;
+   END-EXEC;
+   
+   if (result == OK)
+   {
+      
+      
+      memcpy (pCalcFee,  T_Calculated_fee.arr, T_Calculated_fee.len);
+      
+      sprintf(sLine,"Calculated Fee  : %s",pCalcFee);
+      trace_event (sLine, PROCESSING);
+      
+      trace_event ("End GetNnsCalculatedFee(OK)", PROCESSING);
+      return (OK);
+   }
+   else
+   {
+   	  trace_event ("End GetNnsCalculatedFee(NOK)", PROCESSING);
+      return (NOK);
+   }
+
+nns_manage_error:
+   sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+   trace_event (  sLine , ERROR );
+   trace_event ("End GetNnsCalculatedFee (ERROR)", PROCESSING);
+   return (NOK);
+}

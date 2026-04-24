@@ -1,0 +1,106 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetEmvajd  (int nIndiceCtx, TSRoutingEmvajd *routing_emvajd )
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR CARD_NBR          [22];
+        char NETWORK           [ 2];
+        char PRIMARY_CREDIT_RESSOURCE    [ 6];
+        char SECONDARY_CREDIT_RESSOURCE  [ 6];
+        char PRIMARY_DEBIT_RESSOURCE    [ 6];
+        char SECONDARY_DEBIT_RESSOURCE  [ 6];
+        int  flag;
+	int  response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetEmvajd() ", PROCESSING );
+	memset ( CARD_NBR.arr            , 0 , sizeof ( CARD_NBR.arr ));
+        memset ( NETWORK                 , 0 ,  2);
+        memset ( PRIMARY_CREDIT_RESSSOURCE     , 0 ,  6);
+        memset ( SECONDARY_CREDIT_RESSOURCE    , 0 ,  6);
+        memset ( PRIMARY_DEBIT_RESSSOURCE      , 0 ,  6);
+        memset ( SECONDARY_DEBIT_RESSOURCE     , 0 ,  6);
+
+	memcpy ( CARD_NBR.arr , routing_emvajd->card_nbr  , 
+                   strlen ( routing_emvajd->card_nbr );
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_routing_emvajd->
+	EXEC SQL EXECUTE
+	    DECLARE T_BANK   BANK%ROWTYPE;
+                    FLAG     BOOLEAN ;
+	BEGIN
+
+       :response_code := P7_ROUTING_EMVA_TOOLS.GET_ROUTING_EMVA
+						(   
+         					   :CARD_NBR, 
+	                                           :NETWORK,
+	                                            FLAG /* en sortie */
+	                                        );
+
+        IF FLAG = TRUE THEN
+            :flag = 1;
+        ELSE
+            :flag = 0;
+        END IF;
+
+/*
+		IF :response_code = 0 THEN
+		:NETWORK              := T_BANK.NETWORK;
+		:PRIMARY_RESSOURCE    := T_BANK.PRIMARY_RESSOURCE;
+		:SECONDARY_RESSOURCE  := T_BANK.SECONDARY_RESSOURCE;
+		END IF;
+*/
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+		memcpy(routing_emvajd->network , NETWORK , 2);
+		memcpy(routing_emvajd->primary_ressource,
+							PRIMARY_RESSOURCE , 6);
+		memcpy(routing_emvajd->secondary_ressource,
+						      SECONDARY_RESSOURCE , 6);
+
+	        trace_event ( "End GetEmvajd( OK ) ", PROCESSING );
+		return(OK);
+	}
+	trace_event ( "End GetEmvajd( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_routing_emvajd->:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+		memcpy ( routing_emvajd->code_action , 
+							CODE_ACTION, 3 );
+		memcpy ( routing_emvajd->data_capture_mode , 
+							DATA_CAPTURE_MODE, 1 );
+	        trace_event ( "End GetEmvajd( OK ) ", PROCESSING );
+		return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetEmvajd( NOK ) ", PROCESSING );
+	return( NOK );
+}

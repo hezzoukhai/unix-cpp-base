@@ -1,0 +1,104 @@
+#include <stdio.h>
+
+#include <define.h>
+#include <jcc_param.h>
+#include <param_ctx.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+int  ProcessStopList (int  nIndexCtx,
+					  char * buffer_snd,/*SNO22092015*/
+                      char *sMsgErr,
+                      char *sActionCode
+		     )
+{
+
+	char sLine[MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+        char       T_Type;
+        char       T_action_code     [ 3 + 1];
+        VARCHAR    T_msg_err        [ 256];
+        int        result;
+		VARCHAR     T_Buffer          [LG_MAX];
+		
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event ("Start  ProcessStopList()", PROCESSING);
+
+
+   memset (T_msg_err.arr,  0, sizeof(T_msg_err.arr));
+   T_msg_err.len = 0;
+   memset (T_action_code,     0, sizeof(T_action_code));
+
+   
+   memset(T_Buffer.arr,   0,      sizeof(T_Buffer.arr));
+   T_Buffer.len = 0;
+
+
+   /*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(buffer_snd)
+
+   memcpy(T_Buffer.arr,   buffer_snd, strlen(buffer_snd));
+   
+   T_Buffer.len = strlen(buffer_snd);
+
+	/*MKB060309 PCI Norme Integration */
+	/*if (debug_option == 1)
+	{
+	   sprintf (sLine, "Card Number ........: %s\n", T_CardNumber.arr);
+	   trace_event(sLine,TRACE);
+	}
+   sprintf (sLine, "Declaration date ...: %s\n", T_DeclarationDate);
+   trace_event(sLine,TRACE);
+   sprintf (sLine, "Action Date ........: %s\n", T_EndDate);
+   trace_event(sLine,TRACE);
+   sprintf (sLine, "Reason code ........: %s\n", T_ReasonCode);
+   trace_event(sLine,TRACE);
+   sprintf (sLine, "Type  ..............: %c\n", T_Type);
+   trace_event(sLine,TRACE);
+   sprintf (sLine, "Bank Code  .........: %s\n", T_BankCode);
+   trace_event(sLine,TRACE);
+   sprintf (sLine, "Network Code  ......: %s\n", T_NetworkCode);
+   trace_event(sLine,TRACE);*/
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx; 
+   EXEC SQL WHENEVER SQLERROR GOTO stop_list_err;
+   EXEC SQL EXECUTE
+   BEGIN
+		:result := PCRD_FILE_UPDATE_TOOLS.STOP_LIST (:T_Buffer,
+													 :T_msg_err,
+													 :T_action_code);
+   
+
+   END;
+   END-EXEC;
+
+   memcpy(sActionCode, T_action_code, 3);
+   memcpy(sMsgErr, T_msg_err.arr, T_msg_err.len);
+
+   memcpy(buffer_snd,T_Buffer.arr,T_Buffer.len);
+
+   /*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(buffer_snd)
+	memset(T_Buffer.arr,   0,      sizeof(T_Buffer.arr));
+
+   trace_event ("End  ProcessStopList(OK)", PROCESSING);
+   return (OK);
+
+   stop_list_err:
+	  memcpy(sActionCode, "306", 3);
+	  sprintf(sMsgErr, "Oracle Error %.100s",sqlca.sqlerrm.sqlerrmc);
+	  trace_event (sMsgErr, ERROR);
+	  /*PADSS*/
+	  P7_DB_EXCP_POSTPROC_TLV_BUF(buffer_snd)
+	  memset(T_Buffer.arr,   0,      sizeof(T_Buffer.arr));
+      trace_event ("End  ProcessStopList(MALFUNCTION)", PROCESSING);
+      return (NOK);
+}
+

@@ -1,0 +1,275 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+int CheckLimits (    int   nIndiceCtx          ,
+					 char  *sOnOffFlag		   ,
+                     char *sTlvBuffer          ,
+					 char *sAlternAmnt
+                )
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  		  [ LG_MAX + 1];
+ 	char       	T_on_off_flag 		  [ 3 + 1];
+ 	VARCHAR    	T_altern_amount 	  [ 18 + 1];
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start CheckLimits() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+ 	memset( T_on_off_flag 			   ,0	 , 	 sizeof(T_on_off_flag));
+ 	memset( T_altern_amount.arr        ,0    ,   sizeof(T_altern_amount.arr));
+ 	T_altern_amount.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+ 	memcpy( T_on_off_flag 		   ,sOnOffFlag , 	 strlen(sOnOffFlag));
+	
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_CheckLimits;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_CTRL_LIMIT.CTRL_LIMIT( :T_on_off_flag, 		  
+ 						     :T_altern_amount 	  ,
+						     :T_tlv_auth ); 
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+    memcpy(sAlternAmnt , T_altern_amount.arr , T_altern_amount.len);
+	sAlternAmnt[T_altern_amount.len]='\0';
+	
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		sprintf(sLine,"End CheckLimits(OK)[%s]", sAlternAmnt);
+		trace_event(sLine,PROCESSING);
+		return(OK);
+	}
+
+	sprintf(sLine,"End CheckLimits(%d)[%s]",response_code, sAlternAmnt);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_CheckLimits :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End CheckLimits(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+int CheckVelocityLimits (    int   nIndiceCtx          ,
+							 char  *sOnOffFlag		   ,
+							 char *sTlvBuffer          ,
+							 char *sAlternAmnt
+						)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  		  [ LG_MAX + 1];
+ 	char       	T_on_off_flag 		  [ 3 + 1];
+ 	VARCHAR    	T_altern_amount 	  [ 18 + 1];
+	int		response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start CheckVelocityLimits() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+ 	memset( T_on_off_flag 			   ,0	 , 	 sizeof(T_on_off_flag));
+ 	memset( T_altern_amount.arr        ,0    ,   sizeof(T_altern_amount.arr));
+ 	T_altern_amount.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+ 	memcpy( T_on_off_flag 		   ,sOnOffFlag , 	 strlen(sOnOffFlag));
+	
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_CheckLimits;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_CTRL_LIMIT.CTRL_VELOCITY_LIMITS(		:T_on_off_flag, 		  
+ 																		:T_altern_amount 	  ,
+																		:T_tlv_auth ); 
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+    memcpy(sAlternAmnt , T_altern_amount.arr , T_altern_amount.len);
+	sAlternAmnt[T_altern_amount.len]='\0';
+	
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		sprintf(sLine,"End CheckVelocityLimits(OK)[%s]", sAlternAmnt);
+		trace_event(sLine,PROCESSING);
+		return(OK);
+	}
+
+	sprintf(sLine,"End CheckVelocityLimits(%d)[%s]",response_code, sAlternAmnt);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_CheckLimits :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End CheckVelocityLimits(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+
+int GenAuthoFees ( int   nIndiceCtx , char *sTlvBuffer)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  		  [ LG_MAX + 1];
+	int		response_code;
+	int		nAlterAmount;
+
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GenAuthoFees() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	nAlterAmount = 0;
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+ 	
+	
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_gen_autho_fees;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_GEN_AUTHO_FEES.GEN_AUTHO_FEES( :T_tlv_auth,:nAlterAmount /* ICH20170824 ADD Default param :alter amount*/ ); 
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  );
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	if (response_code == OK)
+	{
+		
+		trace_event("End GenAuthoFees(OK)",PROCESSING);
+		return(OK);
+	}	
+
+	
+	sprintf(sLine,"End GenAuthoFees(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_gen_autho_fees :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,0    ,   sizeof(T_tlv_auth.arr )  );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End GenAuthoFees(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

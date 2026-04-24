@@ -1,0 +1,98 @@
+
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      hps_atm_admin_card_subtotals.pc                                                                 */
+/*                                                                             */
+/* Description                                                                 */
+/*      ATM CUTOFF Tools Management                                        */
+/*******************************************************************************/
+#include <stdio.h>
+#include <string.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <define.h>
+#include <ndc_param.h>
+#include <param_ctx.h>
+
+
+  /***********************************************************************
+  **  nom	: hps_atm_admin_card_subtotals()			**
+  **  desc	: recuperation des donnees de reconcilliation GAB	**
+  **  entree	: pTermNbr	-> numero du terminal			**
+  **  sortie	: pReconcData	-> donnees de reconcilliation au format	**
+  **		PowerSEVEN						**
+  **  retour	: OK	-> donnees recuperees				**
+  **		  NOK	-> The atm was balanced				**
+  **		  ERROR	-> erreur fatal					**
+  **  auteur	: Younes OUADI (09 Sep 1999)				**
+  **		(C) 1997 - 2001 : Hightech Payment Systems		**
+  ***********************************************************************/
+int	GetAtmAdminCardSubtotals(
+int	nIndexCtx,
+char	*pTermNbr,
+char	*pCardNumber,
+char	*pReconcData
+)
+{
+    struct sqlca sqlca;
+    char	sLine [MAX_LINE_TRC];
+EXEC SQL BEGIN DECLARE SECTION;
+    int		hOpCode;
+    varchar	hTermNbr	[  15+1];
+    varchar	hCardNbr	[  22+1];
+    varchar	hReconcData	[1024+1];
+    int		hRet;
+EXEC SQL End  DECLARE SECTION;
+
+sprintf(sLine, "Start GetAtmAdminCardSubtotals(%.15s,%.16s)", pTermNbr, pCardNumber);
+trace_event(sLine, PROCESSING);
+
+    /* - Raz des variables ------------------------------------------------- */
+    memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr));
+    hTermNbr.len = 0;
+    memset(hCardNbr.arr,	0, sizeof(hCardNbr.arr));
+    hCardNbr.len = 0;
+    memset(hReconcData.arr,	0, sizeof(hReconcData.arr));
+    hReconcData.len = 0;
+
+    /* - Init des variables ------------------------------------------------- */
+    memcpy(hTermNbr.arr,	pTermNbr, strlen(pTermNbr));
+    hTermNbr.len = strlen(pTermNbr);
+
+    memcpy(hCardNbr.arr,	pCardNumber, strlen(pCardNumber));
+    hCardNbr.len = strlen(pCardNumber);
+
+    /* - Capture des exceptions -------------------------------------------- */
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    /*EXEC SQL WHENEVER SQLERROR GOTO GetAtmBalancingDataErr;*/
+
+
+    /* - Traitement PL/SQL ------------------------------------------------- */
+    EXEC SQL EXECUTE
+    BEGIN
+        :hRet := PCRD_SPECEFIC_ADMIN_CARD.GET_SUBTOTALS(:hTermNbr, :hCardNbr, :hReconcData);
+    END;
+    END-EXEC;
+
+    /* - Examen du retour PL/SQL ------------------------------------------- */
+    if (hRet != OK) {
+        trace_event("End   GetAtmAdminCardSubtotals(NOK)", PROCESSING);
+        return hRet;
+    }
+
+    /* - Recuperation du resultat PL/SQL ------------------------------------ */
+    memcpy(pReconcData, hReconcData.arr, hReconcData.len);
+
+sprintf(sLine, "End   GetAtmAdminCardSubtotals(%.45s)", pReconcData);
+trace_event(sLine, PROCESSING);
+return (OK);
+GetAtmBalancingDataErr:
+    sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   SetAtmAdminCardIncr(ERROR)", ERROR);
+    return (ERROR);
+}
+

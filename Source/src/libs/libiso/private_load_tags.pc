@@ -1,0 +1,93 @@
+#include <stdio.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <tlv_com.h>
+#include <tlv_private.h>
+#include <tlv_autho.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int  LoadPrivateDataTags (int  nIndexCtx, char* sFieldName, tlv_info_t* tab_tlv_fields, int nSize, int* nNbFields )
+{
+
+	char	sLine[MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR		T_field_name			[6 + 1];
+	int         result;
+
+	SQL_CURSOR      tags_cursor;
+	struct
+	{
+		VARCHAR			tag [ 6 + 1];
+		char			print_flag;
+	}  tags_info;
+	int					tags_count;
+	int					i;
+	
+
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf(sLine,"Start LoadPrivateDataTags(%s)",sFieldName);
+   trace_event(sLine,PROCESSING);
+
+
+	memset (T_field_name.arr,			0, sizeof(T_field_name.arr));T_field_name.len = 0;
+	strncpy (T_field_name.arr, sFieldName, sizeof(T_field_name.arr) - 1);
+	
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL ALLOCATE :tags_cursor;
+   EXEC SQL WHENEVER SQLERROR GOTO get_tags_error;
+
+
+	EXEC SQL EXECUTE
+		BEGIN
+			:result :=  PCRD_PRIV_TLV_REPOSITORY.OPEN_PRIV_TLV_REP_CURSOR ( :T_field_name, :tags_cursor, :tags_count );
+		END;
+	END-EXEC;
+
+	if (result != OK)
+	{
+		sprintf(sLine,"Error to get tags , field_name[%s]",T_field_name.arr);
+		trace_event(sLine,ERROR);
+		return (NOK);
+	}
+
+	if( tags_count > nSize )
+	{
+		sprintf(sLine,"Available  count (%d) > Maximum user tags (%d)",tags_count,nSize);
+		trace_event(sLine,ERROR);
+		return (NOK);
+	}
+
+	(*nNbFields) = tags_count;
+
+	for( i=0; i < tags_count; i++ )
+	{
+		memset (tags_info.tag.arr,     	0, sizeof(tags_info.tag.arr));tags_info.tag.len=0;
+		
+
+		sprintf(sLine,"Reading tag %d",i);
+		trace_event(sLine,PROCESSING);
+
+		EXEC SQL FETCH :tags_cursor  INTO :tags_info;
+		sprintf(sLine,"Tag: %s\n",	tags_info.tag.arr);
+		trace_event(sLine,PROCESSING);
+
+		strncpy(tab_tlv_fields[i].sTlvName,tags_info.tag.arr, MAX_TLV_TAG_LEN );
+		tab_tlv_fields[i].nType = AUTHO_TLV_VAR;
+		tab_tlv_fields[i].nLength = 0;
+	}
+
+
+	return (OK);
+
+
+get_tags_error:
+	sprintf (sLine, "End LoadPrivateDataTags(MALFUNCTION)|%s",sqlca.sqlerrm.sqlerrmc);
+    fprintf(stderr,sLine);
+	return (NOK);
+}

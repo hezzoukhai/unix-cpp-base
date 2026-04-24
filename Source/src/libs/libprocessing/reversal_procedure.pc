@@ -1,0 +1,92 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+int   ReversalProcedure( int   nIndiceCtx	,
+			 			 char *sReversalMode, char *sBillCalculation	,
+			 			 char *sTlvBuffer ,
+			 			 char *sCaptureCode, char *sRoutingCode
+					  	)
+{
+	struct sqlca sqlca;
+	char sLine [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	 [ LG_MAX + 1];
+ 	char       	T_bill_calcul_flag [ 1 + 1 ];
+ 	char       	T_reversal_mode [ 1 + 1 ];
+	char        T_ROUTING_CODE  [ 6 + 1 ];
+	char        T_CAPTURE_CODE  [ 6 + 1 ];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start ReversalProcedure() ", PROCESSING );
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+ 	memset ( T_bill_calcul_flag  , 0, sizeof ( T_bill_calcul_flag ));
+ 	memset ( T_reversal_mode , 0, sizeof ( T_reversal_mode ));
+ 	memset ( T_ROUTING_CODE      , 0, sizeof ( T_ROUTING_CODE ));
+ 	memset ( T_CAPTURE_CODE      , 0, sizeof ( T_CAPTURE_CODE ));
+
+ 	memcpy ( T_bill_calcul_flag ,  sBillCalculation  , 1 );
+ 	memcpy ( T_reversal_mode , sReversalMode ,  1 );
+
+	memset ( T_tlv_auth.arr     ,  0  ,   sizeof (T_tlv_auth.arr ));
+	T_tlv_auth.len = 0;
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+   PrintTlvBuffer ( T_tlv_auth.arr );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_reversal_procedure;
+	EXEC SQL EXECUTE
+	BEGIN
+
+         :response_code := PCRD_P7_REVERSAL_PROCESSING.REVERSAL_PROCEDURE ( 
+ 													:T_bill_calcul_flag,
+ 													:T_reversal_mode,
+													:T_tlv_auth,
+													:T_CAPTURE_CODE ,
+													:T_ROUTING_CODE );
+
+	END;
+	END-EXEC;
+
+	tlvcpy( sTlvBuffer    , T_tlv_auth.arr  , T_tlv_auth.len);
+ 	if ( memcmp ( T_reversal_mode ,  ROUTING_MODE , 1 ) != 0 )
+    {
+          fprintf( stderr,"\n REVERSAL MODE = [%.1s] \n", T_reversal_mode );
+		  memcpy( sRoutingCode , T_ROUTING_CODE , 6 );
+    }
+    else
+		  memcpy( sCaptureCode , T_CAPTURE_CODE , 6 );
+
+	memset ( T_tlv_auth.arr     ,  0  ,   sizeof (T_tlv_auth.arr ));
+	sprintf(sLine,"End ReversalProcedure(%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_reversal_procedure :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr     ,  0  ,   sizeof (T_tlv_auth.arr ));
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End ReversalProcedure(SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

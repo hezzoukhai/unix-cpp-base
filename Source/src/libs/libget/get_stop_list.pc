@@ -1,0 +1,93 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+PCRD_GET_DATA_RISK_ROWS.
+CHECK_ONLINE_CARD_STATUS
+
+int CheckOnlineStopList  (int nIndiceCtx, TSIsoInfo *msgInfo, 
+					  TSStopList *stop_list)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	char   BANK_CODE    [ 6 ];
+ 	char   CENTER_CODE  [ 2 ];
+ 	char   COUNTRY_CODE [ 3 ];
+ 	char   BANK_CURRENCY_CODE [ 3 ];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetBank() ", PROCESSING );
+	memset ( BANK_CODE            ,  0  ,   6  );
+	memset ( CENTER_CODE          ,  0  ,   2  );
+	memset ( COUNTRY_CODE         ,  0  ,   3  );
+	memset ( BANK_CURRENCY_CODE   ,  0  ,   3  );
+
+	memcpy ( BANK_CODE , bank.bank_code , 6);
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_bank;
+	EXEC SQL EXECUTE
+	    DECLARE T_BANK   BANK%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_PARAM_GENERAL_ROWS.GET_BANK
+						(   :BANK_CODE, 
+	                                             T_BANK 
+	                                        );
+
+
+		IF :response_code = 0 THEN
+		:BANK_CODE              := T_BANK.BANK_CODE;
+		:CENTER_CODE            := T_BANK.CENTER_CODE;
+		:COUNTRY_CODE           := T_BANK.COUNTRY_CODE;
+		:BANK_CURRENCY_CODE     := T_BANK.BANK_CURRENCY_CODE;
+		END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+		memcpy(bank.center_code,
+							CENTER_CODE,2);
+		memcpy(bank.country_code,
+							COUNTRY_CODE,3);
+		memcpy(bank.bank_currency_code,
+							BANK_CURRENCY_CODE,3);
+	        trace_event ( "End GetBank( OK ) ", PROCESSING );
+		return(OK);
+	}
+	trace_event ( "End GetBank( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_bank :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+		memcpy ( bank.code_action , 
+							CODE_ACTION, 3 );
+		memcpy ( bank.data_capture_mode , 
+							DATA_CAPTURE_MODE, 1 );
+	        trace_event ( "End GetBank( OK ) ", PROCESSING );
+		return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetBank( NOK ) ", PROCESSING );
+	return( NOK );
+}

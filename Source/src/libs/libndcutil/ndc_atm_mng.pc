@@ -1,0 +1,547 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      ndc_atm_mng.pc                                                         */
+/*                                                                             */
+/* Description                                                                 */
+/*      ATM Status Tools Management                                            */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+ Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+ 0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+int   printer_fault(int nIndexCtx , char *V_terminal_number,char *V_AcqBank /*ICH270715*/)
+{
+   struct sqlca sqlca;
+   char sLine [ MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         T_terminal_number       [15];
+        VARCHAR    		T_AcqBank  	 			[6+1];/*ICH270715*/ 
+		int				retour;
+   EXEC SQL END DECLARE SECTION;
+   trace_event("Start printer_fault() ",PROCESSING);
+
+   memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+   memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+
+   memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+   T_terminal_number.len = strlen(V_terminal_number);
+   
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+	
+   EXEC SQL WHENEVER SQLERROR GOTO printer_fault_error;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL EXECUTE
+   BEGIN
+  		:retour := PCRD_ATM_TOOLS.PRINTER_FAULT(:T_terminal_number,:T_AcqBank);
+   END;
+   END-EXEC;
+   trace_event("End   printer_fault(OK) ",PROCESSING);
+   return(OK);
+   printer_fault_error  :
+      sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+      trace_event(sLine, ERROR);
+      trace_event("End   printer_fault(NOK) ",PROCESSING);
+      return(NOK);
+}
+/**************************************************************************/
+/*Fonction out_service                                                    */
+/*--------------------                                                    */
+/* Description : Cette fonction a pour but mettre a jour la table         */
+/*               terminal_atm_watch_warning suite a une connexion On-line du GAB*/
+/* Entree      : Numero de terminal                                       */
+/* Sortie      : OK   si l'update est sans probleme                       */
+/*               ERROR  si probleme                                       */
+/**************************************************************************/
+int out_service(int nIndexCtx,char *V_terminal_number, char *V_AcqBank /*ICH270715*/, char *message_number, 
+                char *label, char *action)
+{
+   struct sqlca sqlca;
+   char sLine [ MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         T_terminal_number       [15+1];
+        VARCHAR      		 T_AcqBank  	 	[6+1];/*ICH270715*/ 
+        char            T_off_line_reason_code  [ 4+1];
+        char            T_out_of_service_reason_code  [ 1+1];
+        char            T_message_number        [10+1];
+        char            T_type                  [ 1+1];
+        VARCHAR         T_action                [50+1];
+        VARCHAR         T_label                 [50+1];
+        int             retour;
+   EXEC SQL END DECLARE SECTION;
+
+
+   trace_event("Start out_service() ",PROCESSING);
+
+   memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+
+   memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+   T_terminal_number.len = strlen(V_terminal_number);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+	
+   memset(T_off_line_reason_code, 0, sizeof(T_off_line_reason_code));
+   memcpy(T_off_line_reason_code, "    ", 4 );
+
+   memset(T_message_number, 0, sizeof(T_message_number));
+   memcpy(T_message_number, message_number, 10);
+
+   memset(T_out_of_service_reason_code, 0, sizeof(T_out_of_service_reason_code));
+
+   memset(T_label.arr,  0, sizeof(T_label.arr));
+   T_label.len = 0;
+
+   memset(T_action.arr, 0, sizeof(T_action.arr));
+   T_action.len = 0;
+
+	 memset(T_type      , 0, sizeof(T_type));
+   
+   memset(label,  0, 50);
+   memset(action, 0, 50);
+
+   EXEC SQL WHENEVER SQLERROR GOTO get_jrnl_error;
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL EXECUTE
+   BEGIN
+        :retour := PCRD_ATM_TOOLS.GET_JRNL_INFO(	:T_AcqBank,/*ICH270715*/  
+        											:T_message_number,
+												 	:T_type,/* Supp Nabil 220704 Parametre de plus	:T_terminal_number,*//*Linux*/
+                                  				 	:T_label,
+                                  				 	:T_action);
+   END;
+   END-EXEC;
+
+   if ( retour != OK ){
+      	sprintf(sLine,"End   out_service(%d) ",retour);
+      	trace_event(sLine,PROCESSING);
+      	return(retour);
+	}
+   memcpy(label,  T_label.arr, T_label.len);
+   memcpy(action, T_action.arr, T_action.len);
+
+   if (T_off_line_reason_code[0] == 'E') printer_fault(nIndexCtx,V_terminal_number,V_AcqBank /*ICH270715*/);
+   else
+   if (T_off_line_reason_code[0] == '8') safe_box_fault(nIndexCtx,V_terminal_number,V_AcqBank /*ICH270715*/);
+   else
+   if (T_off_line_reason_code[0] == 'D') encryption_fault(nIndexCtx,V_terminal_number,V_AcqBank /*ICH270715*/,"O");
+   else
+   if (T_off_line_reason_code[0] == 'C') card_reader_fault(nIndexCtx,V_terminal_number,V_AcqBank /*ICH270715*/);
+   else
+   if (T_off_line_reason_code[0] == '6') cassette_fault(nIndexCtx,V_terminal_number,V_AcqBank /*ICH270715*/);
+
+   trace_event("End   out_service(OK) ",PROCESSING);
+   return(OK);
+
+   get_jrnl_error     :
+      EXEC SQL WHENEVER SQLERROR CONTINUE;
+      sprintf(sLine, "%s %d", sqlca.sqlerrm.sqlerrmc, getpid());
+      trace_event(sLine, ERROR);
+      trace_event("End   out_service(ERROR) ",PROCESSING);
+      return(ERROR);
+}
+
+int   safe_box_fault(int nIndexCtx , char *V_terminal_number,char *V_AcqBank /*ICH270715*/)
+{
+   struct sqlca sqlca;
+   char sLine [ MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         T_terminal_number       [15];
+        VARCHAR    		T_AcqBank  	 	        [6+1];/*ICH270715*/ 
+		int				retour;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event("Start safe_box_fault() ",PROCESSING);
+
+   memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+   memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+
+   memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+   T_terminal_number.len = strlen(V_terminal_number);
+   
+    memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+    T_AcqBank.len = strlen(V_AcqBank);
+    
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR  GOTO safe_box_fault_error;
+   EXEC SQL EXECUTE
+   BEGIN
+        :retour := PCRD_ATM_TOOLS.SAFE_BOX_FAULT(:T_terminal_number,:T_AcqBank/*ICH270715*/ ,'O');
+   END;
+   END-EXEC;
+
+   trace_event("End   safe_box_fault(OK) ",PROCESSING);
+   return(OK);
+
+   safe_box_fault_error  :
+      EXEC SQL WHENEVER SQLERROR CONTINUE;
+      sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+      trace_event(sLine, ERROR);
+      trace_event("End   safe_box_fault(NOK) ",PROCESSING);
+      return(NOK);
+}
+
+int   safe_box_stat(int nIndexCtx , char *V_terminal_number,char *V_AcqBank /*ICH270715*/, char *V_status)
+{
+   struct sqlca sqlca;
+   char sLine [ MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         T_terminal_number       [15];
+         VARCHAR      	T_AcqBank  		[6+1];/*ICH270715*/ 
+       char            T_status      		[ 1+1];
+		int				retour;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event("Start safe_box_stat() ",PROCESSING);
+
+   memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+   memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+   memset(T_status, 0, sizeof(T_status));
+
+   memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+   T_terminal_number.len = strlen(V_terminal_number);
+   
+    memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+    T_AcqBank.len = strlen(V_AcqBank);
+    
+   memcpy(T_status, V_status, sizeof(T_status));
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR  GOTO safe_box_stat_error;
+   EXEC SQL EXECUTE
+   BEGIN
+        :retour := PCRD_ATM_TOOLS.SAFE_BOX_FAULT(:T_terminal_number,:T_AcqBank/*ICH270715*/,:T_status);
+   END;
+   END-EXEC;
+
+   trace_event("End   safe_box_stat(OK) ",PROCESSING);
+   return(OK);
+
+safe_box_stat_error  :
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine, ERROR);
+   trace_event("End   safe_box_stat(NOK) ",PROCESSING);
+   return(NOK);
+}
+
+
+int   card_reader_fault( int nIndexCtx , char *V_terminal_number,char *V_AcqBank /*ICH270715*/)
+{
+   struct sqlca sqlca;
+   char sLine [ MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         T_terminal_number       [15];
+        VARCHAR    		T_AcqBank  	 	        [6+1];/*ICH270715*/ 
+		int				retour;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event("Start card_reader_fault() ",PROCESSING);
+
+   memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+   memset(T_AcqBank.arr,	     0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+
+   memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+   T_terminal_number.len = strlen(V_terminal_number);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR  GOTO card_reader_fault_error;
+   EXEC SQL EXECUTE
+   BEGIN
+        :retour := PCRD_ATM_TOOLS.CARD_READER_FAULT(:T_terminal_number, :T_AcqBank/*ICH270715*/,'O');
+   END;
+   END-EXEC;
+   trace_event("End   card_reader_fault(OK) ",PROCESSING);
+   return(OK);
+
+card_reader_fault_error   :
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine, ERROR);
+   trace_event("End   card_reader_fault(NOK) ",PROCESSING);
+   return(NOK);
+}
+
+int   card_reader_stat( int nIndexCtx , char *V_terminal_number,char *V_AcqBank /*ICH270715*/, char *V_status)
+{
+   struct sqlca sqlca;
+   char sLine [ MAX_LINE_TRC];
+    EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         T_terminal_number   [15];
+        VARCHAR      	T_AcqBank  	    [6+1];/*ICH270715*/ 
+        char			T_status       		[ 1+1];
+		int				retour;
+    EXEC SQL END DECLARE SECTION;
+
+    trace_event("Start card_reader_stat() ",PROCESSING);
+
+    memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+    memset(T_AcqBank.arr,	     0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+    memset(T_status, 0, sizeof(T_status));
+    
+    memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+    T_terminal_number.len = strlen(V_terminal_number);
+    
+  	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+	
+    memcpy(T_status, V_status, sizeof(T_status));
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR  GOTO card_reader_stat_error;
+   EXEC SQL EXECUTE
+   BEGIN
+        :retour := PCRD_ATM_TOOLS.CARD_READER_FAULT(:T_terminal_number, :T_AcqBank/*ICH270715*/,:T_status);
+   END;
+   END-EXEC;
+   trace_event("End   card_reader_stat(OK) ",PROCESSING);
+   return(OK);
+
+card_reader_stat_error   :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   card_reader_stat(NOK) ",PROCESSING);
+    return(NOK);
+}
+
+int   cassette_fault( int nIndexCtx ,char *V_terminal_number,char *V_AcqBank /*ICH270715*/)
+{
+   struct sqlca sqlca;
+   char sLine [ MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         T_terminal_number       [15];
+        VARCHAR    		T_AcqBank  	 	        [6+1];/*ICH270715*/ 
+		int				retour;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event("Start cassette_fault() ",PROCESSING);
+
+   memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+   memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+
+   memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+   T_terminal_number.len = strlen(V_terminal_number);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR  GOTO cassette_fault_error;
+   EXEC SQL EXECUTE
+   BEGIN
+        :retour := PCRD_ATM_TOOLS.CASSETTE_FAULT(:T_terminal_number,:T_AcqBank/*ICH270715*/,'N');
+   END;
+   END-EXEC;
+   trace_event("End   cassette_fault(OK) ",PROCESSING);
+   return(OK);
+
+
+cassette_fault_error   :
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine, ERROR);
+   trace_event("End   cassette_fault(NOK) ",PROCESSING);
+   return(NOK);
+}
+
+int   encryption_fault(int nIndexCtx , char *V_terminal_number,char *V_AcqBank /*ICH270715*/,char *V_status)
+{
+   struct sqlca sqlca;
+   char sLine [ MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         T_terminal_number       [15];
+        VARCHAR    		T_AcqBank  	 	[		6+1];/*ICH270715*/ 
+        char            T_encryption_status     [1+1];
+		int				retour;
+   EXEC SQL END DECLARE SECTION;
+
+   sprintf(sLine,"Start encryption_fault(%s,%s,%s) ",V_terminal_number,V_AcqBank,V_status);
+   trace_event(sLine,PROCESSING);
+
+   memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+   memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+   memset(T_encryption_status, 0, sizeof(T_encryption_status));
+
+   memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+   T_terminal_number.len = strlen(V_terminal_number);
+ 
+   memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+   T_AcqBank.len = strlen(V_AcqBank);   
+   
+   memcpy(T_encryption_status, V_status, 1);
+   
+   sprintf(sLine,"encryption Status(%s) ",T_encryption_status);
+   trace_event(sLine,PROCESSING);
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR  GOTO encryption_fault_error;
+   EXEC SQL EXECUTE
+   BEGIN
+        :retour := PCRD_ATM_TOOLS.ENCRYPTOR_FAULT(:T_terminal_number,:T_AcqBank/*ICH270715*/,:T_encryption_status);
+   END;
+   END-EXEC;
+   trace_event("End   encryption_fault(OK) ",PROCESSING);
+   return(OK);
+
+encryption_fault_error   :
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine, ERROR);
+   trace_event("End   encryption_fault(NOK) ",PROCESSING);
+   return(NOK);
+}
+/*
+int in_service(int nIndexCtx, char *V_terminal_number,char *V_AcqBank )
+{
+   struct sqlca sqlca;
+   char sLine [ MAX_LINE_TRC];
+
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         T_terminal_number  [15];
+          VARCHAR      	T_AcqBank  	   [6+1]; 
+          char            T_reason_code      [ 4+1];
+		int				retour;
+   EXEC SQL END DECLARE SECTION;
+
+
+   trace_event("Start in_service() ",PROCESSING);
+
+   memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+   memset(T_AcqBank.arr,	     0, sizeof(T_AcqBank.arr));     
+   memset(T_reason_code, 0, sizeof(T_reason_code));
+
+   memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+   T_terminal_number.len = strlen(V_terminal_number);
+   
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+	
+   memset(T_reason_code, 0, sizeof(T_reason_code));
+   memcpy(T_reason_code, "    ", 4 );
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR  GOTO in_service_error;
+   EXEC SQL EXECUTE
+   BEGIN
+        :retour := PCRD_ATM_TOOLS.IN_SERVICE_STATUS(:T_terminal_number, :T_AcqBank);
+   END;
+   END-EXEC;
+   trace_event("End   in_service(OK) ",PROCESSING);
+   return(OK);
+
+in_service_error     :
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   sprintf(sLine, "%s %d", sqlca.sqlerrm.sqlerrmc, getpid());
+   trace_event(sLine, ERROR);
+   trace_event("End  in_service(ERROR) ",PROCESSING);
+   return(ERROR);
+
+}
+*/
+
+int     ticket_printer_stat( int nIndexCtx,char *V_terminal_number,char *V_AcqBank /*ICH270715*/, char *V_status)
+{
+   struct sqlca sqlca;
+   char sLine [ MAX_LINE_TRC];
+   EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         T_terminal_number       [15];
+        VARCHAR    		T_AcqBank  	 			[6+1];/*ICH270715*/ 
+        char            T_printer_status        [ 1+1];
+		int				retour;
+   EXEC SQL END DECLARE SECTION;
+
+   trace_event("Start ticket_printer_stat() ",PROCESSING);
+
+   memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+   memset(T_printer_status, 	 0, sizeof(T_printer_status));
+   memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+
+   memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+   T_terminal_number.len = strlen(V_terminal_number);
+
+	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+	
+   memcpy(T_printer_status, V_status, 1);
+
+
+   EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+   EXEC SQL WHENEVER SQLERROR  GOTO ticket_printer_stat_error;
+   EXEC SQL EXECUTE
+   BEGIN
+        :retour := PCRD_ATM_TOOLS.TICKET_PRINTER_FAULT(:T_terminal_number,:T_AcqBank/*ICH270715*/,:T_printer_status);
+   END;
+   END-EXEC;
+   trace_event("End   ticket_printer_stat(OK) ",PROCESSING);
+   return(OK);
+
+ticket_printer_stat_error  :
+   EXEC SQL WHENEVER SQLERROR CONTINUE;
+   sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+   trace_event(sLine, ERROR);
+   trace_event("End   ticket_printer_stat(NOK) ",PROCESSING);
+   return(NOK);
+}
+
+int     log_printer_stat(int nIndexCtx ,char *V_terminal_number,char *V_AcqBank, char *V_status)
+{
+   struct sqlca sqlca;
+    char sLine[MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         T_terminal_number       [15];
+         VARCHAR    		T_AcqBank  	 	        [6+1];/*ICH270715*/ 
+        char            T_printer_status        [ 1+1];
+		int				retour;
+    EXEC SQL END DECLARE SECTION;
+
+    trace_event("Start log_printer_stat() ",PROCESSING);
+
+    memset(T_terminal_number.arr, 0, sizeof(T_terminal_number.arr));
+ 	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr));/*ICH270715*/     
+    memset(T_printer_status, 0, sizeof(T_printer_status));
+
+    memcpy(T_terminal_number.arr, V_terminal_number, strlen(V_terminal_number));
+    T_terminal_number.len = strlen((char *)V_terminal_number);
+
+  	memcpy(T_AcqBank.arr, V_AcqBank, strlen(V_AcqBank));
+	T_AcqBank.len = strlen(V_AcqBank);
+
+    memcpy(T_printer_status, V_status, 1);
+
+
+    EXEC SQL WHENEVER SQLERROR  GOTO log_printer_stat_error;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL EXECUTE
+    BEGIN
+        :retour := PCRD_ATM_TOOLS.LOG_PRINTER_FAULT(:T_terminal_number,:T_AcqBank/*ICH270715*/,:T_printer_status);
+    END;
+    END-EXEC;
+    trace_event("End   log_printer_stat(OK) ",PROCESSING);
+    return(OK);
+
+log_printer_stat_error  :
+    EXEC SQL WHENEVER SQLERROR CONTINUE;
+    sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+    trace_event(sLine, ERROR);
+    trace_event("End   log_printer_stat(NOK) ",PROCESSING);
+    return(NOK);
+}

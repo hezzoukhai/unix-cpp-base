@@ -1,0 +1,84 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <tlv_autho.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+int CheckCardInquiry ( int nIndiceCtx, char 	*sCardNumber , char *sExpiryDate )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+    char sEventCode [ 3 + 1];
+    int  nLength;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    
+ 	VARCHAR   	T_card_number [ 22 + 1 ];
+	VARCHAR			T_expiry_date	[ 4 + 1];
+  int					response_code;  
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start CheckCardInquiry() ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    memset ( T_card_number.arr, 0, sizeof ( T_card_number.arr ));
+    T_card_number.len=0;
+    
+    memset ( T_expiry_date.arr, 0, sizeof ( T_expiry_date.arr ));
+		T_expiry_date.len=0;
+
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+    memcpy ( T_card_number.arr, sCardNumber, strlen ( sCardNumber ));
+    T_card_number.len =  strlen ( sCardNumber );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+
+	response_code = SYSTEM_MALFUNCTION;
+	
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_card_info;
+	EXEC SQL EXECUTE
+	BEGIN
+
+        :response_code := PCRD_SWI_SERVICES_2.CHECK_CARD_NUMBER( :T_card_number,
+															  :T_expiry_date );
+	END;
+	END-EXEC;
+
+    if ( response_code == 0 )
+    {
+       	memcpy ( sExpiryDate, T_expiry_date.arr ,	T_expiry_date.len );
+				trace_event("End CheckCardInquiry( OK )", PROCESSING);
+     }
+
+ sprintf(sLine,"End CheckCardInquiry( %d ) ",response_code );
+ trace_event(sLine,PROCESSING);
+    memset ( T_card_number.arr, 0, sizeof ( T_card_number.arr )); /* PCI */ 
+    memset ( T_expiry_date.arr, 0, sizeof ( T_expiry_date.arr )); /* PCI */
+ return(response_code);
+
+ err_get_card_info :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End CheckCardInquiry(SYSTEM_MALFUNCTION)", PROCESSING);
+    memset ( T_card_number.arr, 0, sizeof ( T_card_number.arr )); /* PCI */ 
+    memset ( T_expiry_date.arr, 0, sizeof ( T_expiry_date.arr )); /* PCI */
+ 	return( SYSTEM_MALFUNCTION );
+}
+
+

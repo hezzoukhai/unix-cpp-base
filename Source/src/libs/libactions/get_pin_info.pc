@@ -1,0 +1,108 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      get_pin_info.pc                                                        */
+/*                                                                             */
+/* Description                                                                 */
+/*      Pin Info Tools Management                                              */
+/*******************************************************************************/
+/*-----------------------------------------------------------------------------
+ Id             Date           	Author                       	Comment
+-----------------------------------------------------------------------------
+ 0001AZ     	02-10-2002   	A. ZAAZAA                       Initial Version	
+-----------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <define.h>
+#ifdef SOLARIS
+#include <limits.h>
+#endif
+#include <param_ctx.h>
+#include <define.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetCardPinOffset (	int  nIndexCtx,
+						char *pCardNumber, 
+						char *pCardSeqNbr, 
+						char *pOffset
+						)
+{
+    char 	sLine[MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+         VARCHAR             hCardNumber     [22];
+		 int			     hSeqNum;
+         VARCHAR             hPinOffset      [16 + 1];
+         int                 hResult;
+    EXEC SQL END DECLARE SECTION;
+
+    if (debug_option == 1)
+        sprintf(sLine, "Start GetCardPinOffset(%.22s, %s)", pCardNumber,pCardSeqNbr);
+    else
+        sprintf(sLine, "Start GetCardPinOffset()");
+
+   trace_event(sLine, PROCESSING);
+
+    /* - Memset des variables --------------------------------- */
+    memset(hCardNumber.arr,	0, sizeof(hCardNumber.arr)  );
+    hCardNumber.len = 0;
+	
+    memset(hPinOffset.arr,	0, sizeof(hPinOffset.arr)   );
+    hPinOffset.len  = 0;
+
+   
+    /* - Initialisation des variables -------------------------- */
+    memcpy(hCardNumber.arr,	pCardNumber, strlen(pCardNumber)	);
+    hCardNumber.len     	= strlen(pCardNumber);
+	
+	hSeqNum = atoi(pCardSeqNbr);
+
+    /* - Capture des exceptions -------------------------------- */
+    EXEC SQL WHENEVER SQLERROR GOTO get_card_pin_offset;
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+    EXEC SQL EXECUTE
+    BEGIN
+       :hResult := PCRD_P7_CTRL_SECURITY.GET_CARD_PIN_OFFSET (	:hCardNumber,
+															    :hSeqNum,	   
+																:hPinOffset
+															);
+    END;
+    END-EXEC;
+
+    if ( hResult == OK )
+    {
+		memcpy ( pOffset, hPinOffset.arr, hPinOffset.len ); pOffset[hPinOffset.len]='\0';
+		if( debug_option == 1 )
+		{
+			sprintf(sLine,"PIN Offset[%s]",pOffset);
+			trace_event(sLine, PROCESSING);
+		}
+
+		memset(hCardNumber.arr,	0, sizeof(hCardNumber.arr)  );
+
+		memset(hPinOffset.arr,	0, sizeof(hPinOffset.arr)   );
+		sprintf(sLine, "End   GetCardPinOffset(OK)");
+		trace_event(sLine, PROCESSING);
+		return (OK);
+    }
+
+	memset(hCardNumber.arr,	0, sizeof(hCardNumber.arr)  );
+	memset(hPinOffset.arr,	0, sizeof(hPinOffset.arr)   );
+	sprintf(sLine, "End   GetCardPinOffset(NOK)");
+	trace_event(sLine, PROCESSING);
+	return (NOK);
+
+get_card_pin_offset:
+	sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+
+	memset(hCardNumber.arr,	0, sizeof(hCardNumber.arr)  );
+	memset(hPinOffset.arr,	0, sizeof(hPinOffset.arr)   );
+	trace_event("End   GetCardPinOffset(ERROR)", ERROR);
+	return (ERROR);
+}
+
+
+

@@ -1,0 +1,292 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+/**Linux**/
+#include <tlv_fields.h>
+#include <tlv_private.h>
+#include <tlv_privfields.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int UpdateBalance  ( int nIndiceCtx , char cUpdateFlag, char *sTlvBuffer )
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+ 	char      	T_update_flag ;
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    trace_event ( "Start UpdateBalance () ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+	T_update_flag = cUpdateFlag;
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UpdateBalance;
+	EXEC SQL EXECUTE
+	DECLARE
+        approval_flag     BOOLEAN :=FALSE;
+        reversal_flag     BOOLEAN :=FALSE;
+        partial_flag      BOOLEAN :=FALSE;
+	BEGIN
+		IF :T_update_flag = '2'
+		THEN
+    		approval_flag  	:= TRUE; 
+		ELSIF :T_update_flag = '3'
+		THEN
+    		reversal_flag  	:= TRUE; 
+		ELSIF :T_update_flag = '4'
+		THEN
+    		partial_flag  	:= TRUE; 
+		END IF;
+		
+
+		:response_code := PCRD_P7_ACCOUNT_MNG.UPDATE_BALANCE(
+                                                                     approval_flag, 
+                                                                     reversal_flag, 
+                                                                     partial_flag, 
+																	 'Y',
+                                                                    :T_tlv_auth ); 
+	END;
+	END-EXEC;
+	
+    tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+#if IS_P7_SWI
+
+/** START MAW20070417 **/
+    if ( OK == response_code )
+    {
+		char            sIccData [ LG_MAX ], szTmpData [ LG_MAX ];
+		int             nIccLen, nTmpLen;
+		TSTlvPrivate    ICCtlvInfo;
+   
+       /** Only if the PLSQL has added the ARPC-RespCode and the UNIX added the ARPC **/
+        if (GetTlvBuffer(AUTO_ICC_DATA, sTlvBuffer, sIccData, &nIccLen) == SUCCESS)
+        {
+           InitTlvPrivate(&ICCtlvInfo);
+           AnalyseTlvPrivate(sIccData, nIccLen, &ICCtlvInfo);
+
+           memset(szTmpData, 0, sizeof(szTmpData));
+
+           if ( GetTlvPrivate(CHIP_ISS_ARPC_RESP_CODE_TAG, &ICCtlvInfo, szTmpData, &nTmpLen) == SUCCESS
+             && GetTlvPrivate(CHIP_ISS_AUTHEN_DATA_TAG, &ICCtlvInfo, szTmpData, &nTmpLen) == SUCCESS 
+			 /* Start EBE140609: Make sure that it's actually PWC who generated those values */
+			 && GetTlvPrivate(AUTO_SECURITY_VER_RESULTS, &ICCtlvInfo, szTmpData, &nTmpLen) == SUCCESS 
+			 && szTmpData[4] != '4'
+			 /* End EBE140609 */
+			 )
+           {
+              memset(szTmpData, 0, sizeof(szTmpData));
+              if ( OK != check_crpt_data ( nIndiceCtx, sTlvBuffer, szTmpData ) )
+              {
+                 trace_event("End UpdateBalance (SYSTEM_MALFUNCTION) <ERROR ON check_crpt_data()>", PROCESSING);
+                 return( SYSTEM_MALFUNCTION );
+              }
+
+              if ( GetTlvPrivate("C29", &ICCtlvInfo, szTmpData, &nTmpLen) == SUCCESS )
+              {
+                 memset(szTmpData, 0, sizeof(szTmpData));
+                 if ( OK !=  gen_iss_script_data ( nIndiceCtx, sTlvBuffer, szTmpData) )
+                 {
+                    trace_event("End UpdateBalance (SYSTEM_MALFUNCTION) <ERROR ON gen_iss_script_data()>", PROCESSING);
+                    return( SYSTEM_MALFUNCTION );
+                 }
+              }
+
+              if ( OK !=  UpdateAuthoActivity ( nIndiceCtx, sTlvBuffer ) )
+              {
+                 trace_event("End UpdateBalance (SYSTEM_MALFUNCTION) <ERROR ON UpdateAuthoActivity()>", PROCESSING);
+				 memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+                 return( SYSTEM_MALFUNCTION );
+              }
+
+           }
+        }
+    }
+/** END   MAW20070417 **/
+#endif
+
+	
+	sprintf(sLine,"End UpdateBalance (%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_UpdateBalance :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+    tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End UpdateBalance (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+int PostAuthorization  ( int nIndiceCtx , char cInsUpdFlag, char *sTlvBuffer )
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+ 	char      	T_ins_upd_flag[1+1] ;
+	int		    response_code;
+	VARCHAR   	T_tlv_warn	  [ 256 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    trace_event ( "Start PostAuthorization () ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+	
+	memset ( T_tlv_warn.arr            ,  0  ,   sizeof(T_tlv_warn.arr )  );
+	T_tlv_warn.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+   	 memset (T_ins_upd_flag,      0, sizeof(T_ins_upd_flag));
+  	 T_ins_upd_flag[0] =  cInsUpdFlag;
+
+	
+	/*sT_ins_upd_flag = cInsUpdFlag;*/
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = -3;
+	EXEC SQL WHENEVER SQLERROR GOTO err_PostAuth;
+	EXEC SQL EXECUTE
+	BEGIN		
+
+		:response_code := PCRD_AUTHO_ACTIVITY_TLV_PROC.POST_AUTHORIZATION(:T_tlv_auth,:T_ins_upd_flag, :T_tlv_warn); 
+	END;
+	END-EXEC;
+	
+    tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+
+	
+	sprintf(sLine,"End PostAuthorization (%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_PostAuth :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+    tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End PostAuthorization (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}
+
+int UpdatePanActAccBal  ( int nIndiceCtx , char *sTlvBuffer )
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth	  [ LG_MAX + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    trace_event ( "Start UpdatePanActAccBal () ", PROCESSING );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	T_tlv_auth.len = 0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_auth.len = strlen(sTlvBuffer );
+
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = -3;
+	EXEC SQL WHENEVER SQLERROR GOTO err_Update;
+	EXEC SQL EXECUTE
+	BEGIN		
+
+		:response_code := PCRD_P7_ISS_AUTHO_TOOLS.UPDATE_PAN_ACT_ACC_BAL(:T_tlv_auth); 
+	END;
+	END-EXEC;
+	
+    tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+	
+	sprintf(sLine,"End UpdatePanActAccBal (%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+err_Update :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+    tlvcpy( sTlvBuffer , T_tlv_auth.arr, T_tlv_auth.len);
+	memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  ); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End UpdatePanActAccBal (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}

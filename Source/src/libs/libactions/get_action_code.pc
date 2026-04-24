@@ -1,0 +1,161 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <tlv_autho.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+int GetActionCode ( int nIndiceCtx, char 	*sTlvAuth , char *sActionCode )
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+    char sEventCode [ 3 + 1];
+    int  nLength;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+ 	VARCHAR   	T_tlv_auth [ LG_MAX + 1];
+ 	char   		T_action_code [ 3 + 1];
+	int		    response_code;
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetActionCode() ", PROCESSING );
+
+    GetTlvBuffer(AUTO_EVENT_CODE,sTlvAuth,sEventCode,&nLength);
+
+    sprintf(sLine,"==> EVENT CODE( %.3s )", sEventCode   );
+    trace_event(sLine,PROCESSING);
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr ));
+    memset ( T_action_code , 0, sizeof ( T_action_code  ));
+	T_tlv_auth.len=0;
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvAuth)
+
+/****************************************************************************/
+/*      CHAMP CLE                                                           */
+/****************************************************************************/
+    memcpy ( T_tlv_auth.arr, sTlvAuth, strlen ( sTlvAuth ));
+    T_tlv_auth.len =  strlen ( sTlvAuth );
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_action_code;
+	EXEC SQL EXECUTE
+	BEGIN
+
+        :response_code := PCRD_P7_GENERAL_TOOLS.GET_ACTION_CODE( :T_tlv_auth , 
+								 :T_action_code
+							       );
+	END;
+	END-EXEC;
+
+	tlvcpy ( sTlvAuth    , T_tlv_auth.arr , T_tlv_auth.len  );
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr )); /**PA DSS*/
+
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvAuth)
+
+    if ( response_code == 0 )
+    {
+       	memcpy ( sActionCode , T_action_code  , 3  );
+		sprintf(sLine,"End GetActionCode( OK ):Action (%d:%.3s)", response_code, sActionCode );
+		trace_event(sLine, PROCESSING);
+		return OK;
+     }
+
+	 sprintf(sLine,"End GetActionCode( NOK )  Action (%d:%.3s)", response_code, sActionCode );
+	 trace_event(sLine,PROCESSING);
+	 return(response_code);
+
+ err_get_action_code :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+    tlvcpy ( sTlvAuth    , T_tlv_auth.arr , T_tlv_auth.len );
+	memset ( T_tlv_auth.arr, 0, sizeof ( T_tlv_auth.arr )); /* PCI */
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvAuth)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End GetActionCode(SYSTEM_MALFUNCTION)", PROCESSING);
+ 	return( SYSTEM_MALFUNCTION );
+}
+/****************************************************************************/
+/*Start IBO20230822 PLUTONL-6798*/
+int GetActionFlag ( int nIndiceCtx, char *sActionCode, char *sActionFlag)
+{
+    struct sqlca sqlca;
+    char sLine [ MAX_LINE_TRC];
+
+    EXEC SQL BEGIN DECLARE SECTION;
+ 	char   		T_action_code [ 3 + 1];
+ 	char   		T_action_flag [ 1 + 1];
+	int		    response_code;
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetActionFlag() ", PROCESSING );
+
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+    memset ( T_action_code , 0, sizeof ( T_action_code  ));
+    memset ( T_action_flag , 0, sizeof ( T_action_flag  ));
+
+	memcpy ( T_action_code, sActionCode, 3);
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                       */
+/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_action_flag;
+	EXEC SQL EXECUTE
+	BEGIN
+
+        :response_code := PCRD_P7_GENERAL_TOOLS.GET_ACTION_FLAG( :T_action_code , 
+								 :T_action_flag
+							       );
+	END;
+	END-EXEC;
+
+
+
+    if ( response_code == 0 )
+    {
+       	memcpy ( sActionFlag , T_action_flag  , 1  );
+		sprintf(sLine,"End GetActionFlag( OK ):ActionFlag (%d:%.1s)", response_code, sActionFlag );
+		trace_event(sLine, PROCESSING);
+		return OK;
+     }
+
+	 sprintf(sLine,"End GetActionFlag( NOK )  ActionFlag (%d)", response_code );
+	 trace_event(sLine,PROCESSING);
+	 return(response_code);
+
+ err_get_action_flag :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+  
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End GetActionFlag(SYSTEM_MALFUNCTION)", PROCESSING);
+ 	return( SYSTEM_MALFUNCTION );
+}
+/*End IBO20230822 PLUTONL-6798*/
+

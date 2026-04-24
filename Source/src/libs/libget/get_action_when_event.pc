@@ -1,0 +1,82 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetActionWhenEvent  (int nIndiceCtx, TSActionWhenEvent *action_when_event)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	char   EVENT_CODE 		[ 3 ];
+	char   CODE_ACTION 		[ 3 ];
+	char   DATA_CAPTURE_MODE 	[ 1 ];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetActionWhenEvent() ", PROCESSING );
+	memset ( EVENT_CODE            ,  0  ,   3  );
+	memset ( CODE_ACTION           ,  0  ,   3  );
+	memset ( DATA_CAPTURE_MODE     ,  0  ,   1  );
+
+	memcpy ( EVENT_CODE,action_when_event->event_code,3);
+
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_action_when_event;
+	EXEC SQL EXECUTE
+	    DECLARE T_P7_ACTION_WHEN_EVENT   P7_ACTION_WHEN_EVENT%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_PARAM_GENERAL_ROWS.GET_P7_ACTION_WHEN_EVENT
+						(   :EVENT_CODE, 
+	                                            T_P7_ACTION_WHEN_EVENT 
+	                                        );
+
+
+		IF :response_code = 0 THEN
+		:CODE_ACTION        := T_P7_ACTION_WHEN_EVENT.CODE_ACTION;
+		:DATA_CAPTURE_MODE  := T_P7_ACTION_WHEN_EVENT.DATA_CAPTURE_MODE;
+		END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+		memcpy(action_when_event->code_action, CODE_ACTION,3);
+		memcpy ( action_when_event->data_capture_mode , 
+							DATA_CAPTURE_MODE,1);
+	        trace_event ( "End GetActionWhenEvent( OK ) ", PROCESSING );
+		return(OK);
+	}
+	trace_event ( "End GetActionWhenEvent( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_action_when_event:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+		memcpy ( action_when_event->code_action , CODE_ACTION, 3 );
+		memcpy ( action_when_event->data_capture_mode , 
+							DATA_CAPTURE_MODE, 1 );
+	        trace_event ( "End GetActionWhenEvent( OK ) ", PROCESSING );
+		return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetActionWhenEvent( NOK ) ", PROCESSING );
+	return( NOK );
+}

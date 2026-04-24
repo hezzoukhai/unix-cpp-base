@@ -1,0 +1,470 @@
+/*******************************************************************************/
+/*  (c) Hightech Payment Systems 2001                                          */
+/* Module                                                                      */
+/*      terminal.pc                                                                 */
+/*                                                                             */
+/* Description                                                                 */
+/*      terminal Tools Management                                        */
+/*******************************************************************************/
+/*---------------------------------------------------------------------------------------------------------------------------------
+Id              	Date             	Author                       	Comment
+-----------------------------------------------------------------------------------------------------------------------------------
+0001MK     		18-02-2002   		Mahjoub KARROUM    		Initiale Version	
+---------------------------------------------------------------------------------------------------------------------------------*/
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <sqlca.h>
+#include <sqlcpr.h>
+#include <define.h>
+#include <actioncode.h> 
+#include <iso_hps.h> 
+#include <param_ctx.h> 
+#include <ndc_param.h> 
+#include <thr_ndc_extern.h> 
+
+
+/******************************************************************************/
+/* Fonction get_terminal_info.                                                */
+/* ---------------------------		                                      */
+/* Description : Fonction qui recupere les informations concernants un        */
+/*		 terminal donne.					      */
+/* Entree      : le numero du terminal					      */
+/*               le numero du point de service				      */
+/*	         la banque acquereur 			 		      */
+/*		 le mcc						              */
+/*		 le code country				              */
+/* Sortie      : OK						              */
+/*               NOK                   			                      */
+/*               MALFUNCTION                                                  */
+/* Date/Auteur : 09/11/1996 Y_KAOUTAR                                         */
+/* Revision    :                                                              */
+/******************************************************************************/
+int    get_terminal_info(
+	int			nIndexCtx,
+	char		*v_term_nbr,
+	char		*v_acqBank,
+	char		*v_outlet_nbr,
+	char		*v_acquirer_bank,
+	int	 		*v_mcc,
+	char		*v_country_code,
+	char		*v_atm_location,
+	int	 		*v_tpk_number)
+{
+
+	struct sqlca sqlca;
+	char  sLine[MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR 		T_term_nbr     [15+1]; 
+	varchar      	T_AcqBank  	   [6+1];/*ICH270715*/ 
+	VARCHAR 		T_outlet_nbr   [15+1]; 
+	char 	  		T_acquirer_bank[ 6+1];
+	char      	T_mcc		   [4+1];
+	char 	  		T_country_code [ 3+1];
+	VARCHAR 		T_atm_location [40+1];
+	char      	T_tpk_number   [3+1];
+	int	 		response;
+	EXEC SQL END DECLARE SECTION;
+
+
+	sprintf(sLine,"Debut get_terminal_info(%s,%s)", v_term_nbr,v_acqBank/*ICH270715*/ );
+	trace_event(sLine, PROCESSING);
+
+	memset(T_term_nbr.arr, 0, sizeof(T_term_nbr.arr));
+	memcpy(T_term_nbr.arr, v_term_nbr, strlen((char *)v_term_nbr));
+	T_term_nbr.len = strlen((char *)v_term_nbr);
+
+	memset(T_AcqBank.arr, 0, sizeof(T_AcqBank.arr));/*ICH270715*/ 
+	memcpy(T_AcqBank.arr, v_acqBank, strlen((char *)v_acqBank));
+	T_AcqBank.len = strlen((char *)v_acqBank);
+
+	memset(T_outlet_nbr.arr, 0, sizeof(T_outlet_nbr.arr)); 
+	T_outlet_nbr.len = 0;
+	memset(T_atm_location.arr, 0 ,sizeof(T_atm_location.arr)); 
+	T_atm_location.len = 0;
+	memset(T_mcc, 			0, sizeof(T_mcc)); 
+	memset(T_country_code,  0, sizeof(T_country_code)); 
+	memset(T_acquirer_bank, 0, sizeof(T_acquirer_bank));
+	memset(T_tpk_number, 	0, sizeof(T_tpk_number)); 
+
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO terminal_info;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL EXECUTE
+		DECLARE
+		l_term_nbr 		varchar2(15);
+	l_outlet_nbr 	varchar2(15);
+	l_acquirer_bank char(6);
+	l_mcc 			char(4);
+	l_country_code 	char(3);
+	l_atm_location 	varchar2(40);
+	l_tpk_number 	char(3);
+	BEGIN
+		IF (:T_term_nbr = '##') THEN l_term_nbr := NULL; END IF;
+
+
+	:response := PCRD_ATM_TOOLS.GET_TERMINAL_INFO( :T_term_nbr, 
+		:T_AcqBank/*ICH270715*/ ,
+		l_outlet_nbr,
+		l_acquirer_bank,
+		l_mcc,
+		l_country_code,
+		l_atm_location,
+		l_tpk_number);
+	IF (l_outlet_nbr IS NULL) THEN
+		:T_outlet_nbr := '      ';
+	ELSE
+		:T_outlet_nbr := l_outlet_nbr;
+	END IF;
+	IF (l_acquirer_bank IS NULL) THEN
+		:T_acquirer_bank := '      ';
+	ELSE
+		:T_acquirer_bank := l_acquirer_bank;
+	END IF;
+	IF (l_mcc IS NULL) THEN
+		:T_mcc := '   ';
+	ELSE
+		:T_mcc := l_mcc;
+	END IF;
+	IF (l_country_code IS NULL) THEN
+		:T_country_code := '  ';
+	ELSE
+		:T_country_code := l_country_code;
+	END IF;
+	IF (l_atm_location IS NULL) THEN
+		:T_atm_location := '      ';
+	ELSE
+		:T_atm_location := l_atm_location;
+	END IF;
+	IF (l_tpk_number IS NULL) THEN
+		:T_tpk_number := '  ';
+	ELSE
+		:T_tpk_number := l_tpk_number;
+	END IF;
+	END;
+	END-EXEC;
+
+
+	if (response == OK)
+	{
+		memcpy(v_outlet_nbr   , T_outlet_nbr.arr, T_outlet_nbr.len);
+		memcpy(v_country_code , T_country_code  , sizeof(T_country_code));
+		memcpy(v_acquirer_bank, T_acquirer_bank , sizeof(T_acquirer_bank));
+		memcpy(v_atm_location     , T_atm_location.arr  , T_atm_location.len);
+		*v_mcc = atoi(T_mcc);
+		*v_tpk_number = atoi(T_tpk_number);
+
+
+		trace_event("End   get_terminal_info(OK)", PROCESSING);
+		return(OK);
+	}
+
+
+	LogEvent(nIndexCtx,
+		ResourceId,
+		v_term_nbr,
+		ERREUR_TRAIT,
+		"",
+		"", "",
+		"", "");
+
+	trace_event("End   get_terminal_info(NOK)", PROCESSING);
+	return(NOK);
+
+terminal_info :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	LogEvent(nIndexCtx,
+		ResourceId,
+		v_term_nbr,
+		ERREUR_TRAIT,
+		"",
+		"", "",
+		"", "");
+
+	trace_event("End  get_terminal_info(MALFUNCTION)", PROCESSING);
+	return(MALFUNCTION);
+}
+
+int    get_terminal_params(
+	int			nIndexCtx,
+	char		*v_term_nbr,
+	char		*v_acqBank,
+	int	 		*v_tz)
+{
+
+	struct sqlca sqlca;
+	char  sLine[MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR 		T_term_nbr     [15+1]; 
+	varchar      	T_AcqBank  	   [6+1];
+	int      		T_tz;
+	int	 			response;
+	EXEC SQL END DECLARE SECTION;
+
+
+	sprintf(sLine,"Start get_terminal_params(%s,%s)", v_term_nbr,v_acqBank );
+	trace_event(sLine, PROCESSING);
+
+	memset(T_term_nbr.arr, 0, sizeof(T_term_nbr.arr));
+	memcpy(T_term_nbr.arr, v_term_nbr, strlen((char *)v_term_nbr));
+	T_term_nbr.len = strlen((char *)v_term_nbr);
+
+	memset(T_AcqBank.arr, 0, sizeof(T_AcqBank.arr));
+	memcpy(T_AcqBank.arr, v_acqBank, strlen((char *)v_acqBank));
+	T_AcqBank.len = strlen((char *)v_acqBank);
+
+	T_tz = 0;
+
+
+	response = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO terminal_params;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL EXECUTE
+	BEGIN
+		:response := PCRD_ATM_TOOLS.GET_TERMINAL_PARAMS( :T_term_nbr, 
+						:T_AcqBank ,
+						:T_tz);
+	END;
+	END-EXEC;
+
+
+	if (response == OK)
+	{
+		*v_tz = T_tz;
+		sprintf(sLine,"End   get_terminal_params(TZ(%d))",*v_tz);
+		trace_event(sLine, PROCESSING);
+		return(OK);
+	}
+
+	trace_event("End   get_terminal_params(NOK)", PROCESSING);
+	return(NOK);
+
+terminal_params :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End  get_terminal_params(MALFUNCTION)", PROCESSING);
+	return(MALFUNCTION);
+}
+
+/*
+int get_merchant_id(char	*terminal_id,char	*merchant_id)
+{
+	trace_event("Debut get_merchant_id()", PROCESSING);
+	memcpy(merchant_id, "111", 3);
+	trace_event("Fin   get_merchant_id()", PROCESSING);
+	return(OK);
+}
+*/
+
+
+/*
+get_currency_exponent(currency)
+char 	*currency;
+{
+trace_event("Debut get_currency_exponent()", PROCESSING);
+trace_event("Fin   get_currency_exponent()", PROCESSING);
+return(100);
+}
+*/
+
+/***********************************************************************
+**  nom	: CommsAddToTermNbr()					**
+**  desc	: recuperation du numero du terminal a partir de son	**
+**		adresse telecom						**
+**  entree	: pCallingAdd	-> adresse de l'appelant		**
+**  sortie	: pTermNbr	-> numero du terminal			**
+**  retour	: OK	-> la fonction arrive a recuperer le numero du	**
+**		terminal						**
+**		  NOK	-> pas de terminal avec l'adresse indiquee	**
+**		  ERROR	-> erreur fatale				**
+**  creation	: 26 Jan 1999						**
+***********************************************************************/
+int CommsAddToTermNbr(
+	int		nIndexCtx,
+	char	*pCallingAdd,
+	char	*pTermNbr,
+	char	*pExternalId,
+	char	*pAcqBank)/*ICH270715*/
+{
+	struct sqlca sqlca;
+	char  sLine[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	varchar		hCallingAdd		[15+1];
+	varchar		hTermNbr		[15+1];
+	varchar		hTExternalId	[15+1];
+	varchar		hAcqBank		[6];/*ICH270715*/
+	
+	short       pl_null_ExternalId_ind ; 
+			
+	int			hResponseCode;
+	
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(sLine, "Start CommsAddToTermNbr(%.15s)", pCallingAdd);
+	trace_event(sLine, PROCESSING);
+
+	/* - memset et initialisation ------------------------------------------- */
+	memset(hCallingAdd.arr,	0, sizeof(hCallingAdd.arr));
+	hCallingAdd.len	= 0;
+	memset(hTermNbr.arr,	0, sizeof(hTermNbr.arr));
+	hTermNbr.len	= 0;
+	memset(hTExternalId.arr,	0, sizeof(hTExternalId.arr));
+	hTExternalId.len	= 0;
+	memset(hAcqBank.arr,	0, sizeof(hAcqBank.arr));/*ICH270715*/
+	hAcqBank.len        = 0;
+
+
+	memcpy(hCallingAdd.arr,	pCallingAdd, strlen(pCallingAdd));
+	hCallingAdd.len = strlen(pCallingAdd);
+
+
+	/* - capture des exceptions --------------------------------------------- */
+	EXEC SQL WHENEVER SQLERROR GOTO commsAddToTermNbrErr;
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+
+
+	/* - appel de la fonction PL/SQL ---------------------------------------- */
+
+	EXEC SQL EXECUTE
+		BEGIN
+		:hResponseCode := PCRD_ATM_TERMINAL.COMMSADD_TO_TERMNBR(
+		:hCallingAdd,
+		:hTermNbr,
+		:hTExternalId:pl_null_ExternalId_ind,
+		:hAcqBank/*ICH270715*/);
+	END;
+	END-EXEC;
+
+
+	/* - examen du retour de la fonction PL/SQL ----------------------------- */
+	if(hResponseCode != OK)
+	{
+		trace_event("End   CommsAddToTermNbr(NOK)", PROCESSING);
+		return (hResponseCode);
+	}
+
+
+	/* - recuperation du resultat de la fonction PL/SQL --------------------- */
+	memcpy(pTermNbr, hTermNbr.arr, hTermNbr.len);pTermNbr[hTermNbr.len]='\0';
+	
+	if( -1 != pl_null_ExternalId_ind )
+	{
+		memcpy(pExternalId, hTExternalId.arr, hTExternalId.len);pExternalId[hTExternalId.len]='\0';
+
+	}
+	memcpy(pAcqBank, hAcqBank.arr, hAcqBank.len);pAcqBank[hAcqBank.len]='\0'; /*ICH270715*/
+
+	sprintf(sLine, "End   CommsAddToTermNbr(%.15s,%.6s,%.15s)", pTermNbr,pAcqBank,pExternalId);
+	trace_event(sLine, PROCESSING);
+	return (OK);
+
+commsAddToTermNbrErr :
+	sprintf(sLine, "%.79s", sqlca.sqlerrm.sqlerrmc);
+	trace_event(sLine, ERROR);
+	trace_event("End   CommsAddToTermNbr(ERROR)", ERROR);
+	return (ERROR);
+}
+
+
+/******************************************************************************/
+/* Fonction Get_terminal_data.                                                */
+/* ---------------------------                                                */
+/* Description : Fonction qui charge les donnees liees au terminal dans la    */
+/*               structure iso_interne                                        */
+/* Entree      : les donnees iso_interne                                      */
+/*               le code reponse                                              */
+/* Sortie      : OK                                                           */
+/*               NOK                                                          */
+/*               MALFUNCTION                                                  */
+/* Revision    :                                                              */
+/******************************************************************************/
+/*EBE151114: Not used
+int     Get_terminal_data(
+	int 	  nIndexCtx,
+TSIsoInfo *IsoInfo,
+int     action_code)
+{
+	char            tmpField				[LG_MAX];
+	char            term_nbr                [19];
+	char            outlet_nbr              [18];
+	char            acquirer_bank           [ 7];
+	char            card_acc                [43];
+	char            country_code            [ 4];
+	int             tpk_number ;
+	int             mcc;
+	int             lgField;
+	int     		retour;
+
+	trace_event("Start Get_terminal_data()",  PROCESSING);
+
+	memset(term_nbr,      0, sizeof(term_nbr)     );
+	memset(card_acc,      0, sizeof(card_acc)     );
+	memset(outlet_nbr,    0, sizeof(outlet_nbr)   );
+	memset(country_code,  0, sizeof(country_code) );
+	memset(acquirer_bank, 0, sizeof(acquirer_bank));
+	tpk_number  = 0;
+
+
+
+	GetIsoField( ISO_TERMINAL_NBR, IsoInfo, term_nbr, &lgField);
+
+	retour = get_terminal_info(nIndexCtx,
+		term_nbr,
+		acquirer_bank,
+		outlet_nbr,
+		acquirer_bank,
+		&mcc,
+		country_code,
+		card_acc,
+		&tpk_number);
+	if (retour != OK)
+	{
+		if (retour == MALFUNCTION)
+		{
+			action_code = SYSTEM_MALFUNCTION;
+			trace_event("End   Get_terminal_data(GET_TERMINAL_INFO MALFUNCTION)",  PROCESSING);
+		}
+		if (retour == NOK)
+		{
+			action_code = BAD_MERCHANT;
+			trace_event("End   Get_terminal_data(GET_TERMINAL_INFO NOK)",  PROCESSING);
+		}
+	}
+
+
+	sprintf(tmpField, "%03d", action_code);
+	PutIsoField(ISO_RESPONSE_CODE, IsoInfo, tmpField, 3);
+
+	sprintf(tmpField, "%04d", mcc);
+	PutIsoField(ISO_MERCHANT_TYPE, IsoInfo, tmpField, 4);
+
+	PutIsoField(ISO_ACQR_COUNTRY, IsoInfo, country_code, 3);
+
+	if (GetIsoField( ISO_ACQR_ID, IsoInfo, tmpField, &lgField) != SUCCES)
+	{
+		PutIsoField( ISO_ACQR_ID, IsoInfo, acquirer_bank, strlen(acquirer_bank));
+	}
+
+	if (GetIsoField( ISO_TERMINAL_ADR, IsoInfo, tmpField, &lgField) != SUCCES)
+	{
+		PutIsoField( ISO_TERMINAL_ADR, IsoInfo, card_acc, strlen(card_acc));
+	}
+
+	if (GetIsoField( ISO_OUTLET_NBR, IsoInfo, tmpField, &lgField) != SUCCES)
+	{
+		PutIsoField( ISO_OUTLET_NBR, IsoInfo,outlet_nbr , 15) ;
+	}
+
+	trace_event("End   Get_terminal_data(OK)",  PROCESSING);
+	return(OK);
+}
+*/
+
+
+
+

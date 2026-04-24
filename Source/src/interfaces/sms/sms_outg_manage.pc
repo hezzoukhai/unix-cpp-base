@@ -1,0 +1,165 @@
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <event_auth.h>
+#include <tlv_autho.h>
+#include <tlv_fields.h>
+#include <list_thr.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+/**********************************************************************/
+/** GetOutgoingData :                                                **/
+/** Entree : char *sFlagSend                                         **/
+/** Sortie : char *sTlvBuffer                                        **/
+/**********************************************************************/
+int GetOutgoingData  ( int nIndiceCtx , char *sFlagSend, char *sTlvBuffer )
+{
+        struct sqlca sqlca;
+        char sLine               [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         T_tlv_auth        [ LG_MAX + 1];
+        VARCHAR         T_tlv_warning     [ 6 + 1];
+        char            T_FLAG_SEND       [ 1 + 1 ];
+        int             response_code;
+        EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+/*    trace_event ( "Start GetOutgoingData () ", PROCESSING );*/
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+        memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+        T_tlv_auth.len = 0;
+
+        memset ( T_tlv_warning.arr         ,  0  ,   sizeof(T_tlv_warning.arr )  );
+        T_tlv_warning.len = 0;
+
+        memset ( T_FLAG_SEND               ,  0  ,  sizeof(T_FLAG_SEND )  ); 
+
+/****************************************************************************/
+/*      AFFECTATION                                                         */
+/****************************************************************************/
+
+        memcpy ( T_FLAG_SEND  ,        sFlagSend,       1);
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                        */
+/****************************************************************************/
+        response_code = SYSTEM_MALFUNCTION;
+        EXEC SQL WHENEVER SQLERROR GOTO err_GetOutgoingData;
+
+        EXEC SQL EXECUTE
+        BEGIN
+
+        :response_code := PCRD_SMS_OUTGOING_MNG.GET_OUTGOING_DATA( :T_FLAG_SEND,
+                                                                   :T_tlv_auth,
+                                                                   :T_tlv_warning);
+        END;
+        END-EXEC;
+
+        if ( response_code == OK )
+        {
+             memcpy ( sTlvBuffer, T_tlv_auth.arr,   T_tlv_auth.len  );
+             trace_event ( "End GetOutgoingData( OK ) ", PROCESSING );
+             return(OK);
+        }
+
+        sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+        if (memcmp(sLine,"ORA-01405",9) == 0)
+            return(OK);
+
+        trace_event (  sLine , ERROR );
+        trace_event ( "End GetOutgoingData( NOK ) ", PROCESSING );
+        return(NOK);
+
+err_GetOutgoingData :
+        EXEC SQL WHENEVER SQLERROR CONTINUE;
+        sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+        if (memcmp(sLine,"ORA-01405",9) != 0)
+        {
+            trace_event ( sLine , ERROR );
+            trace_event ( "End  GetOutgoingData( MALFUNCTION ) ", PROCESSING );
+        }
+        return (NOK);
+}
+
+/**********************************************************************/
+/** UpdateOutgoingData :                                             **/
+/** Entree : char *sFlagSend                                         **/
+/**          char *sTlvBuffer                                        **/
+/**********************************************************************/
+int UpdateOutgoingData  ( int nIndiceCtx , char *sFlagSend, char *sTlvBuffer )
+{
+        struct sqlca sqlca;
+        char sLine               [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        VARCHAR         T_tlv_auth        [ LG_MAX + 1];
+        char            T_FLAG_SEND       [ 1 + 1 ];
+        int             response_code;
+        EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+    sprintf ( sLine, "Start UpdateOutgoingData (%s) ", sFlagSend );
+    trace_event ( sLine, PROCESSING );
+    PrintTlvBuffer (  sTlvBuffer );
+
+/****************************************************************************/
+/*      INITIALISATION                                                      */
+/****************************************************************************/
+
+        memset ( T_tlv_auth.arr            ,  0  ,   sizeof(T_tlv_auth.arr )  );
+        T_tlv_auth.len = 0;
+
+        memset ( T_FLAG_SEND               ,  0  ,  sizeof(T_FLAG_SEND )  );
+
+/****************************************************************************/
+/*      AFFECTATION                                                         */
+/****************************************************************************/
+        memcpy ( T_tlv_auth.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+        T_tlv_auth.len = strlen(sTlvBuffer );
+
+        memcpy ( T_FLAG_SEND  ,        sFlagSend,       1);
+
+/****************************************************************************/
+/*      Appel PL/SQL                                                        */
+/****************************************************************************/
+        response_code = SYSTEM_MALFUNCTION;
+        EXEC SQL WHENEVER SQLERROR GOTO err_UpdateOutgoingData;
+
+        EXEC SQL EXECUTE
+        BEGIN
+
+        :response_code := PCRD_SMS_OUTGOING_MNG.DELETE_OUTGOING_DATA( :T_FLAG_SEND,
+                                                                      :T_tlv_auth);
+        IF( :response_code = declaration_cst.OK )
+        THEN
+                COMMIT;
+        END IF;
+
+        END;
+        END-EXEC;
+
+        sprintf(sLine,"End   UpdateOutgoingData (%d)", response_code);
+        trace_event(sLine,PROCESSING);
+        return(response_code);
+
+err_UpdateOutgoingData :
+        EXEC SQL WHENEVER SQLERROR CONTINUE;
+        sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+        trace_event (  sLine , ERROR );
+        trace_event("End   UpdateOutgoingData (SYSTEM_MALFUNCTION)", PROCESSING);
+        return( SYSTEM_MALFUNCTION );
+}
+

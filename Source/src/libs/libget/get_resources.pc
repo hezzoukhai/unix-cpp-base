@@ -1,0 +1,396 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <resources.h>
+
+/*YK10072006*/
+#include <signal.h>
+#include <queue.h>
+/*YK10072006*/
+
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetResources  (int nIndiceCtx, TSResources *resources)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	long    		IPC_CRITICAL_LEVEL_NB_MSG;
+ 	int    			IPC_CRITICAL_PERCENT_FREESPACE;
+ 	int    			UFS_CRITICAL_PERCENT_FREESPACE;
+ 	long    		UFS_CRITICAL_SIZE_FREESPACE;
+ 	int    			DBTS_CRITICAL_COUNT_EXTENT;
+ 	char   			RESOURCE_ID 	[ 6  + 1 ];
+ 	char   			RESOURCE_CODE 	[ 2  + 1 ];
+	char   			NODE_ID 		[ 4  + 1 ];			/*EBE140708*/
+    VARCHAR         RESOURCE_NAME   [ 16  + 1 ];
+ 	VARCHAR   		COMPONENT_TYPE 	[ 4  + 1 ];
+ 	char   			STATUS [1 + 1 ];
+ 	char   			SUBJECT_OF_SUPERVISE [ 1 + 1 ];
+ 	VARCHAR   		OBJECT_NAME [ 60 + 1 ];
+ 	VARCHAR   		PRIS_OBJECT_PATH [60 + 1 ];
+ 	VARCHAR   		PRIS_START_SCRIPT_NAME [ 40 + 1 ];
+ 	VARCHAR   		PRIS_START_SCRIPT_PATH [ 60 + 1 ];
+ 	VARCHAR   		PRIS_STOP_SCRIPT_NAME [ 40 + 1 ];
+ 	VARCHAR   		PRIS_STOP_SCRIPT_PATH [ 60 + 1 ];
+ 	char   			PRIS_SUBJECT_OF_AUTO_START [ 1 + 1 ];
+ 	char   			PRIS_SUPPORT_ADM_MESSAGE [ 1 + 1 ];
+ 	char   			PRIS_COMMS_ID [ 2 + 1 ];
+ 	char   			PRIS_CONNECT_MODE [ 1 + 1 ];
+ 	VARCHAR   		PRIS_DEVICE_NAME [ 64 + 1 ];
+ 	VARCHAR   		PRIS_REMOTE_APPLICATION_NAME [ 64 + 1 ];
+ 	VARCHAR   		PRIS_REMOTE_APPLICATION_ID [ 64 + 1 ];
+ 	VARCHAR   		PRIS_LOCAL_APPLICATION_NAME [ 64 + 1 ];
+ 	VARCHAR   		PRIS_LOCAL_APPLICATION_ID [ 64 + 1 ];
+ 	VARCHAR   		PRIS_LOG_FILE_NAME [ 20 + 1 ]; 
+ 	int    			PRIS_LOG_MAX_SIZE;
+ 	int    			PRIS_START_CYCLE;
+ 	int    			PRIS_END_CYCLE;
+ 	char   			PRIS_TRACE_LEVEL [ 1 + 1 ];
+ 	int    			PRIS_NB_STATIC_THREADS;
+ 	int    			PRIS_NB_USER_THREADS_VS_KERNEL;
+ 	int    			PRIS_TIMER_ACQUIRER;
+ 	int    			PRIS_DELTA_TIMER_ISS_ACQ;
+ 	long    		PRIS_ECHO_TEST_TIMER;
+ 	int    			PRIS_TRANSACTION_SIM_MAX;
+ 	char   			PRIS_GEN_REVERSAL_TIMEOUT_LATE [ 1 + 1 ];
+ 	int    			PRIS_CURRENT_CYCLE;
+ 	char   			RESOURCE_LIVE [ 1 + 1 ];
+ 	char   			PRIS_PROCESSING_STEP [ 3 + 1 ];
+ 	char   			PRIS_BANK_CODE       [ 6 + 1 ];
+ 	VARCHAR   		PRIS_INTERNAL_ID [ 32 + 1 ];
+ 	pid_t    		PRIS_PID;
+ 	pid_t    		PRIS_PPID;
+	/**MKB140108 Insure **/
+ 	int    			PRIS_MIN_TROUBLES_IND; 
+ 	int    			PRIS_MAX_TROUBLES_IND; 
+ 	char   			PRIS_PROTOCOL_ID     [ 2 + 1 ];
+        /**end MKB140108*/
+	int				response_code;
+	EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	fprintf ( stderr, "Start GetResources() \n" );
+ 	memset (   RESOURCE_ID  	, 0 ,  sizeof ( RESOURCE_ID ));
+ 	memset (   RESOURCE_CODE  	, 0 ,  sizeof(RESOURCE_CODE) );
+	memset (   NODE_ID  	, 0 ,  sizeof(NODE_ID) );
+ 	COMPONENT_TYPE.len  	    = 0 ;
+ 	memset (   COMPONENT_TYPE.arr  	, 0 ,  sizeof ( COMPONENT_TYPE.arr));
+    RESOURCE_NAME.len       = 0 ;
+    memset (   RESOURCE_NAME.arr    , 0 ,  sizeof ( RESOURCE_NAME.arr));
+ 	memset (   STATUS 		, 0 , sizeof(STATUS) );
+ 	memset (   SUBJECT_OF_SUPERVISE 		, 0 , sizeof(SUBJECT_OF_SUPERVISE) );
+
+ 	memset (   OBJECT_NAME.arr ,  0 ,  sizeof ( OBJECT_NAME.arr ));
+ 	OBJECT_NAME.len =  0;
+
+ 	memset (   PRIS_OBJECT_PATH.arr , 0 , sizeof (PRIS_OBJECT_PATH.arr ));
+ 	PRIS_OBJECT_PATH.len = 0 ;
+
+ 	IPC_CRITICAL_LEVEL_NB_MSG = 0;
+ 	IPC_CRITICAL_PERCENT_FREESPACE = 0;
+ 	UFS_CRITICAL_PERCENT_FREESPACE = 0;
+ 	UFS_CRITICAL_SIZE_FREESPACE = 0;
+ 	DBTS_CRITICAL_COUNT_EXTENT = 0;
+ 	PRIS_START_SCRIPT_NAME.len =0 ;
+ 	memset (   PRIS_START_SCRIPT_NAME.arr, 0 , sizeof(PRIS_START_SCRIPT_NAME.arr) );
+ 	PRIS_START_SCRIPT_PATH.len = 0 ;
+ 	memset (   PRIS_START_SCRIPT_PATH.arr, 0 , sizeof(PRIS_START_SCRIPT_PATH.arr) );
+ 	PRIS_STOP_SCRIPT_NAME.len = 0 ;
+ 	memset (   PRIS_STOP_SCRIPT_NAME.arr , 0 , sizeof( PRIS_STOP_SCRIPT_NAME.arr) );
+ 	PRIS_STOP_SCRIPT_PATH.len = 0 ;
+ 	memset (   PRIS_STOP_SCRIPT_PATH.arr , 0 , sizeof(PRIS_STOP_SCRIPT_PATH.arr) );
+ 	memset (   PRIS_SUBJECT_OF_AUTO_START , 0, sizeof(PRIS_SUBJECT_OF_AUTO_START) );
+ 	memset (   PRIS_SUPPORT_ADM_MESSAGE , 0, sizeof(PRIS_SUPPORT_ADM_MESSAGE) );
+ 	memset (   PRIS_COMMS_ID , 0, sizeof(PRIS_COMMS_ID) );
+ 	memset (   PRIS_CONNECT_MODE , 0, sizeof(PRIS_CONNECT_MODE) );
+ 	PRIS_DEVICE_NAME.len = 0;
+ 	memset (   PRIS_DEVICE_NAME.arr , 0, sizeof(PRIS_DEVICE_NAME.arr));
+ 	PRIS_REMOTE_APPLICATION_NAME.len =0; 
+ 	memset (   PRIS_REMOTE_APPLICATION_NAME.arr ,0, 
+				sizeof ( PRIS_REMOTE_APPLICATION_NAME.arr));
+ 	PRIS_REMOTE_APPLICATION_ID.len =  0; 
+ 	memset (   PRIS_REMOTE_APPLICATION_ID.arr ,  0, 
+				sizeof ( PRIS_REMOTE_APPLICATION_ID.arr ));
+ 	PRIS_LOCAL_APPLICATION_NAME.len = 0; 
+ 	memset (   PRIS_LOCAL_APPLICATION_NAME.arr , 0, 
+				sizeof ( PRIS_LOCAL_APPLICATION_NAME.arr ));
+ 	PRIS_LOCAL_APPLICATION_ID.len =   0; 
+ 	memset (   PRIS_LOCAL_APPLICATION_ID.arr ,   0, 
+				sizeof ( PRIS_LOCAL_APPLICATION_ID.arr ));
+ 	PRIS_LOG_FILE_NAME.len        =   0; 
+ 	memset (   PRIS_LOG_FILE_NAME.arr        ,   0, 
+				sizeof ( PRIS_LOG_FILE_NAME.arr ));
+ 	PRIS_LOG_MAX_SIZE = 0;
+ 	PRIS_START_CYCLE = 0;
+ 	PRIS_END_CYCLE = 0;
+ 	memset (   PRIS_TRACE_LEVEL , 0, sizeof(PRIS_TRACE_LEVEL) );
+ 	PRIS_NB_STATIC_THREADS = 0;
+ 	PRIS_NB_USER_THREADS_VS_KERNEL = 0;
+ 	PRIS_TIMER_ACQUIRER = 0;
+ 	PRIS_DELTA_TIMER_ISS_ACQ = 0;
+ 	PRIS_ECHO_TEST_TIMER = 0;
+ 	PRIS_TRANSACTION_SIM_MAX = 0;
+ 	memset (   PRIS_GEN_REVERSAL_TIMEOUT_LATE , 0, sizeof(PRIS_GEN_REVERSAL_TIMEOUT_LATE) );
+ 	PRIS_CURRENT_CYCLE = 0;
+ 	memset (   RESOURCE_LIVE , 0, sizeof(RESOURCE_LIVE) );
+ 	memset (   PRIS_PROCESSING_STEP , 0, sizeof(PRIS_PROCESSING_STEP) );
+ 	PRIS_INTERNAL_ID.len  = 0;
+ 	memset (   PRIS_INTERNAL_ID.arr  , 0, sizeof ( PRIS_INTERNAL_ID.arr ));
+ 	memset (   PRIS_BANK_CODE        , 0, sizeof ( PRIS_BANK_CODE ));
+ 	PRIS_PID = 0;
+ 	PRIS_PPID = 0;
+	/**MKB140108 Insure*/
+ 	PRIS_MIN_TROUBLES_IND = 0;
+ 	PRIS_MAX_TROUBLES_IND = 0;
+ 	memset (   PRIS_PROTOCOL_ID        , 0, sizeof ( PRIS_PROTOCOL_ID ));
+
+/****************************************************************************/
+/*******   CHAMP CLE ********************************************************/
+/****************************************************************************/
+
+	memcpy ( RESOURCE_ID   , resources->resource_id , 6);
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_resources;
+	EXEC SQL EXECUTE
+	    DECLARE T_RESOURCES   RESOURCES%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_PARAM_GENERAL_ROWS.GET_RESOURCES ( :RESOURCE_ID, 
+	                                             					  T_RESOURCES);
+
+
+
+  IF :response_code = 0 THEN
+
+ 	:RESOURCE_CODE  	      := NVL ( T_RESOURCES.RESOURCE_CODE , LPAD (' ' , 2 ));
+ 	:RESOURCE_NAME           := NVL ( T_RESOURCES.ABRV_WORDING  , LPAD (' ' , 16 ));
+	:NODE_ID			     := NVL( T_RESOURCES.NODE_ID , LPAD (' ' ,4 ));
+ 	:COMPONENT_TYPE 		  := NVL ( T_RESOURCES.COMPONENT_TYPE , LPAD (' ' ,4 ));
+ 	:STATUS 				  := NVL ( T_RESOURCES.STATUS , LPAD (' ' , 1 ));
+ 	:SUBJECT_OF_SUPERVISE 	  := NVL ( T_RESOURCES.SUBJECT_OF_SUPERVISE , LPAD (' ' , 1 ));
+ 	:OBJECT_NAME     		  := NVL ( T_RESOURCES.OBJECT_NAME,LPAD(' ' , 60 ) );
+ 	:PRIS_OBJECT_PATH 		  := NVL ( T_RESOURCES.PRIS_OBJECT_PATH,LPAD(' ', 60));
+ 	:PRIS_START_SCRIPT_NAME  := NVL ( T_RESOURCES.PRIS_START_SCRIPT_NAME, LPAD (' ' , 40 ));
+ 	:PRIS_START_SCRIPT_PATH  := NVL ( T_RESOURCES.PRIS_START_SCRIPT_PATH , LPAD (' ' , 60 ));
+ 	:PRIS_STOP_SCRIPT_NAME   := NVL ( T_RESOURCES.PRIS_STOP_SCRIPT_NAME , LPAD (' ' , 40 ));
+ 	:PRIS_STOP_SCRIPT_PATH  	 := NVL ( T_RESOURCES.PRIS_STOP_SCRIPT_PATH , LPAD (' ' , 60 ));
+ 	:PRIS_SUBJECT_OF_AUTO_START := NVL ( T_RESOURCES.PRIS_SUBJECT_OF_AUTO_START , LPAD (' ' , 1 ));
+ 	:PRIS_SUPPORT_ADM_MESSAGE 	 := NVL ( T_RESOURCES.PRIS_SUPPORT_ADM_MESSAGE , LPAD (' ' , 1 ));
+ 	:PRIS_START_CYCLE 		     := NVL ( T_RESOURCES.PRIS_START_CYCLE ,  -1 );
+ 	:PRIS_END_CYCLE 		     := NVL ( T_RESOURCES.PRIS_END_CYCLE ,  -1);
+ 	:PRIS_ECHO_TEST_TIMER 		 := NVL ( T_RESOURCES.PRIS_ECHO_TEST_TIMER , -1);
+ 	:PRIS_TRANSACTION_SIM_MAX 	 := NVL ( T_RESOURCES.PRIS_TRANSACTION_SIM_MAX,-1);
+ 	:PRIS_CURRENT_CYCLE 		 := NVL ( T_RESOURCES.PRIS_CURRENT_CYCLE,-1);
+ 	:PRIS_INTERNAL_ID 		 := NVL ( T_RESOURCES.PRIS_INTERNAL_ID,LPAD (' ',32 ));
+ 	:PRIS_LOG_FILE_NAME 	 := NVL ( T_RESOURCES.PRIS_LOG_FILE_NAME , LPAD (' ' , 20 ));
+ 	:PRIS_LOG_MAX_SIZE  	 := NVL ( T_RESOURCES.PRIS_LOG_MAX_SIZE , -1 );
+ 	:PRIS_TRACE_LEVEL 		 := NVL ( T_RESOURCES.PRIS_TRACE_LEVEL , LPAD (' ' , 1 ));
+ 	:PRIS_COMMS_ID  		 := NVL ( T_RESOURCES.PRIS_COMMS_ID , LPAD (' ' , 2 ));
+ 	:PRIS_CONNECT_MODE  	 := NVL ( T_RESOURCES.PRIS_CONNECT_MODE , LPAD (' ' , 1 ));
+ 	:PRIS_DEVICE_NAME 		 := NVL ( T_RESOURCES.PRIS_DEVICE_NAME , LPAD (' ' , 64 ));
+ 	:PRIS_REMOTE_APPLICATION_NAME 	 := NVL(T_RESOURCES.PRIS_REMOTE_APPLICATION_NAME , LPAD ( ' ' ,  64 ));
+ 	:PRIS_REMOTE_APPLICATION_ID 	 := NVL(T_RESOURCES.PRIS_REMOTE_APPLICATION_ID , LPAD ( ' ' ,  64 ));
+ 	:PRIS_LOCAL_APPLICATION_NAME  	 := NVL(T_RESOURCES.PRIS_LOCAL_APPLICATION_NAME, LPAD (' ' ,  64 ));
+ 	:PRIS_LOCAL_APPLICATION_ID  	 := NVL ( T_RESOURCES.PRIS_LOCAL_APPLICATION_ID, LPAD (' ' ,  64 ));
+ 	:PRIS_NB_STATIC_THREADS 	 := NVL ( T_RESOURCES.PRIS_NB_STATIC_THREADS , -1 );
+ 	:PRIS_NB_USER_THREADS_VS_KERNEL := NVL ( T_RESOURCES.PRIS_NB_USER_THREADS_VS_KERNEL , -1 );
+ 	:PRIS_TIMER_ACQUIRER  		 := NVL ( T_RESOURCES.PRIS_TIMER_ACQUIRER , -1 );
+ 	:PRIS_DELTA_TIMER_ISS_ACQ 	 := NVL ( T_RESOURCES.PRIS_DELTA_TIMER_ISS_ACQ ,-1);
+ 	:PRIS_GEN_REVERSAL_TIMEOUT_LATE := NVL ( T_RESOURCES.PRIS_GEN_REVERSAL_TIMEOUT_LATE , LPAD ( ' ' ,  1 ));
+ 	:RESOURCE_LIVE  		 := NVL ( T_RESOURCES.RESOURCE_LIVE , LPAD(' ' ,  1 ));
+ 	:PRIS_PROCESSING_STEP 		 := NVL ( T_RESOURCES.PRIS_PROCESSING_STEP , LPAD ( ' ' ,  3 ));
+ 	:PRIS_PID 			     := NVL ( T_RESOURCES.PRIS_PID , -1 );
+ 	:PRIS_BANK_CODE 		 := NVL ( T_RESOURCES.PRIS_BANK_CODE , LPAD(' ' ,6));
+         /**MKB140108 Insure **/
+ 	:PRIS_MIN_TROUBLES_IND  		 := NVL ( T_RESOURCES.PRIS_MIN_TROUBLES_IND , -1 );
+ 	:PRIS_MAX_TROUBLES_IND  		 := NVL ( T_RESOURCES.PRIS_MAX_TROUBLES_IND , -1 );
+ 	:PRIS_PROTOCOL_ID 		 := NVL ( T_RESOURCES.PRIS_PROTOCOL_ID , LPAD(' ' ,2));
+   END IF;
+END;
+END-EXEC;
+
+
+ if ( response_code == 0 )
+ {
+	memcpy(resources->resource_code, RESOURCE_CODE, 2); 
+	resources->resource_code[2] = '\0';
+	memcpy(resources->node_id, NODE_ID, 4); 
+	resources->node_id[4] = '\0';
+	memcpy ( resources->resource_name,RESOURCE_NAME.arr,RESOURCE_NAME.len );
+		resources->resource_name[ RESOURCE_NAME.len ] = 0;
+	memcpy ( resources->component_type,COMPONENT_TYPE.arr,COMPONENT_TYPE.len );
+		resources->component_type [ COMPONENT_TYPE.len ] = 0;
+	memcpy ( resources->status ,    STATUS 		,  1 );
+	memcpy ( resources->subject_of_supervise , SUBJECT_OF_SUPERVISE , 1 );
+	memcpy ( resources->object_name ,   OBJECT_NAME.arr ,  OBJECT_NAME.len );
+	resources->object_name [ OBJECT_NAME.len ] = 0;
+	memcpy(resources->pris_object_path,PRIS_OBJECT_PATH.arr,PRIS_OBJECT_PATH.len);
+	resources->pris_object_path[PRIS_OBJECT_PATH.len] = 0;
+  resources->ipc_critical_level_nb_msg = IPC_CRITICAL_LEVEL_NB_MSG;
+  resources->ipc_critical_percent_freespace = IPC_CRITICAL_PERCENT_FREESPACE;
+  resources->ufs_critical_percent_freespace = UFS_CRITICAL_PERCENT_FREESPACE;
+  resources->ufs_critical_size_freespace = UFS_CRITICAL_SIZE_FREESPACE;
+  resources->dbts_critical_count_extent = DBTS_CRITICAL_COUNT_EXTENT;
+
+  memcpy ( resources->pris_start_script_name , PRIS_START_SCRIPT_NAME.arr, 
+				  							PRIS_START_SCRIPT_NAME.len );
+  resources->pris_start_script_name [ PRIS_START_SCRIPT_NAME.len ] = 0;
+
+  memcpy ( resources->pris_start_script_path , PRIS_START_SCRIPT_PATH.arr, 
+											PRIS_START_SCRIPT_PATH.len );
+  resources->pris_start_script_path [ PRIS_START_SCRIPT_PATH.len ] = 0;
+
+  memcpy ( resources->pris_stop_script_name , PRIS_STOP_SCRIPT_NAME.arr , 
+				  								PRIS_STOP_SCRIPT_NAME.len );
+  resources->pris_stop_script_name [ PRIS_STOP_SCRIPT_NAME.len ] = 0;
+
+  memcpy ( resources->pris_stop_script_path , PRIS_STOP_SCRIPT_PATH.arr , 
+				  								PRIS_STOP_SCRIPT_PATH.len );
+  resources->pris_stop_script_path [ PRIS_STOP_SCRIPT_PATH.len ] = 0;
+
+  memcpy(resources->pris_subject_of_auto_start,PRIS_SUBJECT_OF_AUTO_START,1);
+  memcpy(resources->pris_support_adm_message , PRIS_SUPPORT_ADM_MESSAGE , 1 );
+  memcpy(resources->pris_comms_id ,  PRIS_COMMS_ID , 2);
+  memcpy(resources->pris_connect_mode,PRIS_CONNECT_MODE,1);
+  memcpy(resources->pris_device_name,PRIS_DEVICE_NAME.arr,PRIS_DEVICE_NAME.len);
+  resources->pris_device_name [ PRIS_DEVICE_NAME.len ] = 0;
+  trim(resources->pris_device_name,PRIS_DEVICE_NAME.len);
+
+  memcpy(resources->pris_remote_application_name,
+											PRIS_REMOTE_APPLICATION_NAME.arr ,
+			  								PRIS_REMOTE_APPLICATION_NAME.len );
+  resources->pris_remote_application_name[PRIS_REMOTE_APPLICATION_NAME.len]=0;
+  trim(resources->pris_remote_application_name,PRIS_REMOTE_APPLICATION_NAME.len);
+
+
+  memcpy(resources->pris_remote_application_id,PRIS_REMOTE_APPLICATION_ID.arr, 
+				 								PRIS_REMOTE_APPLICATION_ID.len);
+  resources->pris_remote_application_id[PRIS_REMOTE_APPLICATION_ID.len]=0;
+  trim(resources->pris_remote_application_id,PRIS_REMOTE_APPLICATION_ID.len);
+
+  memcpy(resources->pris_local_application_name,PRIS_LOCAL_APPLICATION_NAME.arr,
+				  							PRIS_LOCAL_APPLICATION_NAME.len );
+  resources->pris_local_application_name[ PRIS_LOCAL_APPLICATION_NAME.len ] = 0;
+  trim(resources->pris_local_application_name, PRIS_LOCAL_APPLICATION_NAME.len);
+
+  memcpy ( resources->pris_local_application_id , PRIS_LOCAL_APPLICATION_ID.arr,
+				  							PRIS_LOCAL_APPLICATION_ID.len );
+  resources->pris_local_application_id [ PRIS_LOCAL_APPLICATION_ID.len ] = 0;
+  trim(resources->pris_local_application_id,PRIS_LOCAL_APPLICATION_ID.len);
+
+  memcpy ( resources->pris_log_file_name , PRIS_LOG_FILE_NAME.arr        ,   
+				  							PRIS_LOG_FILE_NAME.len );
+  resources->pris_log_file_name[PRIS_LOG_FILE_NAME.len]=0;
+
+  resources->pris_log_max_size = PRIS_LOG_MAX_SIZE;
+  resources->pris_start_cycle  = PRIS_START_CYCLE;
+  resources->pris_end_cycle    = PRIS_END_CYCLE;
+  memcpy(resources->pris_trace_level, PRIS_TRACE_LEVEL,1);
+  resources->pris_nb_static_threads = PRIS_NB_STATIC_THREADS;
+  resources->pris_nb_user_threads_vs_kernel = PRIS_NB_USER_THREADS_VS_KERNEL;
+  resources->pris_timer_acquirer = PRIS_TIMER_ACQUIRER;
+  resources->pris_delta_timer_iss_acq = PRIS_DELTA_TIMER_ISS_ACQ;
+  resources->pris_echo_test_timer = PRIS_ECHO_TEST_TIMER;
+  resources->pris_transaction_sim_max = PRIS_TRANSACTION_SIM_MAX;
+  memcpy(resources->pris_gen_reversal_timeout_late,
+										PRIS_GEN_REVERSAL_TIMEOUT_LATE , 1 );
+  resources->pris_current_cycle = PRIS_CURRENT_CYCLE;
+  memcpy(resources->resource_live ,   RESOURCE_LIVE ,1);
+  memcpy(resources->pris_processing_step ,  PRIS_PROCESSING_STEP , 3 );
+  memcpy(resources->pris_internal_id,PRIS_INTERNAL_ID.arr,PRIS_INTERNAL_ID.len);
+  memcpy(resources->pris_bank_code,PRIS_BANK_CODE, 6 );
+  resources->pris_internal_id [ PRIS_INTERNAL_ID.len ] = 0;
+  resources->pris_pid  =   PRIS_PID ;
+  resources->pris_ppid =   PRIS_PPID;
+
+  /**MKB140108 Insure*/
+  resources->pris_min_troubles_ind  =   PRIS_MIN_TROUBLES_IND ;
+  resources->pris_max_troubles_ind  =   PRIS_MAX_TROUBLES_IND;
+  memcpy(resources->pris_protocol_id,PRIS_PROTOCOL_ID, 2 );
+  /**end MKB140108**/
+
+  /*YK10072006: empty queue for the old pid*/
+  /*EBE141229: GetResource may be called in the middle of processing. so do this action explicitly in InitModule()
+  EmptyQueue(nBalMsg, resources->pris_pid);
+  EmptyQueue(nBalAdm, resources->pris_pid);*/
+  /*kill ( resources->pris_pid , SIGKILL );*/ /*A ne pas faire, vu qu'on appels cette fonction aussi dans la fonction ReconnectInterface*/  
+  /*YK10072006: empty queue for the old pid*/
+
+
+  fprintf(stderr,"node_id :%s\n",resources->node_id);
+  fprintf ( stderr, "End   GetResources(OK) \n" );
+  return(OK);
+  }
+
+  fprintf(stderr,"End GetResources (NOK) :%s\n",sqlca.sqlerrm.sqlerrmc);
+  return(NOK);
+
+err_get_resources:
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+	fprintf(stderr,"End GetResources (NOK) :%s\n",sqlca.sqlerrm.sqlerrmc);
+	return( NOK );
+}
+
+
+int GetResourceNode  (int nIndiceCtx, char *sResourceId , char *sNodeId)
+{
+        struct sqlca sqlca;
+        char sLine [ MAX_LINE_TRC];
+
+        EXEC SQL BEGIN DECLARE SECTION;
+        char	T_resource_id[6 + 1];
+        char    T_node_id[4 + 1];
+        int     response_code;
+        EXEC SQL END DECLARE SECTION;
+
+  EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+        
+		sprintf(sLine,"Start GetResourceNode(%s)",sResourceId);
+        trace_event ( sLine, PROCESSING );
+
+       
+        memset ( T_resource_id      ,  0  ,   sizeof(T_resource_id));
+        memset ( T_node_id ,  0  ,   sizeof(T_node_id));
+        
+
+        strncpy ( T_resource_id , sResourceId , 6);
+        response_code = 909;
+
+        EXEC SQL WHENEVER SQLERROR GOTO err_get_res_node;
+        EXEC SQL EXECUTE
+        BEGIN
+
+        :response_code := PCRD_P7_FUNCTION_TOOLS.GET_RESOURCE_NODE(:T_resource_id,:T_node_id);
+
+        END;
+        END-EXEC;
+
+        if ( response_code == 0 )
+        {
+			memcpy(sNodeId,T_node_id,4);
+			sNodeId[4]='\0';
+			sprintf(sLine,"End GetResourceNode( OK )[%s]",sNodeId);
+			trace_event ( sLine, PROCESSING );
+			return(OK);
+        }
+        trace_event ( "End GetResourceNode( NOK ) ", PROCESSING );
+        return(NOK);
+
+err_get_res_node :
+        EXEC SQL WHENEVER SQLERROR CONTINUE;
+        sprintf(sLine, "%s",sqlca.sqlerrm.sqlerrmc);
+        trace_event (  sLine , ERROR );
+        trace_event ( "End GetResourceNode( NOK ) ", PROCESSING );
+        return( NOK );
+}

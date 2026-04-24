@@ -1,0 +1,476 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+/*#include <iso_hps.h>
+#include <event_auth.h>*/
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+#include <tlv_private.h>
+#include <tlv_fields.h>
+
+
+
+int fetch_input_count  ( int nIndiceCtx ,char *pAcqBank , char  *OpCode, char* sServiceType, int *Utility_input_count )
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	
+	int       hUtility_input_count;
+	int		    response_code;
+	VARCHAR		T_service_type[1 + 1];
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	sprintf(sLine,"Start fetch_input_count [%s][%s])", OpCode,pAcqBank );
+	trace_event ( sLine, PROCESSING );
+
+	memset ( T_service_type.arr            ,  0  ,   sizeof(T_service_type.arr )  );
+	T_service_type.len = 0;
+
+	/****************************************************************************/
+	/*      Appel PL/SQL                                                       */
+	/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UbpInquiry;
+	EXEC SQL EXECUTE
+	BEGIN
+	:response_code := PCRD_UBP_TOOLS.GET_INPUT_COUNT( :pAcqBank , :OpCode,:T_service_type, :hUtility_input_count  ); 
+	END;
+	END-EXEC;
+	
+	if( response_code == OK )
+	{
+		*Utility_input_count  = hUtility_input_count;
+		sServiceType[0] = T_service_type.arr[0];
+	}
+	else
+	{
+		*Utility_input_count  = 0;
+	}
+
+
+
+	sprintf(sLine,"End   fetch_input_count (%d, count(%d))", response_code, *Utility_input_count);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+	err_UbpInquiry :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End fetch_input_count (SYSTEM_MALFUNCTION)", PROCESSING);
+	trace_event("DETAILS", PROCESSING);
+	
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+int fetch_input_screen  (			int nIndiceCtx , 								
+									char *pAcqBank, 
+									char *Utility_id, 
+									int input_number, 
+									char *pTransLang , 
+									char *pInputScreen, 
+									char* input_type)
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR   	T_pInputScreen	  [ 3 + 1]; 	
+	VARCHAR   	T_pTransLang	  [ 12 + 1];
+	VARCHAR   	T_pInputType	  [ 1 + 1]; 
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	sprintf(sLine,"Start fetch_input_screen [%s])", Utility_id); 
+	trace_event ( sLine, PROCESSING );
+
+	/****************************************************************************/
+	/*      INITIALISATION                                                      */
+	/****************************************************************************/
+	memset ( T_pInputScreen.arr            ,  0  ,   sizeof(T_pInputScreen.arr )  );
+	T_pInputScreen.len = 0;
+	
+	memset ( T_pTransLang.arr            ,  0  ,   sizeof(T_pTransLang.arr )  );
+	T_pTransLang.len = 0; 
+
+	memset ( T_pInputType.arr            ,  0  ,   sizeof(T_pInputType.arr )  );
+	T_pInputType.len = 0; 
+
+	memcpy ( T_pTransLang.arr     ,  pTransLang   ,   strlen(pTransLang )  );
+	T_pTransLang.len = strlen(pTransLang );
+	
+	/****************************************************************************/
+	/*      Appel PL/SQL                                                       */
+	/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_UbpInquiry;
+	EXEC SQL EXECUTE 
+	BEGIN
+	:response_code := PCRD_UBP_TOOLS.GET_INPUT_SCREEN(	:pAcqBank , 															
+	:Utility_id, 
+	:input_number, 
+	:T_pTransLang,
+	:T_pInputScreen,																	
+	:T_pInputType ); 
+	END;
+	END-EXEC;
+	
+	if( response_code == OK )
+	{ 
+		memcpy(pInputScreen, T_pInputScreen.arr, 3);
+		input_type[0] = T_pInputType.arr[0];
+	}
+	
+
+	sprintf(sLine,"End fetch_input_screen (%d: scr:[%s], action [%c])", response_code,pInputScreen,input_type[0]);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+	err_UbpInquiry :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End fetch_input_screen (SYSTEM_MALFUNCTION)", PROCESSING);
+	trace_event("DETAILS", PROCESSING);
+	
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+int get_utility_by_oc  (			int nIndiceCtx , 
+						char *plProfileCode,
+						char *pAcqBank, 
+						int pOp_code,
+						char *pMaster_idx,
+						char *pUtility_id									
+							) 
+{
+	struct sqlca sqlca; 
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR   	T_pUtility_id	  [ 30 + 1]; 
+	VARCHAR   	T_pOp_code	      [ 4 + 1]; 
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	sprintf(sLine,"Start get_utility_by_oc [%d] plProfileCode[%s])", pOp_code,plProfileCode);
+	trace_event ( sLine, PROCESSING );
+
+	/****************************************************************************/
+	/*      INITIALISATION                                                      */
+	/****************************************************************************/
+	memset ( T_pUtility_id.arr            ,  0  ,   sizeof(T_pUtility_id.arr )  );
+	T_pUtility_id.len = 0;
+	memset ( T_pOp_code.arr            ,  0  ,   sizeof(T_pOp_code.arr )  );
+	T_pOp_code.len = 0;
+	/****************************************************************************/
+	/*      Appel PL/SQL                                                       */
+	/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	sprintf(T_pOp_code.arr, "%d",pOp_code ); 
+	T_pOp_code.len = 4;
+	
+	EXEC SQL WHENEVER SQLERROR GOTO err_UbpInquiry;
+	EXEC SQL EXECUTE
+	BEGIN 
+	:response_code := PCRD_UBP_TOOLS.GET_UTILITY_BY_OC(	:pAcqBank , 
+	:plProfileCode,
+	:T_pOp_code,
+	:pMaster_idx,
+	:T_pUtility_id ); 
+	END; 
+	END-EXEC;
+	
+	if( response_code == OK ) 
+	{
+		memcpy(pUtility_id, T_pUtility_id.arr, T_pUtility_id.len);
+	}
+
+
+	sprintf(sLine,"End get_utility_by_oc (len:%d: Utility_id:[%s])", T_pUtility_id.len,pUtility_id);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+	err_UbpInquiry :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End get_utility_by_oc (SYSTEM_MALFUNCTION)", PROCESSING);
+	trace_event("DETAILS", PROCESSING);
+	
+	return( SYSTEM_MALFUNCTION );
+}
+
+
+
+
+/*-------------GENERIC UBP ENQUIRY---------*/
+
+int UbpInquiry_Serv  ( int nIndiceCtx , char *sTlvBuffer )
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR   	T_tlv_bal	  [ LG_MAX + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start UbpInquiry_Serv () ", PROCESSING );
+
+	return OK;
+	/****************************************************************************/
+	/*      INITIALISATION                                                      */
+	/****************************************************************************/
+
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  );
+	T_tlv_bal.len = 0;
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_bal.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_bal.len = strlen(sTlvBuffer );
+
+
+	/****************************************************************************/
+	/*      Appel PL/SQL                                                       */
+	/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_Ubp;
+	EXEC SQL EXECUTE
+	BEGIN
+
+	:response_code := PCRD_UBP_WEB_SERVICES.UTILITY_ENQUIRY(  :T_tlv_bal  ); 
+	
+	END;
+	END-EXEC;
+	
+	tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  );
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine,"End UbpInquiry_Serv (%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+	err_Ubp :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End UbpInquiry_Serv (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}/* End UbpInquiry_Serv */
+
+
+
+/*************************************PAYMENT***********************************/
+
+
+/*-------------GENERIC UBP PAYMENT---------*/
+
+int UbpPayment_Serv  ( int nIndiceCtx , char *sTlvBuffer )
+{
+	struct sqlca sqlca;
+	char sLine 		 [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	VARCHAR   	T_tlv_bal	  [ LG_MAX + 1];
+	int		    response_code;
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start UbpPayment_Serv () ", PROCESSING );
+
+	
+
+	/****************************************************************************/
+	/*      INITIALISATION                                                      */
+	/****************************************************************************/
+
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  );
+	T_tlv_bal.len = 0;
+
+
+
+	/*PADSS*/
+	P7_DB_PREPROC_TLV_BUF(sTlvBuffer)
+
+	memcpy ( T_tlv_bal.arr     ,  sTlvBuffer   ,   strlen(sTlvBuffer )  );
+	T_tlv_bal.len = strlen(sTlvBuffer );
+
+
+	/****************************************************************************/
+	/*      Appel PL/SQL                                                       */
+	/****************************************************************************/
+	response_code = SYSTEM_MALFUNCTION;
+	EXEC SQL WHENEVER SQLERROR GOTO err_Ubp;
+	EXEC SQL EXECUTE
+	BEGIN
+
+	:response_code := PCRD_UBP_WEB_SERVICES.UTILITY_PAYMENT(  :T_tlv_bal  ); 
+	
+	END;
+	END-EXEC;
+	
+	tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  );
+	/*PADSS*/
+	P7_DB_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine,"End UbpPayment_Serv (%d)", response_code);
+	trace_event(sLine,PROCESSING);
+	return(response_code);
+
+	err_Ubp :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	tlvcpy( sTlvBuffer , T_tlv_bal.arr, T_tlv_bal.len);
+	memset ( T_tlv_bal.arr            ,  0  ,   sizeof(T_tlv_bal.arr )  );
+	/*PADSS*/
+	P7_DB_EXCP_POSTPROC_TLV_BUF(sTlvBuffer)
+
+	sprintf(sLine, "%.40s",sqlca.sqlerrm.sqlerrmc);
+	trace_event (  sLine , ERROR );
+	trace_event("End UbpPayment_Serv (SYSTEM_MALFUNCTION)", PROCESSING);
+	return( SYSTEM_MALFUNCTION );
+}/* End UbpPayment_Serv */
+
+
+/****************************************Reply Data**********************************/
+
+/*****************************************************************************/
+/* Fonction Get_UBP_ReplyData                                                     */
+/* ----------------------------------------                                  */
+/*  Fonction : La fonction Get_UBP_ReplyData() cherche l'etat suivant du GAB en se*/
+/*             basant                                                        */
+/*             sur le RESPONSE CODE, CURRENT TRANSACTION et NEXT TRANSACTION.*/
+/*             En consultant la table ATM_REPLY_SWITCH, si la fonction ne    */
+/*             trouve aucun enregistrement correspondant au triplet          */
+/*             (pRepCode, pCurTrn, pNextTrn), alors elle retourne le triplet*/
+/*             (NEXT_STATE, SCREEN_NUMBER, UPDATE_SCREEN_NUMBER) par defaut  */
+/*  Entree   : Le code reponse                                               */
+/*             Le code de la transaction courrante                           */
+/*             Le code de la prochaine transaction                           */
+/*  Sortie   : La next state                                                 */
+/*             La screen number                                              */
+/*             La update_screen_number                                       */ 
+/*  Retour   : OK                                                            */
+/*  Revision :                                                               */
+/*****************************************************************************/
+int     Get_UBP_ReplyData(nIndexCtx,
+/*NOT USED*/
+pRepCode,
+pCurTrn,
+pNextTrn,
+pTerminalNumber,
+pAcqBank,
+pNextState,
+pScrNbr,
+pUpScrNbr,
+Card_type_flag
+)
+int    nIndexCtx;
+int    pRepCode;
+int    pCurTrn;
+int    pNextTrn;
+char   *pTerminalNumber; /**IDA22012015**/
+char   *pAcqBank; /**IDA22012015**/
+char   *pNextState;
+char   *pScrNbr;
+char   *pUpScrNbr;
+char   *Card_type_flag;
+
+{
+	struct sqlca sqlca; /*MK 060606*/
+	char ligne[MAX_LINE_TRC];
+	EXEC SQL BEGIN DECLARE SECTION;
+	int		T_pRepCode;
+	int		T_pCurTrn;
+	int		T_pNextTrn;	
+	VARCHAR	T_pTerminalNumber[15 + 1];		/**IDA22012015**/
+	VARCHAR	T_AcqBank[6 + 1];		/**ICH270715**/	
+	char    T_pNextState	[3+1];
+	char    T_pScrNbr		[3+1];
+	char    T_pUpScrNbr		[3+1];
+	VARCHAR T_Card_type_flag	[1+1];
+	int	plRetour;
+	EXEC SQL END DECLARE SECTION;
+
+	sprintf(ligne, "Start Get_UBP_ReplyData(%d,%d,%d,%s,%s,%s)", pRepCode, pCurTrn, pNextTrn, Card_type_flag,pTerminalNumber,pAcqBank);
+	trace_event(ligne, PROCESSING);
+
+	memset(T_pNextState, 0,sizeof(T_pNextState));
+	memset(T_pScrNbr,    0,sizeof(T_pScrNbr));
+	memset(T_pUpScrNbr,  0,sizeof(T_pUpScrNbr));
+	memset( T_Card_type_flag.arr            ,  0  ,   sizeof(T_Card_type_flag.arr )  );
+	T_Card_type_flag.len = 0;
+	memset(T_AcqBank.arr,	0, sizeof(T_AcqBank.arr)	);/*ICH270715*/
+
+
+	memcpy ( T_Card_type_flag.arr     , Card_type_flag ,   strlen(Card_type_flag )  );
+	T_Card_type_flag.len = strlen(Card_type_flag);
+	memcpy ( T_pTerminalNumber.arr     , pTerminalNumber ,   strlen(pTerminalNumber )  );/**IDA22012015**/
+	T_pTerminalNumber.len = strlen(pTerminalNumber);/**IDA22012015**/
+	memcpy(T_AcqBank.arr,	pAcqBank, strlen(pAcqBank)	);/*ICH270715*/
+	T_AcqBank.len = strlen(pAcqBank);
+
+	T_pRepCode = pRepCode;	
+	T_pCurTrn   = pCurTrn;
+	T_pNextTrn  = pNextTrn;
+
+	plRetour = NOK;
+
+	sprintf(ligne, "Get_UBP_ReplyData(%d,%d,%d,%s)", pRepCode, pCurTrn, pNextTrn, Card_type_flag);
+	trace_event(ligne, PROCESSING);
+
+	EXEC SQL CONTEXT USE :tab_ParamCtx[nIndexCtx].ctx;
+	EXEC SQL EXECUTE
+
+	BEGIN
+	NULL;
+	END;
+	END-EXEC;
+
+	if(plRetour == OK)
+	{
+		memcpy(pNextState, T_pNextState, sizeof(T_pNextState));
+		memcpy(pScrNbr, T_pScrNbr, sizeof(T_pScrNbr));
+		memcpy(pUpScrNbr, T_pUpScrNbr, sizeof(T_pUpScrNbr));
+		sprintf(ligne, "END   Get_UBP_ReplyData(%s,%s,%s)", pNextState, pScrNbr, pUpScrNbr);
+		trace_event(ligne, PROCESSING);
+
+
+		return(OK);
+	}
+
+	trace_event("END   Get_UBP_ReplyData(FATAL)", PROCESSING);
+	return(NOK);
+
+}

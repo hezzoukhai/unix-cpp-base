@@ -1,0 +1,119 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/errno.h>
+#include <define.h>
+#include <param_ctx.h>
+#include <iso_hps.h>
+#include <virtual_record.h>
+
+#include <sqlca.h>
+#include <sqlcpr.h>
+
+
+
+int GetAcquirerCenter  (int nIndiceCtx, TSCenter  *acquirer_center)
+{
+	struct sqlca sqlca;
+	char detail [ MAX_LINE_TRC];
+
+	EXEC SQL BEGIN DECLARE SECTION;
+ 	char   CENTER_CODE [ 2 ];
+ 	char   GROUPING_CODE [ 1 ];
+  	char   NETWORK_CODE [ 2 ];
+ 	int    MULTI_COUNTRY_OPTION;
+ 	char   COUNTRY_CODE [ 3 ];
+ 	char   COUNTRY_CODE_ALPHA [ 3 ];
+ 	char   CURRENCY_CODE [ 3 ];
+ 	char   CURRENCY_CODE_ALPHA [ 3 ];
+	int	response_code;
+	EXEC SQL END DECLARE SECTION;
+
+        EXEC SQL CONTEXT USE :tab_ParamCtx[nIndiceCtx].ctx;
+
+	trace_event ( "Start GetCenter() ", PROCESSING );
+
+/*************************************************************************/
+/*      INITIALISATION                                                   */
+/*************************************************************************/
+ 	memset (  CENTER_CODE          , 0,      2 );
+ 	memset (  GROUPING_CODE        , 0,      1 );
+  	memset (  NETWORK_CODE         , 0,      2 );
+ 	MULTI_COUNTRY_OPTION = 0;
+ 	memset (  COUNTRY_CODE         , 0,      3 );
+ 	memset (  COUNTRY_CODE_ALPHA   , 0,      3 );
+ 	memset (  CURRENCY_CODE        , 0,      3 );
+ 	memset (  CURRENCY_CODE_ALPHA  , 0,      3 );
+
+/*************************************************************************/
+/*      CHAMP CLE                                                        */
+/*************************************************************************/
+	memcpy ( CENTER_CODE, acquirer_center->center_code , 2);
+
+/*************************************************************************/
+/*      LECTURE                                                          */
+/*************************************************************************/
+	response_code = 909;
+	EXEC SQL WHENEVER SQLERROR GOTO err_get_center;
+	EXEC SQL EXECUTE
+	    DECLARE T_CENTER   CENTER%ROWTYPE;
+	BEGIN
+
+       :response_code := PCRD_GET_PARAM_GENERAL_ROWS.GET_CENTER
+						(   :CENTER_CODE, 
+	                                            T_CENTER 
+	                                        );
+
+
+		IF :response_code = 0 THEN
+		:GROUPING_CODE        := T_CENTER.GROUPING_CODE;
+		:NETWORK_CODE         := T_CENTER.NETWORK_CODE ;
+		:MULTI_COUNTRY_OPTION := T_CENTER.MULTI_COUNTRY_OPTION;
+		:COUNTRY_CODE         := T_CENTER.COUNTRY_CODE        ;
+		:COUNTRY_CODE_ALPHA   := T_CENTER.COUNTRY_CODE_ALPHA;
+		:CURRENCY_CODE        := T_CENTER.CURRENCY_CODE      ;
+		:CURRENCY_CODE_ALPHA  := T_CENTER.CURRENCY_CODE_ALPHA;
+		END IF;
+	END;
+	END-EXEC;
+
+	if ( response_code == 0 )
+	{
+     	  memcpy(acquirer_center->grouping_code,GROUPING_CODE,1);
+     	  memcpy(acquirer_center->network_code,NETWORK_CODE,2);
+     	  acquirer_center->multi_country_option = MULTI_COUNTRY_OPTION;
+     	  memcpy(acquirer_center->country_code,COUNTRY_CODE ,3);
+     	  memcpy(acquirer_center->country_code_alpha 
+					 , COUNTRY_CODE_ALPHA ,3);
+     	  memcpy(acquirer_center->currency_code,CURRENCY_CODE,3);
+     	  memcpy(acquirer_center->currency_code_alpha 
+					 , CURRENCY_CODE_ALPHA ,3);
+	  trace_event ( "End GetCenter( OK ) ", PROCESSING );
+	  return(OK);
+	}
+	trace_event ( "End GetCenter( NOK ) ", PROCESSING );
+	return(NOK);
+
+err_get_center :
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	sprintf(detail, "%s",sqlca.sqlerrm.sqlerrmc);
+
+
+	if (memcmp(detail,"ORA-01405",9) == 0)
+	{
+     	  memcpy(acquirer_center->grouping_code,GROUPING_CODE,1);
+     	  memcpy(acquirer_center->network_code,NETWORK_CODE ,2);
+     	  acquirer_center->multi_country_option = MULTI_COUNTRY_OPTION;
+     	  memcpy(acquirer_center->country_code,COUNTRY_CODE ,3);
+     	  memcpy(acquirer_center->country_code_alpha
+					 , COUNTRY_CODE_ALPHA ,3);
+     	  memcpy(acquirer_center->currency_code,CURRENCY_CODE,3);
+     	  memcpy(acquirer_center->currency_code_alpha 
+					 , CURRENCY_CODE_ALPHA ,3);
+	  trace_event ( "End GetCenter( OK ) ", PROCESSING );
+	  return(OK);
+	}
+
+	trace_event (  detail , ERROR );
+	trace_event ( "End GetCenter( NOK ) ", PROCESSING );
+	return( NOK );
+}
