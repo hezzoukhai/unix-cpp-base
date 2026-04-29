@@ -1,0 +1,463 @@
+{
+    "Visa Interface": {
+        "path": "Source/src/interfaces/base1",
+        "components": [
+            "visa_adm.c::timeval",
+            "visa_advice.c::timeval",
+            "visa_aut_req.c::timeval",
+            "visa_bal.c::timeval",
+            "visa_file_upd.c::timeval",
+            "visa_ini.c::sigset_t",
+            "visa_line.c::timeval",
+            "visa_net_mng.c::timeval",
+            "visa_reversal.c::timeval",
+            "visa_saf.c::timeval",
+            "visa_services.c::timeval",
+            "visa_sig.c::sigset_t",
+            "visa_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "Base24 Interface": {
+        "path": "Source/src/interfaces/base24",
+        "components": [
+            "b24_convert_utils.c::SConvertPair",
+            "b24_convert_utils.c::TSConvertPair",
+            "b24_ini.c::sigset_t",
+            "b24_msg_tools.c::tm",
+            "b24_msg_tools.c::timeval",
+            "b24_thread_adm.c::timeval",
+            "b24_thread_bal.c::timeval",
+            "b24_thread_file_update.c::timeval",
+            "b24_thread_line.c::timeval",
+            "b24_thread_saf.c::timeval",
+            "b24_thread_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "CBAE Interface": {
+        "path": "Source/src/interfaces/cbae",
+        "components": [
+            "cbae_convert_utils.c::SCategVisa",
+            "cbae_convert_utils.c::TSIsoCbaePair",
+            "cbae_convert_utils.c::TSCategVisa",
+            "cbae_convert_utils.c::TSAccntType",
+            "cbae_convert_utils.c::SAccntType",
+            "cbae_convert_utils.c::TSTransType",
+            "cbae_convert_utils.c::SIsoCbaePair",
+            "cbae_convert_utils.c::STransType",
+            "cbae_ini.c::sigset_t",
+            "cbae_process_signin.c::timeval",
+            "cbae_thread_adm.c::timeval",
+            "cbae_thread_bal.c::timeval",
+            "cbae_thread_ctl.c::timeval",
+            "cbae_thread_line.c::timeval",
+            "cbae_thread_saf.c::timeval",
+            "cbae_thread_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "CIS Interface": {
+        "path": "Source/src/interfaces/cis",
+        "components": [
+            "cis_aut_req.c::timeval",
+            "cis_bal.c::timeval",
+            "cis_file_upd.c::timeval",
+            "cis_ini.c::sigset_t",
+            "cis_line.c::timeval",
+            "cis_reversal.c::timeval",
+            "cis_saf.c::timeval",
+            "cis_services.c::timeval",
+            "cis_sig.c::sigset_t",
+            "cis_singin.c::timeval",
+            "cis_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "CUP Interface": {
+        "path": "Source/src/interfaces/cup",
+        "components": [
+            "cup_advice.c::timeval",
+            "cup_aut_req.c::timeval",
+            "cup_bal.c::timeval",
+            "cup_ini.c::sigset_t",
+            "cup_line.c::timeval",
+            "cup_net_mng.c::timeval",
+            "cup_reversal.c::timeval",
+            "cup_saf.c::timeval",
+            "cup_services.c::timeval",
+            "cup_sig.c::sigset_t",
+            "cup_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "DCISC Interface": {
+        "path": "Source/src/interfaces/dcisc",
+        "components": [
+            "dcisc_adm.c::timeval",
+            "dcisc_bal.c::timeval",
+            "dcisc_ini.c::sigset_t",
+            "dcisc_line.c::timeval",
+            "dcisc_saf.c::timeval",
+            "dcisc_sig.c::sigset_t",
+            "dcisc_signin.c::timeval",
+            "dcisc_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "Discover Interface": {
+        "path": "Source/src/interfaces/discover_us",
+        "components": [
+            "discover_aut_req.c::timeval",
+            "discover_bal.c::timeval",
+            "discover_line.c::timeval",
+            "discover_sig.c::sigset_t",
+            "discover_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "HSID Interface": {
+        "path": "Source/src/interfaces/hsid",
+        "components": [
+            "bank_adm.c::timeval",
+            "bank_aut_rep.c::timeval",
+            "bank_aut_req.c::timeval",
+            "bank_bal.c::timeval",
+            "bank_ini.c::sigset_t",
+            "bank_line.c::timeval",
+            "bank_main.c::timeval",
+            "bank_proc.c::timeval",
+            "bank_saf.c::timeval",
+            "bank_sig.c::sigset_t",
+            "bank_signin.c::timeval",
+            "bank_timeout.c::timeval",
+            "saf_processing.c::timeval"
+        ],
+        "children": {}
+    },
+    "IST Interface": {
+        "path": "Source/src/interfaces/ist_interface",
+        "components": [
+            "ist_ini.c::sigset_t",
+            "ist_thread_adm.c::timeval",
+            "ist_thread_bal.c::timeval",
+            "ist_thread_line.c::timeval",
+            "ist_thread_saf.c::timeval",
+            "ist_thread_signin.c::timeval",
+            "ist_thread_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "JCB Interface": {
+        "path": "Source/src/interfaces/jcb_int",
+        "components": [
+            "jcb_bal.c::timeval",
+            "jcb_ini.c::sigset_t",
+            "jcb_line.c::timeval",
+            "jcb_saf.c::timeval",
+            "jcb_sig.c::sigset_t",
+            "jcb_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "MDS Interface": {
+        "path": "Source/src/interfaces/mds",
+        "components": [
+            "mds_aut_req.c::timeval",
+            "mds_ini.c::sigset_t",
+            "mds_reversal.c::timeval",
+            "mds_services.c::timeval",
+            "mds_thread_bal.c::timeval",
+            "mds_thread_line.c::timeval",
+            "mds_thread_saf.c::timeval",
+            "mds_thread_sig.c::sigset_t",
+            "mds_thread_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "Postilion Interface": {
+        "path": "Source/src/interfaces/postilion",
+        "components": [
+            "postilion_bal.c::timeval",
+            "postilion_ini.c::sigset_t",
+            "postilion_line.c::timeval",
+            "postilion_saf.c::timeval",
+            "postilion_sig.c::sigset_t",
+            "postilion_signin.c::timeval",
+            "postilion_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "Pulse Interface": {
+        "path": "Source/src/interfaces/pulse",
+        "components": [
+            "pulse_ini.c::sigset_t",
+            "pulse_thread_adm.c::timeval",
+            "pulse_thread_bal.c::timeval",
+            "pulse_thread_line.c::timeval",
+            "pulse_thread_saf.c::timeval",
+            "pulse_thread_sig.c::sigset_t",
+            "pulse_thread_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "SID Interface": {
+        "path": "Source/src/interfaces/sid",
+        "components": [
+            "bank_adm.c::timeval",
+            "bank_aut_req.c::timeval",
+            "bank_bal.c::timeval",
+            "bank_ini.c::sigset_t",
+            "bank_line.c::timeval",
+            "bank_saf.c::timeval",
+            "bank_sig.c::sigset_t",
+            "bank_signin.c::timeval",
+            "bank_timeout.c::timeval",
+            "saf_processing.c::timeval"
+        ],
+        "children": {}
+    },
+    "SMS Interface": {
+        "path": "Source/src/interfaces/sms",
+        "components": [
+            "sms_adm.c::timeval",
+            "sms_advice.c::timeval",
+            "sms_aut_req.c::timeval",
+            "sms_bal.c::timeval",
+            "sms_file_upd.c::timeval",
+            "sms_ini.c::sigset_t",
+            "sms_line.c::timeval",
+            "sms_net_mng.c::timeval",
+            "sms_outg_processing.c::timeval",
+            "sms_outgoing_thr.c::timeval",
+            "sms_reversal.c::timeval",
+            "sms_saf.c::timeval",
+            "sms_services.c::timeval",
+            "sms_sig.c::sigset_t",
+            "sms_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "SMT Interface": {
+        "path": "Source/src/interfaces/smt",
+        "components": [
+            "bic_bal.c::timeval",
+            "bic_ini.c::sigset_t",
+            "bic_line_restart.c::timeval",
+            "bic_saf.c::timeval",
+            "bic_sig.c::sigset_t",
+            "bic_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "UAESwitch Interface": {
+        "path": "Source/src/interfaces/uaeswitch",
+        "components": [
+            "uaeswitch_ini.c::sigset_t",
+            "uaeswitch_thread_adm.c::timeval",
+            "uaeswitch_thread_bal.c::timeval",
+            "uaeswitch_thread_line.c::timeval",
+            "uaeswitch_thread_saf.c::timeval",
+            "uaeswitch_thread_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "Core Data Structures": {
+        "path": "Source/src/inc",
+        "components": [
+            "account.h::account_t",
+            "account.h::account_s",
+            "action_when_event.h::TSActionWhenEvent",
+            "action_when_event.h::SActionWhenEvent",
+            "alarm_thr.h::sig_inf",
+            "alarm_thr.h::timeout_t",
+            "alarm_thr.h::alrm_inf_t",
+            "alarm_thr.h::timeou_s",
+            "amex_gca_structs.h::STagAmex",
+            "amex_gca_structs.h::TSTagAmex",
+            "amex_gns_structs.h::STagAmex",
+            "amex_gns_structs.h::TSTagAmex",
+            "amex_thr.h::SAmexCtx",
+            "amex_thr.h::TSAmexCtx",
+            "atmcmd.h::atm_command",
+            "atmcmd.h::atm_command_t",
+            "atmcutoff.h::SCutOffData",
+            "atmcutoff.h::SCurrData",
+            "atmcutoff.h::SCurrDataT",
+            "autho_period.h::SAuthoPeriod",
+            "autho_period.h::TSAuthoPeriod",
+            "b24_header.h::TSB24Header",
+            "balance.h::TSBalance",
+            "balance.h::SBalance",
+            "bank.h::SBank",
+            "bank.h::TSBank",
+            "bank_network.h::SBankNetwork",
+            "bank_network.h::TSBankNetwork",
+            "base24.h::tlv_info_type",
+            "base24.h::msg_field_format_t",
+            "base24.h::tlv_info_st",
+            "base24.h::msg_subfield_format_st",
+            "base24.h::msg_subfield_format_t",
+            "base24.h::msg_field_format_st",
+            "base24.h::msg_map_st",
+            "base24.h::TSComChannel",
+            "base24.h::msg_map_t",
+            "base24/base24_tokens.h::token_info_type",
+            "base24/base24_tokens.h::TSToken",
+            "base24/base24_tokens.h::token_item_def",
+            "base24/base24_tokens.h::tokens_info_type",
+            "base24/base24_tokens.h::TSTokens",
+            "base24/iso_base24.h::TSCSMData",
+            "base24/iso_base24.h::TSBase24Header",
+            "base24/iso_base24.h::TSBase24Info",
+            "base24/iso_base24.h::SBase24Info",
+            "base24/iso_base24.h::SBase24Header"
+        ],
+        "children": {}
+    },
+    "Core Libraries": {
+        "path": "Source/src/libs",
+        "components": [
+            "libcom/tcp_com.c::sockaddr",
+            "libcom/tcp_com.c::sockaddr_in",
+            "libcom/tcp_com.c::hostent",
+            "libcom/tcp_com.c::servent",
+            "libcom/tcp_ssl.c::sockaddr_in",
+            "libcom/tcp_ssl.c::timeval",
+            "libcom/tcp_ssl.c::client_bio_t",
+            "libcom/tcp_ssl.c::sockaddr",
+            "libcom/tcp_ssl.c::hostent",
+            "libcom/tcp_ssl.c::servent",
+            "libcom/tcp_com_ssl.c::sockaddr",
+            "libcom/tcp_com_ssl.c::hostent",
+            "libcom/tcp_com_ssl.c::servent",
+            "libcom/tcp_com_ssl.c::sockaddr_in",
+            "libcom/tcp_com_tls.c::sockaddr_in",
+            "libcom/tcp_com_tls.c::client_bio_t",
+            "libcom/tcp_com_tls.c::hostent",
+            "libcom/tcp_com_tls.c::sockaddr",
+            "libcom/tcp_com_wrap.c::sockaddr_in",
+            "libcom/tcp_com_wrap.c::timeval",
+            "libcom/tcp_com_wrap.c::hostent",
+            "libcom/tcp_com_wrap.c::sockaddr",
+            "libcom/tcp_com_wrap.c::servent",
+            "libcom/tcp_hsm.c::timeval",
+            "libcom/tcp_hsm_atalla.c::timeval",
+            "libcom/tcp_ist.c::sockaddr_in",
+            "libcom/tcp_ist.c::sockaddr",
+            "libcom/tcp_ist.c::linger",
+            "libcom/tcp_ist.c::hostent",
+            "libcom/tcp_ist.c::servent",
+            "libcom/tcp_uaeswitch.c::linger",
+            "libcom/tcp_uaeswitch.c::servent",
+            "libcom/tcp_uaeswitch.c::hostent",
+            "libcom/tcp_uaeswitch.c::sockaddr",
+            "libcom/tcp_uaeswitch.c::sockaddr_in",
+            "libcom3/p7_com_ssl.c::sockaddr",
+            "libcom3/p7_com_ssl.c::hostent",
+            "libcom3/p7_com_ssl.c::sockaddr_in",
+            "libcom3/p7_com_ssl.c::timeval",
+            "libcom3/p7_com_tcp.c::sockaddr",
+            "libcom3/p7_com_tcp.c::hostent",
+            "libcom3/p7_com_tcp.c::servent",
+            "libcom3/p7_com_tcp.c::timeval",
+            "libcom3/p7_com_tcp.c::sockaddr_in",
+            "libcom3/p7_com_tcp_win32.c::sockaddr",
+            "libcom3/p7_com_tcp_win32.c::hostent",
+            "libcom3/p7_com_tcp_win32.c::sockaddr_in"
+        ],
+        "children": {}
+    },
+    "Threading Library": {
+        "path": "Source/src/libs/libthr",
+        "components": [
+            "alarm_thr.c::timeval",
+            "alarm_thr.c::sigset_t",
+            "alarm_thr.c::timespec",
+            "cut_over_manage.c::tm",
+            "cut_over_manage.c::timespec",
+            "cut_over_manage.c::timeval",
+            "hsm_prod_conso.c::timeval",
+            "hsm_prod_conso.c::timespec",
+            "list_thr.c::timeval",
+            "thr_utils.c::sigset_t",
+            "thr_utils.c::timeval",
+            "thr_utils.c::timespec"
+        ],
+        "children": {}
+    },
+    "TLV Library": {
+        "path": "Source/src/libs/libtlv",
+        "components": [
+            "dump_tlv.c::s_tlv_print",
+            "dump_tlv.c::timeval",
+            "dump_tlv.c::t_tlv_print",
+            "dump_tlv_prod.c::t_tlv_print",
+            "dump_tlv_prod.c::s_tlv_print"
+        ],
+        "children": {}
+    },
+    "ATM Server": {
+        "path": "Source/src/servers/atm",
+        "components": [
+            "logigab/lg_ini.c::sigset_t",
+            "logigab/lg_line.c::timeval",
+            "logigab/lg_proc.c::timeval",
+            "logigab/lg_sig.c::sigset_t",
+            "logigab/lg_thr.c::timeval",
+            "logigab/lg_thr.c::timespec"
+        ],
+        "children": {}
+    },
+    "POS Server": {
+        "path": "Source/src/servers/pos/posiso_tdes",
+        "components": [
+            "posiso_adm.c::timeval",
+            "posiso_bal.c::timeval",
+            "posiso_ini.c::sigset_t",
+            "posiso_main.c::timeval",
+            "posiso_proc.c::timeval",
+            "posiso_proc_spec.c::timeval",
+            "posiso_services.c::timeval",
+            "posiso_sig.c::sigset_t",
+            "posiso_thr.c::timeval",
+            "posiso_thr.c::timespec"
+        ],
+        "children": {}
+    },
+    "MQ Server": {
+        "path": "Source/src/servers/mq_srv",
+        "components": [
+            "mq_inc.c::timeval",
+            "mq_ini.c::sigset_t",
+            "mq_list.c::timeval",
+            "mq_sig.c::sigset_t",
+            "mq_timeout.c::timeval"
+        ],
+        "children": {}
+    },
+    "Fraud Daemon": {
+        "path": "Source/src/daemons/daemon_fraud_V2",
+        "components": [
+            "fraud_adm.c::timeval",
+            "fraud_ctl.c::timeval",
+            "fraud_ini_thr.c::sigset_t",
+            "fraud_main_thr.c::timeval",
+            "fraud_notif.c::timeval",
+            "fraud_proc.c::timeval",
+            "fraud_sig.c::sigset_t"
+        ],
+        "children": {}
+    },
+    "System Monitoring Daemon": {
+        "path": "Source/src/daemons/daemon_sysmon",
+        "components": [
+            "sysmon_ini.c::sigset_t",
+            "sysmon_thread_adm.c::timeval",
+            "sysmon_thread_pris_proc.c::timeval",
+            "sysmon_thread_proc.c::timeval",
+            "sysmon_thread_purge.c::timeval"
+        ],
+        "children": {}
+    }
+}

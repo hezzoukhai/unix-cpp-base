@@ -1,0 +1,40 @@
+{
+    "generation_info": {
+        "timestamp": "2026-04-29T11:35:06.937626",
+        "main_model": "gpt-4.1",
+        "generator_version": "1.0.1",
+        "repo_path": "/Users/mac/Movies/Guppy-ai/migration_github/code-wiki/pwc-unix_icpsconv",
+        "commit_id": null
+    },
+    "statistics": {
+        "total_components": 9114,
+        "leaf_nodes": 1852,
+        "max_depth": 2
+    },
+    "files_generated": [
+        "overview.md",
+        "module_tree.json",
+        "first_module_tree.json",
+        "SMS Interface.md",
+        "SMT Interface.md",
+        "CUP Interface.md",
+        "TLV Library.md",
+        "Pulse Interface.md",
+        "IST Interface.md",
+        "Discover Interface.md",
+        "CBAE Interface.md",
+        "JCB Interface.md",
+        "Core Data Structures.md",
+        "SID Interface.md",
+        "Postilion Interface.md",
+        "System Monitoring Daemon.md",
+        "CIS Interface.md",
+        "POS Server.md",
+        "Core Libraries.md",
+        "DCISC Interface.md",
+        "MDS Interface.md",
+        "HSID Interface.md",
+        "Threading Library.md",
+        "Visa Interface.md"
+    ]
+}

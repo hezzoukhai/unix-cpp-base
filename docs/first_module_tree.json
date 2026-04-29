@@ -1,0 +1,286 @@
+{
+    "iso8583_processing": {
+        "path": "Source/src/inc/iso8583/",
+        "components": [
+            "Source/src/inc/iso8583/berinfo.h::BerInfo",
+            "Source/src/inc/iso8583/berinfo.h::BerInfoProperties",
+            "Source/src/inc/iso8583/berinfo.h::ber_field_t",
+            "Source/src/inc/iso8583/bitmapinfo.h::BitMappedInfo",
+            "Source/src/inc/iso8583/bitmapinfo.h::BitMappedProperties",
+            "Source/src/inc/iso8583/bitmapinfo.h::bm_field_t",
+            "Source/src/inc/iso8583/conv_module.h::TSFieldMapping",
+            "Source/src/inc/iso8583/conv_module.h::TSConversionModule",
+            "Source/src/inc/iso8583/fieldinfo.h::field_info_s",
+            "Source/src/inc/iso8583/fieldinfo.h::field_info_t",
+            "Source/src/inc/iso8583/msg_layout.h::TSFieldPresence",
+            "Source/src/inc/iso8583/msg_layout.h::TSMsgLayout",
+            "Source/src/inc/iso8583/msginfo.h::MsgInfo",
+            "Source/src/inc/iso8583/msginfo.h::MsgInfoProperties",
+            "Source/src/inc/iso8583/staticinfo.h::StaticInfo",
+            "Source/src/inc/iso8583/staticinfo.h::StaticInfoProperties",
+            "Source/src/inc/iso8583/staticinfo.h::static_field_t",
+            "Source/src/inc/iso8583/structinfo.h::StructInfo",
+            "Source/src/inc/iso8583/tlvinfo.h::TlvInfo",
+            "Source/src/inc/iso8583/tlvinfo.h::TlvInfoProperties",
+            "Source/src/inc/iso8583/tlvinfo.h::tlv_field_t",
+            "Source/src/inc/msg_flow_mapping.h::SMsgMappingList",
+            "Source/src/inc/msg_flow_mapping.h::TSMsgMappingList",
+            "Source/src/inc/gen_tlv_msg_mapping_flow.h::TSTlvMsgMappingFlow"
+        ],
+        "children": {}
+    },
+    "network_communication": {
+        "path": "Source/src/inc/",
+        "components": [
+            "Source/src/inc/network.h::TSNetwork",
+            "Source/src/inc/network.h::SNetwork",
+            "Source/src/inc/network_switch.h::TSNetworkSwitch",
+            "Source/src/inc/network_switch.h::SNetworkSwitch",
+            "Source/src/inc/bank_network.h::TSBankNetwork",
+            "Source/src/inc/bank_network.h::SBankNetwork",
+            "Source/src/inc/base24.h::TSComChannel",
+            "Source/src/inc/base24.h::msg_map_st",
+            "Source/src/inc/base24.h::msg_map_t",
+            "Source/src/inc/base24.h::msg_field_format_st",
+            "Source/src/inc/base24.h::msg_field_format_t",
+            "Source/src/inc/base24.h::msg_subfield_format_st",
+            "Source/src/inc/base24.h::msg_subfield_format_t",
+            "Source/src/inc/base24.h::tlv_info_st",
+            "Source/src/inc/base24.h::tlv_info_type",
+            "Source/src/inc/cbcom.h::TSCBComChannel",
+            "Source/src/inc/cbcom.h::SCBComChannel",
+            "Source/src/inc/p7_com_prop.h::TSComInfoProperties",
+            "Source/src/inc/p7_com_ssl.h::TSCtlSSLComInfo",
+            "Source/src/inc/p7_com_ssl.h::TSSSLComInfo",
+            "Source/src/inc/p7_com_tcp.h::TSTCPComInfo",
+            "Source/src/inc/p7_com_tcp.h::TSTCPCltComInfo"
+        ],
+        "children": {}
+    },
+    "threading": {
+        "path": "Source/src/inc/",
+        "components": [
+            "Source/src/inc/list_thr.h::SNodeData",
+            "Source/src/inc/list_thr.h::TSNodeStruct",
+            "Source/src/inc/list_thr.h::SNodeStruct",
+            "Source/src/inc/list_thr.h::TSNodeData",
+            "Source/src/inc/alarm_thr.h::timeout_t",
+            "Source/src/inc/alarm_thr.h::alrm_inf_t",
+            "Source/src/inc/alarm_thr.h::sig_inf",
+            "Source/src/inc/alarm_thr.h::timeou_s",
+            "Source/src/inc/thread_var.h::SThrInfo",
+            "Source/src/inc/thread_var.h::TSThrInfo"
+        ],
+        "children": {}
+    },
+    "transaction_context": {
+        "path": "Source/src/inc/",
+        "components": [
+            "Source/src/inc/dblglobls.h::SContextT",
+            "Source/src/inc/dblglobls.h::SContext",
+            "Source/src/inc/dblglobls.h::SSystem",
+            "Source/src/inc/dblglobls.h::STrnRef",
+            "Source/src/inc/dblglobls.h::STrnRefT",
+            "Source/src/inc/dblglobls.h::SSystemT",
+            "Source/src/inc/ndcglobls.h::SContextT",
+            "Source/src/inc/ndcglobls.h::SContext",
+            "Source/src/inc/ndcglobls.h::SSystem",
+            "Source/src/inc/ndcglobls.h::STrnRefT",
+            "Source/src/inc/ndcglobls.h::SSystemT",
+            "Source/src/inc/ndcglobls.h::STrnRef",
+            "Source/src/inc/iso_sni_globls.h::main_iso_sni_globals_t",
+            "Source/src/inc/iso_sni_globls.h::admin_processing_globals",
+            "Source/src/inc/iso_sni_globls.h::SSystemT",
+            "Source/src/inc/iso_sni_globls.h::main_iso_sni_globals",
+            "Source/src/inc/iso_sni_globls.h::SContext",
+            "Source/src/inc/iso_sni_globls.h::STrnRefT",
+            "Source/src/inc/iso_sni_globls.h::admin_processing_globals_t",
+            "Source/src/inc/iso_sni_globls.h::SSystem",
+            "Source/src/inc/iso_sni_globls.h::STrnRef",
+            "Source/src/inc/iso_sni_globls.h::iso_net_processing_globals",
+            "Source/src/inc/iso_sni_globls.h::iso_net_processing_globals_t",
+            "Source/src/inc/iso_sni_globls.h::SContextT"
+        ],
+        "children": {}
+    },
+    "card_account_management": {
+        "path": "Source/src/inc/",
+        "components": [
+            "Source/src/inc/card.h::TSCard",
+            "Source/src/inc/card.h::STrackIIRecord",
+            "Source/src/inc/card.h::TSTrckIIRecord",
+            "Source/src/inc/card.h::SCard",
+            "Source/src/inc/account.h::account_t",
+            "Source/src/inc/account.h::account_s",
+            "Source/src/inc/card_activity.h::TSCardActivity",
+            "Source/src/inc/card_activity.h::SCardActivity",
+            "Source/src/inc/card_product.h::TSCardProduct",
+            "Source/src/inc/card_product.h::SCardProduct",
+            "Source/src/inc/card_range.h::SCardRange",
+            "Source/src/inc/card_range.h::TSCardRange"
+        ],
+        "children": {}
+    },
+    "settlement_batch": {
+        "path": "Source/src/inc/",
+        "components": [
+            "Source/src/inc/batch_param.h::TBatchUpDateParam",
+            "Source/src/inc/batch_param.h::SBatchUpDateParam",
+            "Source/src/inc/batch_param.h::SBatchGetParam",
+            "Source/src/inc/batch_param.h::TBatchGetParam",
+            "Source/src/inc/atmcutoff.h::SCutOffData",
+            "Source/src/inc/atmcutoff.h::SCurrDataT",
+            "Source/src/inc/atmcutoff.h::SCurrData",
+            "Source/src/inc/renewal.h::SRenewalTrailer",
+            "Source/src/inc/renewal.h::TSAccessCard",
+            "Source/src/inc/renewal.h::TSRenewalHeader",
+            "Source/src/inc/renewal.h::STimeDeposit",
+            "Source/src/inc/renewal.h::SAccessCard",
+            "Source/src/inc/renewal.h::SCreditCard",
+            "Source/src/inc/renewal.h::TSTimeDeposit",
+            "Source/src/inc/renewal.h::SRenewalRow",
+            "Source/src/inc/renewal.h::TSRenewalDetail",
+            "Source/src/inc/renewal.h::TSRenewal",
+            "Source/src/inc/renewal.h::TSRenewalRow",
+            "Source/src/inc/renewal.h::SRenewal",
+            "Source/src/inc/renewal.h::SDemandDeposit",
+            "Source/src/inc/renewal.h::TSDemandDeposit",
+            "Source/src/inc/renewal.h::TSRenewalTrailer",
+            "Source/src/inc/renewal.h::SRenewalHeader",
+            "Source/src/inc/renewal.h::TSCreditCard",
+            "Source/src/inc/renewal.h::SRenewalDetail",
+            "Source/src/inc/dbl_param.h::SProduit",
+            "Source/src/inc/dbl_param.h::TSProduit",
+            "Source/src/inc/dbl_paramdef.h::dbl_param_t",
+            "Source/src/inc/dbl_paramdef.h::dbl_param"
+        ],
+        "children": {}
+    },
+    "security_hsm": {
+        "path": "Source/src/inc/",
+        "components": [
+            "Source/src/inc/hsm_atalla.h::AtallaCmdTagProperties",
+            "Source/src/inc/hsm_atalla.h::TSAtallaCmd",
+            "Source/src/inc/hsm_atalla.h::AtallaCmdInfoProperties",
+            "Source/src/inc/hsm_atalla.h::TSAtallaMsgLayout",
+            "Source/src/inc/hsm_atalla.h::TSAtallaFieldProp",
+            "Source/src/inc/hsm_c2p.h::TSC2PMsgLayout",
+            "Source/src/inc/hsm_c2p.h::TSC2PFieldProp",
+            "Source/src/inc/hsm_c2p.h::C2PCmdInfoProperties",
+            "Source/src/inc/hsm_c2p.h::C2PCmdTagProperties",
+            "Source/src/inc/hsm_c2p.h::TSC2PCmd",
+            "Source/src/inc/libvhsm.h::TSHsmCmd",
+            "Source/src/inc/libvhsm.h::SHsmCmd",
+            "Source/src/inc/security_data.h::s_secdata",
+            "Source/src/inc/security_data.h::t_secdata",
+            "Source/src/inc/security_flags.h::SSecurityFlags",
+            "Source/src/inc/security_flags.h::TSecurityFlags",
+            "Source/src/inc/security_results.h::SSecurityResults",
+            "Source/src/inc/security_results.h::TSecurityResults"
+        ],
+        "children": {}
+    },
+    "visa_module": {
+        "path": "Source/src/inc/iso_visa.h",
+        "components": [
+            "Source/src/inc/iso_visa.h::STagVisa",
+            "Source/src/inc/iso_visa.h::TSTagVisa",
+            "Source/src/inc/iso_visa.h::SVisaInfo",
+            "Source/src/inc/iso_visa.h::TSVisaInfo"
+        ],
+        "children": {}
+    },
+    "sms_module": {
+        "path": "Source/src/inc/iso_sms.h",
+        "components": [
+            "Source/src/inc/iso_sms.h::STagSms",
+            "Source/src/inc/iso_sms.h::TSTagSms",
+            "Source/src/inc/iso_sms.h::SSmsInfo",
+            "Source/src/inc/iso_sms.h::TSSmsInfo"
+        ],
+        "children": {}
+    },
+    "cb2a_module": {
+        "path": "Source/src/inc/iso_cb2a.h",
+        "components": [
+            "Source/src/inc/iso_cb2a.h::STagCb2a",
+            "Source/src/inc/iso_cb2a.h::TSCb2aInfo",
+            "Source/src/inc/iso_cb2a.h::SCb2aInfo",
+            "Source/src/inc/iso_cb2a.h::TSTagCb2a"
+        ],
+        "children": {}
+    },
+    "cbae_module": {
+        "path": "Source/src/inc/iso_cbae.h",
+        "components": [
+            "Source/src/inc/iso_cbae.h::STagCbae",
+            "Source/src/inc/iso_cbae.h::SCbaeInfo",
+            "Source/src/inc/iso_cbae.h::TSCbaeInfo",
+            "Source/src/inc/iso_cbae.h::TSTagCbae"
+        ],
+        "children": {}
+    },
+    "jcb_module": {
+        "path": "Source/src/inc/iso_jcb.h",
+        "components": [
+            "Source/src/inc/iso_jcb.h::STagJcb",
+            "Source/src/inc/iso_jcb.h::TSJcbInfo",
+            "Source/src/inc/iso_jcb.h::SPdsJcb",
+            "Source/src/inc/iso_jcb.h::TSPdsJcb",
+            "Source/src/inc/iso_jcb.h::TSTagJcb",
+            "Source/src/inc/iso_jcb.h::SJcbInfo"
+        ],
+        "children": {}
+    },
+    "sid_module": {
+        "path": "Source/src/inc/iso_sid.h",
+        "components": [
+            "Source/src/inc/iso_sid.h::STagSid",
+            "Source/src/inc/iso_sid.h::TSTagSid",
+            "Source/src/inc/iso_sid.h::SSidInfo",
+            "Source/src/inc/iso_sid.h::TSSidInfo"
+        ],
+        "children": {}
+    },
+    "utilities": {
+        "path": "Source/src/inc/",
+        "components": [
+            "Source/src/inc/global.h::b64_chunk",
+            "Source/src/inc/global.h::B64_CHUNK",
+            "Source/src/inc/param_arg.h::SArgParam",
+            "Source/src/inc/param_arg.h::TSArgParam",
+            "Source/src/inc/param_ctx.h::SParamCtx",
+            "Source/src/inc/param_ctx.h::TSParamCtx",
+            "Source/src/inc/resources.h::TSResources",
+            "Source/src/inc/resources.h::SResources",
+            "Source/src/inc/limits_setup.h::SLimitsSetup",
+            "Source/src/inc/limits_setup.h::TSLimitsSetup",
+            "Source/src/inc/limits_setup_total.h::SLimitsSetupTotal",
+            "Source/src/inc/limits_setup_total.h::TSLimitsSetupTotal"
+        ],
+        "children": {}
+    },
+    "logging_monitoring": {
+        "path": "Source/src/inc/",
+        "components": [
+            "Source/src/inc/event_log.h::TSEventLog",
+            "Source/src/inc/event_log.h::SEventLog",
+            "Source/src/inc/logigab.h::TSLGCryptoInfo",
+            "Source/src/inc/logigab.h::TSLGCrytTmplDesc",
+            "Source/src/inc/logigab.h::TSLGMsgInfo",
+            "Source/src/inc/logigab.h::TSLGCryptoMsg",
+            "Source/src/inc/logigab.h::TSLGCryptoTemplate",
+            "Source/src/inc/logigab.h::SContext",
+            "Source/src/inc/logigab.h::TSLGAccounts",
+            "Source/src/inc/logigab.h::TSLGMsgFieldProp",
+            "Source/src/inc/logigab.h::TSLGField",
+            "Source/src/inc/logigab.h::TSLGKeyElts",
+            "Source/src/inc/logigab.h::SContextT",
+            "Source/src/inc/logigab.h::TSLGMsgLayout",
+            "Source/src/inc/logigab.h::TSLGStruct",
+            "Source/src/inc/system_monitoring.h::TSSysInfo",
+            "Source/src/inc/sysmon.h::TSResLastTime"
+        ],
+        "children": {}
+    }
+}
